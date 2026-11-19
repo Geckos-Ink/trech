@@ -11,9 +11,9 @@ Read the root principles and the parent handbook first; then open only the subca
 (typed controls/Studio descriptions). Shared TRECH JS lives in `js/`; failure fixtures live in
 `tests/fixtures/js/`. The C++ loader loads companions for roots and nested includes; CLI/library
 and Studio share parameter validation. Source inventory includes companions. Contract:
-[`docs/scenario_bundles.md`](../../../docs/scenario_bundles.md). Historical media identities are retained.
+[`docs/scenarios/scenario_bundles.md`](../../../docs/scenarios/scenario_bundles.md). Historical media identities are retained.
 Every bundle has a generated section in
-[`docs/TRECH_current_scenarios_purity.md`](../../../docs/TRECH_current_scenarios_purity.md). Adding,
+[`docs/validation/TRECH_current_scenarios_purity.md`](../../../docs/validation/TRECH_current_scenarios_purity.md). Adding,
 removing or editing a bundle fails CTest `trech_scenario_purity_report` until it is regenerated with
 `PYTHONPATH=tools/validation python3 -m trech_validation.purity`
 ([owner](../../tooling/validation/AGENTS.md)).

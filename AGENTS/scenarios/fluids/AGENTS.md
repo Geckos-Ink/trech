@@ -25,7 +25,7 @@ or particle training labels. Airflow exposes `cfl` and optional `duration_s` (ze
 playback). Recorded camera projection supports perspective/orthographic with shared parallel-ray
 volume, sprite and surface rendering; oblique sections and streaming remain open.
 No cosmetic extrusion or staged ball animation supplies missing physical validation.
-Contract: [solution processes](../../../docs/solution_processes.md); remaining physical/spatial work is in the [independent references roadmap](../references/ROADMAP.md).
+Contract: [solution processes](../../../docs/scenarios/solution_processes.md); remaining physical/spatial work is in the [independent references roadmap](../references/ROADMAP.md).
 Continuum fields are declared to the engine (`ctx.evolveField`). Its registered prediction methods
 (lattice Boltzmann, a learned operator and any method added later) and their statistical
 selection are owned by the [lattice handbook](../../engine/lattice/AGENTS.md).

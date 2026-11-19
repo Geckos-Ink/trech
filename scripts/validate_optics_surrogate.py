@@ -3,7 +3,7 @@
 
 The MolecularOptics extractor derives the visible refractive index from Geant4
 atomic cross sections plus an f-sum-rule valence oscillator (see
-``docs/viz_refraction.md``). One *global* oscillator energy gets the
+``docs/studio/viz_refraction.md``). One *global* oscillator energy gets the
 electron-density scale right but leaves a material-specific residual: it nails
 water / silica but, e.g., under-predicts polystyrene and over-predicts PTFE.
 
@@ -27,7 +27,7 @@ engine's photon transport, which always uses the derived n. Run:
 
     python3 scripts/validate_optics_surrogate.py --run build/dev/out_optics_panel
 
-Outputs docs/validation_optics_surrogate.md + a diff-friendly benchmark txt.
+Outputs docs/validation/validation_optics_surrogate.md + a diff-friendly benchmark txt.
 """
 
 from __future__ import annotations
@@ -309,9 +309,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="panel output dir (trech_viz_scene.json with derived_optics)")
     ap.add_argument("--ridge-lambda", type=float, default=1.0,
                     help="ridge regularisation strength (small panel -> keep firm)")
-    ap.add_argument("--report", default="docs/validation_optics_surrogate.md")
-    ap.add_argument("--json", default="docs/validation_optics_surrogate.json")
-    ap.add_argument("--txt", default="docs/benchmarks/validation_optics_surrogate.txt")
+    ap.add_argument("--report", default="docs/validation/validation_optics_surrogate.md")
+    ap.add_argument("--json", default="docs/validation/validation_optics_surrogate.json")
+    ap.add_argument("--txt", default="docs/validation/benchmarks/validation_optics_surrogate.txt")
     ap.add_argument("--no-write", action="store_true")
     ap.add_argument("--export", default=None,
                     help="fit the ridge on the full panel and write deployable "

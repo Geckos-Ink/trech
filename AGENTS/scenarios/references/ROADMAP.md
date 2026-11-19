@@ -59,7 +59,7 @@ dated record below, and queue its residuals in the same change.
   `scripts/js_engine_differential.py` + probe fixture + CTest `trech_js_engine_differential`.
   **Finding:** the engines are not bit-identical: 15 of 20 Math builtins differ by 1 ulp on
   part of the grid, 2/32 Box-Muller gaussians differ, and 40 mW MD steps amplify this to 352 ulp
-  in positions (CHILL+ phases and the integer RNG stream agree). Details in [`docs/v8.md`](../../../docs/v8.md).
+  in positions (CHILL+ phases and the integer RNG stream agree). Details in [`docs/engine/v8.md`](../../../docs/engine/v8.md).
   This uses Node's V8, not the pinned submodule, and covers top-level evaluation only.
 - [x] Deterministic host math (2026-11-16): the QuickJS host now evaluates `Math.*` and `**`
   through one fdlibm-derived library compiled without contraction (`trech_dmath`); see the
@@ -78,7 +78,7 @@ dated record below, and queue its residuals in the same change.
   generic JS widget composition and in-flight
   validated model/kernel replacement. Save applies the next-run workspace only.
 
-Scope and commands: `docs/process_references.md`, `docs/studio_authoring.md`, `docs/v8.md`.
+Scope and commands: `docs/scenarios/process_references.md`, `docs/studio/studio_authoring.md`, `docs/engine/v8.md`.
 Tests: `test_process_references.cpp`, `scripts/validate_process_references.py`,
 `studio/tests/test_authoring.py`; comparison laws are registered in the JS-law audit ledger.
 Verification: Release CTest 29/29; full Studio pytest 99/99 with local Metal access (including

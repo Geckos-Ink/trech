@@ -43,9 +43,9 @@ Run:
     python3 scripts/validate_glass_of_water.py --run build/dev/out_validation_gow
 
 Outputs:
-    docs/validation_glass_of_water.md            (markdown summary)
-    docs/validation_glass_of_water.json          (machine-readable sidecar)
-    docs/benchmarks/validation_glass_of_water.txt  (diff-friendly text snapshot)
+    docs/validation/validation_glass_of_water.md            (markdown summary)
+    docs/validation/validation_glass_of_water.json          (machine-readable sidecar)
+    docs/validation/benchmarks/validation_glass_of_water.txt  (diff-friendly text snapshot)
 
 The .txt is the permanent reference: it is committed to the repo as the
 canonical baseline so future commits show a visible diff when any number
@@ -669,7 +669,7 @@ def _tfmt(x, digits=6, signed=False):
 
 def render_text(summary: dict) -> str:
     """Diff-friendly fixed-column text snapshot.  This is the format
-    committed under docs/benchmarks/ as the permanent reference; every
+    committed under docs/validation/benchmarks/ as the permanent reference; every
     PR that moves a number shows the delta in code review."""
     e_ev = summary.get("beam_energy_ev")
     energy_str = f"{e_ev:.4f} eV (~ {1239.84 / e_ev:.0f} nm)" if e_ev else "n/a"
@@ -873,11 +873,11 @@ def render_markdown(summary: dict) -> str:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--run", required=True, help="Path to a TRECH output directory.")
-    parser.add_argument("--report", default="docs/validation_glass_of_water.md",
+    parser.add_argument("--report", default="docs/validation/validation_glass_of_water.md",
                         help="Where to write the markdown report.")
-    parser.add_argument("--json", default="docs/validation_glass_of_water.json",
+    parser.add_argument("--json", default="docs/validation/validation_glass_of_water.json",
                         help="Where to write the JSON sidecar.")
-    parser.add_argument("--txt", default="docs/benchmarks/validation_glass_of_water.txt",
+    parser.add_argument("--txt", default="docs/validation/benchmarks/validation_glass_of_water.txt",
                         help="Where to write the diff-friendly text reference.")
     parser.add_argument("--no-write", action="store_true",
                         help="Print the markdown to stdout instead of writing files.")

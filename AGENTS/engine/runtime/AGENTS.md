@@ -95,7 +95,7 @@ invalid parameters and zero sigma consume no draws. It works in strict mode with
 Mixed-stream replay, parameter guards, mean/variance/tails and fresh-runtime replay are covered
 by `tests/test_js_runtime.cpp`, which now requires bit equality with the deterministic host math
 (below), including the `mean + sigma * z` transform.
-[`docs/scenario_hooks.md`](../../../docs/scenario_hooks.md) documents the executable surface.
+[`docs/engine/scenario_hooks.md`](../../../docs/engine/scenario_hooks.md) documents the executable surface.
 Cascade traces distinguish numeric `localInDomain` from effective `inDomain`;
 sorted `upstreamOutOfDomainInputs` names consumed facts produced outside their model's domain.
 Hook out-of-domain counters include these inherited cascade failures. Lineage is per cascade
@@ -166,7 +166,7 @@ without a shell. `--input` selects hydrogenic requests, `--composition` supplied
 both accept bounded batches. This is an independent research/reference path, never a Geant4
 tally, learned cascade, or switch of the QuickJS hook backend. Scientific scope, units, CLI,
 and the standalone `trech.atomic_research.v1` report are in
-[`docs/atomic_stability.md`](../../../docs/atomic_stability.md).
+[`docs/research/atomic_stability.md`](../../../docs/research/atomic_stability.md).
 
 Preserve unknown nuclear stability, widths, lifetimes and total uncertainty as `null`/not
 computed. Reduced mass already includes nonrelativistic recoil. Grid interval counts must

@@ -1,6 +1,6 @@
 // Spectral grids and the target representations learned by every architecture.
 //
-// Representation choices (documented in docs/spectrum_prediction.md):
+// Representation choices (documented in docs/research/spectrum_prediction.md):
 // - Atoms: NIST ASD neutral-atom lines are binned on a fixed wavelength grid and weighted by
 //   g_k*A_ki (transition probability times upper-level degeneracy). Lines without A_ki are
 //   counted but carry no weight. Bins are log-compressed relative to the strongest bin, so the

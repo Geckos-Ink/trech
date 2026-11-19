@@ -29,7 +29,7 @@ dated record below, and queue its residuals in the same change.
   recorded gas temperature/pressure/density range with units and its actual CFL/SI clock.
 - [x] NaCl/airflow enter the reproducible suite and gated compact GIF set. Two native Studio
   window PNGs, two annotated renderer stills and two 360×240/40-frame GIFs enter the root README;
-  source/run/media hashes and refresh commands live in `docs/images/studio-processes/`.
+  source/run/media hashes and refresh commands live in `docs/media/images/studio-processes/`.
   Existing committed GIFs and Chemistry screenshots are unchanged.
 - [x] Compact reference JSON sidecars survive promotion/temporary cleanup. Tests caught the
   old dotted temporary-prefix/suffix collision; separate temporary stems now retain metadata.
@@ -61,7 +61,7 @@ through the native UI. Native and capture images remain distinct, labelled artif
   and verified that correction.
 - [x] NaCl and airflow suite IDs plus gated 360×240, 4 s/10 fps GIFs; retained reference JSON
   sidecars. Root README includes two native windows and both animations, linking renderer PNGs.
-  Capture/source/run/media provenance: `docs/images/studio-processes/manifest.json`.
+  Capture/source/run/media provenance: `docs/media/images/studio-processes/manifest.json`.
 - [ ] Current-cursor stills, UI timeline excerpts, camera/display-state parity for exports,
   progress and partial-file cleanup on cancel remain. Current image is the final held frame;
   animation spans the full recorded timeline with no interpolation and a standard camera.
@@ -81,7 +81,7 @@ export exercised via the menu, and both native windows plus GIF start/middle/end
   `test_scenario_browser_filter_matches_name_folder_and_description`. **[facets and long
   descriptions landed 2026-11-17]** family and validation-status selectors (plus `family:`,
   `validation:`, `grade:`, `physics:` tokens) read the purity generator's new JSON index
-  (`docs/TRECH_current_scenarios_purity.json`, guarded with the Markdown report by CTest
+  (`docs/validation/TRECH_current_scenarios_purity.json`, guarded with the Markdown report by CTest
   `trech_scenario_purity_report`); on the shipped examples the fluid family narrows 75 files to
   10. Descriptions stream to the first code line instead of stopping at 8 KiB/120 lines. Covered
   by `test_scenario_browser_reads_long_descriptions_and_purity_facets`. Remaining — thumbnails from

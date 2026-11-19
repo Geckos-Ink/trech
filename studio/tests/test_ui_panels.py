@@ -107,8 +107,8 @@ def test_scenario_browser_reads_long_descriptions_and_purity_facets() -> None:
         (scenarios / "loose" / "loose.js").write_text("// no index entry\n", encoding="utf-8")
         assert len(filler) > 8192
         assert scenario_description(scenarios / "waves" / "waves.js").endswith("deepword past eight KiB")
-        (repo / "docs").mkdir()
-        (repo / "docs" / "TRECH_current_scenarios_purity.json").write_text(json.dumps({
+        (repo / "docs" / "validation").mkdir(parents=True)
+        (repo / "docs" / "validation" / "TRECH_current_scenarios_purity.json").write_text(json.dumps({
             "schema": "trech_scenario_purity_index_v1", "validation_git_sha": "abcdef0123",
             "scenarios": {
                 "waves": {"entry": "examples/scenarios/waves/waves.js", "grade": "C",

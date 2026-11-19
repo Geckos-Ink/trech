@@ -32,12 +32,12 @@ dated record below, and queue its residuals in the same change.
 - [x] Committed-media coverage check (2026-11-15). [`scripts/check_media_coverage.py`](../../../scripts/check_media_coverage.py)
   lists every tracked GIF/PNG/JPG/WebP/SVG/MP4/WebM, resolves every Markdown reference (inline
   links/images, reference definitions, HTML `src`/`href`/`poster`) relative to its page, exempts
-  the PNG/JPG poster of a shown same-stem GIF and the vendored `docs/geant4-docs/`, and exits 1
+  the PNG/JPG poster of a shown same-stem GIF and the vendored `docs/reference/geant4/`, and exits 1
   naming any medium no page shows. CTest `trech_media_coverage` gates the committed tree (today
   221 media over 152 pages: 219 shown, 2 posters, 0 missing) and unit-tests the resolver and
   rules (Release and Debug CTest 53/53). `scripts/update_experiment_media.py` runs it with `--include-untracked` at the end of a
   refresh, prints each unshown medium and records `markdown_coverage` in its report (advisory,
-  not a failure). Residual: `previews.md` itself is still hand-written (captions need judgement);
+  not a failure). Residual: `docs/previews.md` itself is still hand-written (captions need judgement);
   a link to a directory (e.g. `data/pubchem/`) does not cover its files; the refresh hook was not
   exercised by a real refresh (heavy; media gates apply), only syntax-checked.
 - [ ] Refresh historical native desktop screenshots deliberately when needed; automated
@@ -48,7 +48,7 @@ dated record below, and queue its residuals in the same change.
 - **[landed] Side chart panel** (`tools/viz/trech_viz/charts.py`): 1280×720 GIFs with 2D charts
   composited next to the 3D view. `material_frame` gained `samples`, `charts`, `curves`, `labels`,
   a phase `grid` (one smooth surface/grain cloud per solver cell class) and mesh `vertex_rgba`
-  (`docs/output_schema.md`); every hook-layer README scenario now charts its own observables
+  (`docs/engine/output_schema.md`); every hook-layer README scenario now charts its own observables
   (Briggs–Rauscher concentrations, bulk-water g(r), D(T) vs Holz 2000, efflux log-counts,
   electrolysis inventory, furnace phase counts, Pascal pressure ratio/bulge, osmotic volume,
   MR spectrum/FID, MRI signal/image, CNT transfer curves, beaker evaporation, MD bond/angle/T/Rg).
@@ -110,7 +110,7 @@ dated record below, and queue its residuals in the same change.
   media, engine analytic/nuclear/edep/derived-n HUD lines), and held `material_frame` replay with
   the new optional contract (`length_unit`/`positions`, `up_axis`, `radii`, `bonds`, `vectors`,
   `apparatus` incl. moving segments/meshes, `legend`, `hud_lines`, `clock_text`, `stream`,
-  `render_surface.clip_cylinder.center_mm`), documented in `docs/output_schema.md`.
+  `render_surface.clip_cylinder.center_mm`), documented in `docs/engine/output_schema.md`.
 - **[landed] Scenario emitters** for the MD ladder, shaken glass, Briggs–Rauscher, CNT band panel +
   CNTFET sweep + CMOS netlists, MRI stages 1/3 (Bloch vector, gradient phase winding), MRI stage 4
   volumetric k-space reconstruction (`scripts/run_magnetic_resonance_brain.py --out-gif`), and a

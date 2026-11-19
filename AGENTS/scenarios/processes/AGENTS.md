@@ -105,8 +105,8 @@ The microscope photograph in `hooks.inputs.visual_reference` is attributed appea
 `trech_crystallization_reference.js` and `aerodynamics_reference.js` +
 `trech_euler_reference.js` are explicitly independent comparison fixtures, not particle-trained
 phase-change/aerodynamic predictions. They preserve serial execution and snapshot comparison assumptions in `hooks.inputs`. Scope/tests:
-[`docs/process_references.md`](../../../docs/process_references.md). Do not promote illustrative salt
+[`docs/scenarios/process_references.md`](../../../docs/scenarios/process_references.md). Do not promote illustrative salt
 capacity/attachment or ideal-gas Euler laws into Geant4 truth or claim metal temper/fracture.
 `JsRuntime::authoringMetadataJson` supplies inspected source inventories and optional
 `TRECH_STUDIO` descriptions outside the physics config; Studio edits included modules and applies
-these declarative panels/process descriptions on Save. [`docs/studio_authoring.md`](../../../docs/studio_authoring.md).
+these declarative panels/process descriptions on Save. [`docs/studio/studio_authoring.md`](../../../docs/studio/studio_authoring.md).

@@ -11,7 +11,7 @@
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
 What Geant4 covers as base truth, what it does not model by design (and which TRECH layer replaces it),
-and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_limits.md`](../../../docs/GEANT4_features_and_limits.md).
+and pending migration items for the pinned checkout: [`docs/engine/GEANT4_features_and_limits.md`](../../../docs/engine/GEANT4_features_and_limits.md).
 
 - **Post-`Initialize` carriers are pre-allocated before `SetUserInitialization`.** `derivedOptics`,
   `analyticChecks`, `materialProbes` are `shared_ptr` carriers on `RunOptions` filled after Geant4

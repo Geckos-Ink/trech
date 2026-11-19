@@ -18,12 +18,12 @@ Sources include physical trajectories, emitted solver state and explicitly label
   C++-evaluated QM-trained charges/energies. Their clock is a scan angle, with zero physical time.
   Red/blue bubbles are atom-integrated partial-charge glyphs; gold marks the selected axis.
   This is a bounded hybrid comparison prototype, not Geant4 electronic density or molecular dynamics.
-  See [`docs/molecular_series.md`](../../../docs/molecular_series.md).
+  See [`docs/scenarios/molecular_series.md`](../../../docs/scenarios/molecular_series.md).
 - The second group (butane / dimethyl ether / acetamide) adds **Geant4-trained particle → atom →
   molecule response**, replayed in a separate `particle_response` photon-energy stream. Purple
   halos follow learned atomic photoelectric cross sections; the scaffold and independently
   fitted quantum charges stay fixed during that sweep. See
-  [`docs/particle_molecule.md`](../../../docs/particle_molecule.md).
+  [`docs/inference/particle_molecule.md`](../../../docs/inference/particle_molecule.md).
 
 The only rendering choices are the camera orbit, lighting, palette, ground grid, captions and text.
 Colours, display radii, tints and exaggerations (Pascal's wall displacement ×3, the MRI gradient

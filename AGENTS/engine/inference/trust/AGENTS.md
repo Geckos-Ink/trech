@@ -60,5 +60,5 @@ counts remain hull-only. Candidates are recorded, never automatically rerun or u
 The [manual Geant4 gate](../../../../scripts/validate_inference_resim.py) checks point/cascade
 routing, legacy bytes/hashes, strict gating, combined causes, feature precedence, disabled
 queue/stratification, dispatch isolation and replay. Operator cause counts are checked in C++
-and at the JS boundary. See [`docs/scenario_hooks.md`](../../../../docs/scenario_hooks.md)
-and the [output schema](../../../../docs/output_schema.md) for field contracts.
+and at the JS boundary. See [`docs/engine/scenario_hooks.md`](../../../../docs/engine/scenario_hooks.md)
+and the [output schema](../../../../docs/engine/output_schema.md) for field contracts.

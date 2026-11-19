@@ -282,12 +282,12 @@ if (Python3_Interpreter_FOUND)
     COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_ml_model_validation.py
   )
   # Fresh-run re-check report staleness: fails when a re-checked committed model or its
-  # recipe changed since docs/ml_model_recheck.json was produced (no NumPy needed).
+  # recipe changed since docs/validation/ml_model_recheck.json was produced (no NumPy needed).
   add_test(
     NAME trech_ml_model_recheck
     COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${PROJECT_SOURCE_DIR}/tools/torch
             ${TRECH_ML_PYTHON} -m trech_torch.recheck_models --root ${PROJECT_SOURCE_DIR}
-            --recipes data/ml_recheck_recipes.json --json docs/ml_model_recheck.json --check
+            --recipes data/ml_recheck_recipes.json --json docs/validation/ml_model_recheck.json --check
   )
 endif()
 

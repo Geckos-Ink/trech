@@ -16,7 +16,7 @@ and raw-response SHA-256. Coordinates are joined by atom ID; missing 3D data is 
 never a 2D substitute. Missing charge properties stay null. PubChem conformers/charges
 are theoretical MMFF references, not experimental electronic density. The molecular
 series pins normalized comparison fixtures beside its learned models, excluded from fitting;
-see [`docs/molecular_series.md`](../../docs/molecular_series.md).
+see [`docs/scenarios/molecular_series.md`](../../docs/scenarios/molecular_series.md).
 
 Use a build-local cache for runtime/validation work:
 

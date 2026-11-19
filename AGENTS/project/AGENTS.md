@@ -57,19 +57,29 @@ Read the root principles and the parent handbook first; then open only the subca
 
 ### Docs — [`docs/`](../../docs)
 
-[`output_schema.md`](../../docs/output_schema.md) (the output contracts Studio/viz depend on — update in
-lock-step with `Config.cpp`/parsers), [`structure.md`](../../docs/structure.md),
-[`scenario_hooks.md`](../../docs/scenario_hooks.md), [`viz_refraction.md`](../../docs/viz_refraction.md),
-[`validation_report.md`](../../docs/validation_report.md)/`.json` + [`validation_summary.md`](../../docs/validation_summary.md)
-(committed for regression tracking), [`CNT/BackToTheCarbon.md`](../../docs/CNT/BackToTheCarbon.md),
-[`implementation.md`](../../docs/implementation.md), [`notes.md`](../../docs/notes.md), and the reference-only
-[`trech-roadmap.md`](../../docs/trech-roadmap.md). `docs/geant4-docs/` is a vendored HTML copy of the
-Geant4 manuals. [`GEANT4_features_and_limits.md`](../../docs/GEANT4_features_and_limits.md) maps what
+Start at the [documentation index](../../docs/README.md). Topics are `architecture/`,
+`engine/`, `inference/`, `scenarios/`, `studio/`, `validation/`, `research/`, `project/`,
+`media/` and `reference/`; every directory, including asset leaves, has a navigation README
+linking its files, child folders and parent. Keep indexes current when adding or moving files.
+The annotated gallery is [`docs/previews.md`](../../docs/previews.md). Generated reports and
+sidecars belong together under `docs/validation/`, with text snapshots in `benchmarks/`.
+Capture guides and manifests stay with their images under `docs/media/images/`; vendored
+Geant4 manuals and their unchanged export layout live under `docs/reference/geant4/`.
+Report writers, purity-report discovery and Studio's purity-index lookup use these locations.
+
+[`output_schema.md`](../../docs/engine/output_schema.md) (the output contracts Studio/viz depend on — update in
+lock-step with `Config.cpp`/parsers), [`structure.md`](../../docs/architecture/structure.md),
+[`scenario_hooks.md`](../../docs/engine/scenario_hooks.md), [`viz_refraction.md`](../../docs/studio/viz_refraction.md),
+[`validation_report.md`](../../docs/validation/validation_report.md)/`.json` + [`validation_summary.md`](../../docs/validation/validation_summary.md)
+(committed for regression tracking), [`CNT/BackToTheCarbon.md`](../../docs/research/cnt/BackToTheCarbon.md),
+[`implementation.md`](../../docs/architecture/implementation.md), [`notes.md`](../../docs/project/notes.md), and the reference-only
+[`trech-roadmap.md`](../../docs/project/trech-roadmap.md). `docs/reference/geant4/` is a vendored HTML copy of the
+Geant4 manuals. [`GEANT4_features_and_limits.md`](../../docs/engine/GEANT4_features_and_limits.md) maps what
 the pinned Geant4 provides as base truth, what TRECH must implement above it, and which limits are
 physical/mathematical rather than Geant4's; re-check its version and migration sections when the
 submodule moves.
 
-[`investors-presentation.md`](../../docs/investors-presentation.md) is the 15-slide research
+[`investors-presentation.md`](../../docs/project/investors-presentation.md) is the 15-slide research
 funding discussion draft. It separates existing capabilities from roadmap work, treats the
 €50,000 AI-credit envelope as an unvalidated planning assumption, and budgets specialist time
 and scientific compute separately. CERN/ESA are prospective contacts, not established sponsors.
@@ -86,7 +96,7 @@ Pitfalls follow their owning source: [engine](../engine/AGENTS.md),
   canonical; `build/**` and `--output` `trech_*` files are derived/regenerable. Never treat run
   output as source.
 - **Compatibility:** config hashes are a compatibility promise — preserve them via conditional
-  serialization; keep the JS → JSON → C++ boundary and the `docs/output_schema.md` contracts
+  serialization; keep the JS → JSON → C++ boundary and the `docs/engine/output_schema.md` contracts
   stable (update parser + schema + Studio together). Feature/composition ML schemas are versioned
   (`trech_event_features_v1`, `ridge_optics_n_v1`, `logistic_stratifier_v1`).
 - **Determinism:** strict mode is the reproducibility contract; predictive mode must log every
@@ -99,7 +109,7 @@ Pitfalls follow their owning source: [engine](../engine/AGENTS.md),
 
 ## Current status, known gaps, and roadmap snapshot
 
-Chronology lives in git and [`docs/validation_report.md`](../../docs/validation_report.md). Current
+Chronology lives in git and [`docs/validation/validation_report.md`](../../docs/validation/validation_report.md). Current
 labels:
 
 ### Shipped
@@ -151,7 +161,7 @@ claims with current code before relying on them; note which sections the task wi
 **Handoff:** update changed durable facts in the owning handbook (owners, symbols, contracts,
 feature status) and add any residual/scaffold/TODO to its paired roadmap in the same change.
 Update the root files when shared principles, objectives or routing change; keep
-[`README.md`](../../README.md)/[`CHARTS.md`](../../CHARTS.md)/[`docs/output_schema.md`](../../docs/output_schema.md)
+[`README.md`](../../README.md)/[`CHARTS.md`](../../CHARTS.md)/[`docs/engine/output_schema.md`](../../docs/engine/output_schema.md)
 consistent; run `ctest --preset dev` for engine changes (and the relevant validation/smoke script if
 physics/output changed); report tests run, tests skipped, and remaining gaps accurately;
 never label incomplete work Shipped. For Studio changes, also run the relevant `studio/tests/` pytest coverage;

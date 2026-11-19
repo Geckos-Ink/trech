@@ -28,7 +28,7 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · First `trech-evolve-arch` search on Geant4-harvested runs of a non-optics family (CNT device metrics or fluid parcels), graded against grid/random `defineSearch` on the same splits. Record test-run R², evaluations and epochs, with and without reused knowledge. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
 - **P2** · R2 · Route `TRECH_ML.defineSearch({strategy: "evolvo"})` and the `trech-ml` store to GFSL-NN (preferably through the engine's `trech arch`, which already applies the classic reference bar): genome and knowledge in the checkpoint, `format: "torchscript"` registration for non-dense winners, and validator gates for evolved models (TorchScript parity, sidecar binding, retrain reproduction). ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
 - **P2** · R2 · Evolve set networks and hierarchy levels: masked/padded `set` inputs in GFSL-NN, a lowering of DeepSets/MPNN-shaped genomes to `generic_surrogate_v3`, then per-level search in `trech-train-hierarchy`. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
-- **P3** · R2 · Extend specialist training to density-connected regimes with measured assignment stability and add typed store registration for standalone specialist modules. ([study](../../../docs/multiscale_domain_study.md))
+- **P3** · R2 · Extend specialist training to density-connected regimes with measured assignment stability and add typed store registration for standalone specialist modules. ([study](../../../docs/inference/multiscale_domain_study.md))
 - **P3** · R7 · Native deterministic (`trech_dmath`) evaluation of residual/normalization/attention primitives (so evolved non-dense architectures get byte-reproducible evaluation like dense JSON chains; LibTorch is required and already runs them), cutoff-neighbourhood graphs, and C++ evaluator parity inside the validator. Torch-side residual/norm/attention layers now exist through GFSL-NN. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
 
 ## JS model definitions and checkpoint store (2026-11-10)
@@ -115,7 +115,7 @@ dated record below, and queue its residuals in the same change.
   - Disjoint run splits.
   - Native JSON for dense chains, TorchScript + sidecar + `trech_evolved_arch_v1` otherwise.
   - Retrain-for-export when the size-penalized winner differs.
-  - Contract in [`docs/evolvo_architectures.md`](../../../docs/evolvo_architectures.md).
+  - Contract in [`docs/inference/evolvo_architectures.md`](../../../docs/inference/evolvo_architectures.md).
 - Verification:
   - Evolvo `tests/test_arch.py`: 13/13 with torch, 12 + 1 skip on the NumPy-less CTest Python.
   - CTest `trech_evolvo_arch`.
@@ -130,7 +130,7 @@ dated record below, and queue its residuals in the same change.
 ## Recursive group hierarchies (2026-11-17)
 
 - [x] `trech_torch/hierarchy.py` (`trech-train-hierarchy`) trains the levels `ctx.lift`
-  evaluates ([contract](../../../docs/group_hierarchy.md)). It handles plan/sample formats,
+  evaluates ([contract](../../../docs/inference/group_hierarchy.md)). It handles plan/sample formats,
   engine-identical partition replay, and end-to-end torch training through every level on
   chained predictions. Levels can mix supervised outputs and named latents. Whole-run selection
   samples drive early stopping, with optional AdamW weight decay. The CLI refuses a run shared
@@ -144,7 +144,7 @@ dated record below, and queue its residuals in the same change.
   **worse** than g × Σ of its own predicted block energies (R² 0.620; 0.875 with true block
   labels). The cross-scale correction does not yet pay for itself, and the block level is the
   bottleneck. A first 800-system DeepSets run without early stopping overfit (system 0.35). See
-  [the demo record](../../../docs/group_hierarchy.md#synthetic-demonstration-architecture-only).
+  [the demo record](../../../docs/inference/group_hierarchy.md#synthetic-demonstration-architecture-only).
 - [ ] TorchScript twins, store/`defineModel` integration, hierarchy-specific validator gates and
   recheck recipes (queued above). The trainer is full-batch; very large populations would need
   minibatching over systems.
@@ -154,14 +154,14 @@ dated record below, and queue its residuals in the same change.
 - [x] Independent validator `trech_torch.validate_model` (`trech-validate-surrogate`,
   `trech-ml validate`, `--validate` on train/search) with named gates; verdicts are recorded on
   store checkpoints and shown by `trech-ml show` and Studio's Models dock. Contract:
-  [`docs/ml_models.md`](../../../docs/ml_models.md#validating-a-model).
-- [x] Committed-model audit [`docs/ml_model_audit.md`](../../../docs/ml_model_audit.md) + CTest
+  [`docs/inference/ml_models.md`](../../../docs/inference/ml_models.md#validating-a-model).
+- [x] Committed-model audit [`docs/validation/ml_model_audit.md`](../../../docs/validation/ml_model_audit.md) + CTest
   `trech_ml_model_audit` (staleness + crafted-model gates). Executed on this checkout: 50 committed
   models all load under the engine's rules and stay finite on their trained domain; trust profile
   complete 14 / partial 8 / none 28 (the illustrative hand-authored cascade maps and the untrained
   glass-furnace teachers); 14 carry a joint reference. Both spectrum-prediction models' own
   holdout R²min is negative (−7.97 atomic, −0.48 molecular), consistent with
-  [`docs/spectrum_prediction.md`](../../../docs/spectrum_prediction.md): flagged as warnings.
+  [`docs/research/spectrum_prediction.md`](../../../docs/research/spectrum_prediction.md): flagged as warnings.
 - [x] Executed with torch 2.8 (`build/render-venv`) on the 8 `config_stratify` demo runs
   (4 train / 2 selection / 2 test): the fixed 16×2 SiLU definition passes all 11 applicable gates
   (test R² 0.661, beats the ridge baseline, 96% of test rows covered). The demo search (19
@@ -184,7 +184,7 @@ dated record below, and queue its residuals in the same change.
   covered only 79% of test rows; with nine runs the guaranteed interval covers ≥ 98.5%.
   Committed models trained before this keep their pooled blocks until retrained.
 - [x] (2026-11-11) Fresh-run re-checks of committed models: `trech_torch.recheck_models` +
-  `data/ml_recheck_recipes.json` + generated `docs/ml_model_recheck.md` (CTest
+  `data/ml_recheck_recipes.json` + generated `docs/validation/ml_model_recheck.md` (CTest
   `trech_ml_model_recheck`). The three discrete operators were re-graded on 2 × 6000 fresh teacher
   rows each (seeds never used in training/holdout): regenerated original holdouts reproduce the
   carried RMSE exactly (no producer drift), fresh R² equals carried R² to ≤0.002 (h2o 0.9973,
@@ -193,7 +193,7 @@ dated record below, and queue its residuals in the same change.
 - [x] (2026-11-11) Engine recipes carry per-seed operating points (`seed_params`), an `env`
   block and regenerable training runs (`training.seeds`); fresh runs must differ in conditions.
   Recorded recipes for the three glass set-network models, the five glass-furnace operators and
-  the polyurethane reaction operator (results in `docs/ml_model_recheck.md`, 12 models, 0 fail).
+  the polyurethane reaction operator (results in `docs/validation/ml_model_recheck.md`, 12 models, 0 fail).
   Fresh R² hold the carried ones: set models 0.9997 / 0.9998 / 0.9997, glass-furnace operators
   1.0 on the 3D scenario, polyurethane ≥ 0.9944 per output. The set batch_solid model warns
   because its run-level interval is conservative (98.8% fresh coverage vs 90% nominal; fresh RMSE
@@ -226,4 +226,4 @@ dated record below, and queue its residuals in the same change.
   Future cache reuse checks engine/model/feature-source identity; no legacy cache is silently trusted.
 - [ ] Resolve measured per-feature/joint coverage holes with additional training and new final
   holdouts before broader promotion; calibrate physical uncertainty and validate varied
-  density/source/geometry against independent references. See the [observer limits](../../../docs/particle_observer.md).
+  density/source/geometry against independent references. See the [observer limits](../../../docs/inference/particle_observer.md).

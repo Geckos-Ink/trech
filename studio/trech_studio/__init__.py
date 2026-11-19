@@ -2,7 +2,7 @@
 
 Studio is a *client* of the TRECH engine, never a second physics engine: everything it
 draws comes from a real `trech run` output directory or a live `trech lab` session, parsed
-from the documented JSONL/JSON outputs (see `docs/output_schema.md` at the repo root).
+from the documented JSONL/JSON outputs (see `docs/engine/output_schema.md` at the repo root).
 
 Package layers (import only downward: ui -> scene/engine/render):
 

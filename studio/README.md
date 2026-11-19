@@ -3,7 +3,7 @@
 Shipped JavaScript scenarios are four-file bundles in `examples/scenarios/<name>/`: physics,
 `.view.js`, `.validation.js`, and `.ui.js`. Studio opens the physics entry point and exposes all
 companions in the source editor. Typed input definitions also work in CLI/library runs.
-See [scenario bundles](../docs/scenario_bundles.md).
+See [scenario bundles](../docs/scenarios/scenario_bundles.md).
 
 Refresh experiment images/animations for both engine and Studio with
 `scripts/update_experiment_media.sh` from the repo root. It includes slow runs and writes an
@@ -43,7 +43,7 @@ workspace and running jobs. These controls protect JS drafts; session recovery a
 of unsaved Chemistry/typed-option edits remain roadmap work.
 Processes also selects any recorded material stream and, for solution recipes, lists each
 planned stage's recorded execution (calls, committed/blocked/rejected, engine error code,
-inference accounting; unreported stages read "not reached"). [Authoring contract](../docs/studio_authoring.md).
+inference accounting; unreported stages read "not reached"). [Authoring contract](../docs/studio/studio_authoring.md).
 **File → Export scene scenario…** saves a loaded transport run as a separate runnable `.js`
 draft using its full recorded config. Source origins/spreads, isotope composition and unedited
 physics settings survive; derived appearance stays a result. Callback-bearing scenarios and
@@ -58,7 +58,7 @@ geometry. Run summary and Emits retain the original recorded results. Export and
 to run the draft; Run continues targeting the source editor. Unsaved scene replacement/close offers
 Save(export), Discard or default-Cancel. Drafts cannot export a recorded preview. Live lab patches,
 gizmos and full companion/source round-trip remain roadmap work.
-The new [NaCl dehydration and airflow fixtures](../docs/process_references.md) use this path;
+The new [NaCl dehydration and airflow fixtures](../docs/scenarios/process_references.md) use this path;
 their displayed crystal/temperature/pressure results are independent comparisons.
 
 **Chemistry → Open chemistry workspace** starts the initial molecular workbench. Edit atoms,
@@ -67,24 +67,24 @@ the emitted structure in 3D. Options supplies probe conditions and six independe
 scaffolds. The results tab shows Geant4 isotope/photon facts, bounded learned particle response,
 and missing model coverage. Optional reaction experiments use supplied learned hazards and
 derived atom/isotope/charge conservation; atomistic reaction paths and general chemical
-stability/polarization remain future engine work. [Usage and scope](../docs/chemistry_mode.md).
+stability/polarization remain future engine work. [Usage and scope](../docs/studio/chemistry_mode.md).
 
 The **Scene JSON** tab now imports/exports multi-molecule scenarios and can append the current
 atomic structure as another placed entity. The view selector switches between structures, joint
 electron density, supplied probability samples and fm nuclear proton/neutron ensembles. Open
 `chemistry_probability_reference.js` for the labelled joint water/D2 quantum comparison and
-Geant4 nuclear samples. [Data format and interpretation](../docs/chemistry_probability.md).
+Geant4 nuclear samples. [Data format and interpretation](../docs/studio/chemistry_probability.md).
 
 **Spectra → Open spectrum prediction workspace** activates the optional spectrum-prediction
 extension (`studio_mode` of `spectrum_prediction.js`). The Spectra dock plots each emitted
 measured reference against the learned prediction on its own grid, with the engine's trust badges
 and the held-out/training split. It also lists the emitted architecture leaderboard and runs the
 Node.js training pipeline; **Use trained run** points `data_dir` at the new models, which are
-shown only after a TRECH run. [Contract](../docs/spectrum_prediction.md).
+shown only after a TRECH run. [Contract](../docs/research/spectrum_prediction.md).
 
 [Native Chemistry workspace screenshots](../README.md) show the structure editor, shared
 electron density, probability samples and O-16 nuclear ensembles. Full-size images and their
-[capture provenance](../docs/images/studio-chemistry/README.md) are kept with the documentation.
+[capture provenance](../docs/media/images/studio-chemistry/README.md) are kept with the documentation.
 
 ## Rendered by Studio
 
@@ -107,13 +107,13 @@ From the repo root, run `studio/run_examples_suite.sh aerodynamics` for a fresh 
 Salt inventory animation is retired. Supply a calibrated `interface_file` to replay measured
 native-um triangles; absent data is reported rather than generating geometry. The supplied
 microscope photograph is a visual target without 3D/time calibration. See the
-[data and representation contract](../docs/process_references.md).
+[data and representation contract](../docs/scenarios/process_references.md).
 
 The same example scenarios shown in the [repo README](../README.md) — drawn by **Studio's own
 wgpu viewport** (offscreen capture path), not bespoke demo renderers. These are the scenarios
 Studio renders faithfully today: optics **trajectory** scenes, shaken-glass **fluid particle**
 playback, and material-resolved observer frames. Each Studio capture is a small committed
-reference GIF under [`tests/reference/`](tests/reference/) (regenerated only on demand — see
+reference GIF under [`tests/reference/`](tests/reference) (regenerated only on demand — see
 below); the final lava-lamp pair also shows the same run through classic `trech-viz` for a direct
 renderer comparison.
 
@@ -329,7 +329,7 @@ checkpoint's version and structure at the scenario editor's cursor, adding the `
 include when the file lacks it; the edit is unsaved and undoable. Run summary's **Model
 artifacts** rows name the stored checkpoint whose bytes (SHA-256) the run loaded, or say the model
 is not a stored checkpoint. Without Node.js the dock is
-read-only. See [ML model definitions](../docs/ml_models.md).
+read-only. See [ML model definitions](../docs/inference/ml_models.md).
 
 The **Bundle validation checks** section grades the loaded run's recorded outputs against the
 checks its scenario bundle declares (`<name>.validation.js`: output integrity and any exported
@@ -366,7 +366,7 @@ scenario to open it in the code editor; if it has a previous Studio run, that ru
 "Add folder…" adds your own scenario folders. The filter box matches every typed word against the
 file name, its folder and the scenario's leading comment; two selectors narrow by validation family
 and the validation status recorded in the committed purity index
-(`docs/TRECH_current_scenarios_purity.json`), and the same facts are typeable as `family:fluid`,
+(`docs/validation/TRECH_current_scenarios_purity.json`), and the same facts are typeable as `family:fluid`,
 `validation:pass`, `grade:c` or `physics:operator_partial`. The tooltip says which checkout the
 status was recorded at; it is not a verdict on your working tree.
 
@@ -402,7 +402,7 @@ no GPU → JSON sidecar only; no ffmpeg → still PNG via a built-in encoder.
 
 To refresh the committed **reference GIFs** shown above, add `--update-refs` (or
 `TRECH_STUDIO_UPDATE_REFS=1`); it promotes a curated small subset into
-[`tests/reference/`](tests/reference/). It's **off by default** so the repo isn't churned with
+[`tests/reference/`](tests/reference). It's **off by default** so the repo isn't churned with
 binary diffs on every run. A one-off compact GIF:
 `python -m trech_studio.capture --run <dir> --reference tests/reference/<id>.gif`.
 
@@ -486,7 +486,7 @@ preview detail responds to measured CPU frame cost, viewport size and estimated 
 geometry tessellation and surface grids change, while emitted coordinates/time stay fixed. The
 working allowance also controls preview trajectory loading and GPU cache lengths. GPU execution
 time is unmeasured and this is not a hard process-memory cap. Capture CLI overrides are fixed.
-See [adaptive precision](../docs/adaptive_precision.md) for options and limits.
+See [adaptive precision](../docs/engine/adaptive_precision.md) for options and limits.
 
 
 Chemistry's **States & particles** tab lists computed orbital energies/occupations and particle
@@ -495,18 +495,18 @@ views group one nucleus and report species counts/RMS/radial distributions. **Ca
 reference (RHF/6-31g)** delegates to the optional shared PySCF engine tool, then validates/runs
 TRECH. Configure `TRECH_QUANTUM_PYTHON` if needed. These geometry-conditioned electronic results
 are independent references, not Geant4 molecular dynamics. See
-[calculation and limitations](../docs/chemistry_probability.md#shared-electronic-reference-calculation-and-quantum-states).
+[calculation and limitations](../docs/studio/chemistry_probability.md#shared-electronic-reference-calculation-and-quantum-states).
 
 
 **Field explorer:** move X/Y/Z sections through numeric density gradients, adjust the enclosed
 finite-grid mass and log color window, inspect signed orbital phase lobes, and overlay a recorded
 orbital on the joint density. The **redistribution** field compares joint and independently solved
 isolated-fragment densities; its increase/decrease colors do not by themselves establish bonding.
-[Controls, definitions and capture options](../docs/chemistry_probability.md#explore-gradients-phase-and-density-redistribution).
+[Controls, definitions and capture options](../docs/studio/chemistry_probability.md#explore-gradients-phase-and-density-redistribution).
 
 The **Atomic core/valence reference (Ne)** Chemistry menu example opens a computed ten-electron
 reference. **Electron levels** plots each occupied-energy group's nonuniform density through a
 nucleus or its spherical radial distribution; the latter includes the 4πr² volume measure.
 The cloud colors local recorded contributions and offers a cutaway section. Group energies,
 occupations, nodes and spatial widths come from the independent RHF reference; no fixed shell
-radii or circular orbits are supplied. [Details](../docs/chemistry_probability.md#nonuniform-occupied-level-distributions-through-an-atom).
+radii or circular orbits are supplied. [Details](../docs/studio/chemistry_probability.md#nonuniform-occupied-level-distributions-through-an-atom).

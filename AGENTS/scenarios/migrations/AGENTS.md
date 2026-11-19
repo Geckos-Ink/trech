@@ -7,7 +7,7 @@ Related owners: [Operator migration contract](../../engine/operators/migration/A
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
 This branch covers scenario law migration ledger. The generated
-[scenario purity report](../../../docs/TRECH_current_scenarios_purity.md) shows the ledger per bundle,
+[scenario purity report](../../../docs/validation/TRECH_current_scenarios_purity.md) shows the ledger per bundle,
 next to static normal-path evidence, model provenance and recorded validation. Its review flags
 point at hand-authored normal-path models and at ledger/companion disagreements. Use the linked parent and related owners for implementation contracts and source maps; the paired roadmap records its delivery and validation requirements.
 

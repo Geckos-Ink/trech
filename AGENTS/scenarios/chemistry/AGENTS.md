@@ -19,7 +19,7 @@ Read the root principles and the parent handbook first; then open only the subca
   structures reuse the Geant4-trained particle response; isotope/ion response and general
   stability/polarization remain unavailable. No built-in reaction rates or valence rules.
   `hooks.inputs` records authored state in config/hash/provenance. Studio's Chemistry dock
-  edits those inputs and displays engine emits. Contract: [`docs/chemistry_mode.md`](../../../docs/chemistry_mode.md).
+  edits those inputs and displays engine emits. Contract: [`docs/studio/chemistry_mode.md`](../../../docs/studio/chemistry_mode.md).
 - **Stoichiometry/isotopes come from Geant4.** Material components may use positive integer
   `atoms` instead of `fraction` (all-element/all-atoms mode); optional `massNumber` builds a
   pure isotope using Geant4's tabulated mass. Unknown isotopes/stoichiometric elements fail
@@ -49,7 +49,7 @@ homogeneous proxy, **not quantum electronic labels**. Models carry `geant4_train
 rigid torsion samples with no physical time, not orbitals/density or molecular dynamics.
 PubChem is comparison-only (topology, aligned geometry, MMFF94 charge disagreement).
 `tools/torch/build_molecular_series.py` rebuilds models/reference rows/JS fixtures;
-`docs/molecular_series.md` owns quantitative scope and sources. Measured occupancy flags remain
+`docs/scenarios/molecular_series.md` owns quantitative scope and sources. Measured occupancy flags remain
 visible even when hull/joint checks pass. This first atomic rung does **not** close the general
 Geant4-linked inference-cascade gap. GenericSurrogate's named C++ API now also rejects missing
 inputs, and every backend rejects non-finite inputs/outputs before publishing any output.
@@ -66,7 +66,7 @@ charges fixed. Strict mode disables every stage. Counts are `48 × (atom count +
 predictive run. `tools/torch/build_particle_molecule_models.py` rebuilds the models/labels;
 `scripts/validate_particle_molecule.py` covers mode/reproducibility, held-out responses,
 particle-energy sensitivity and three 30,000-photon MC comparisons. Details:
-[`docs/particle_molecule.md`](../../../docs/particle_molecule.md). Particle-trained correlated electronic,
+[`docs/inference/particle_molecule.md`](../../../docs/inference/particle_molecule.md). Particle-trained correlated electronic,
 charge/bond/torsion inference remains the next lift; the external quantum fits do not fulfill it.
 
 `inferAtoms(ctx,spec,energyEv)` now exposes the same helper's atomic/pooling half while retaining
@@ -76,7 +76,7 @@ traces and engine-carried global held-out RMSE, and uses an explicitly labelled 
 diagram rather than molecular motion. The six named materials are unit-density composition
 proxies. Bounded held-out error gates pass, while per-feature/joint sparsity keeps the model
 experimental. No bond/isomer/physical-density or experimental-accuracy claim follows.
-See the [observer contract](../../../docs/particle_observer.md). The opt-in `observer_model`
+See the [observer contract](../../../docs/inference/particle_observer.md). The opt-in `observer_model`
 accepts a compatible fit and `lift_checkpoint` adds atom → element group → volume inference
 through `ctx.lift`. The layered experiment and its independent validation recipe are in the
-[multi-scale study](../../../docs/multiscale_domain_study.md).
+[multi-scale study](../../../docs/inference/multiscale_domain_study.md).

@@ -92,7 +92,7 @@ dated record below, and queue its residuals in the same change.
 
 - [x] Root README native Studio screenshot gallery: molecule/isotope editor, joint electron
   density with JSON authoring, density samples and O-16 proton/neutron ensembles. Raw captures,
-  source/run metadata and SHA-256 manifest live in `docs/images/studio-chemistry/`; captions
+  source/run metadata and SHA-256 manifest live in `docs/media/images/studio-chemistry/`; captions
   preserve each view's source, scale and nonphysical-clock limitations.
 - [x] Studio automatic discovery tries newest executable builds first, checking typed overrides,
   bundle sources and Studio metadata with a bounded Geant4-free inspection probe before fallback.

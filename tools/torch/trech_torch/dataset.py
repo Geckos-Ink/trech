@@ -1,7 +1,7 @@
 """Unified dataset harvesting from TRECH Geant4 run outputs.
 
 Every TRECH training path starts from the same JSONL artefacts a `trech run`
-writes (see `docs/output_schema.md`):
+writes (see `docs/engine/output_schema.md`):
 
 - `trech_viz_scene.json`      -> material-scale optics samples
                                  (`derived_optics` blocks: composition+density

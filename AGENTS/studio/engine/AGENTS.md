@@ -40,7 +40,7 @@ scenario source or computes physics. `lab.py` (`LabSession`) owns the real-time 
 
 ### Output contracts Studio depends on (do not silently break)
 
-Schemas live in [`docs/output_schema.md`](../../../docs/output_schema.md). Change a field there →
+Schemas live in [`docs/engine/output_schema.md`](../../../docs/engine/output_schema.md). Change a field there →
 update the parser in `studio/trech_studio/engine/outputs.py` and the consuming scene/render adapters in the same change.
 
 | File | Studio consumer | What Studio uses |

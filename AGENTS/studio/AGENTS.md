@@ -185,6 +185,6 @@ python -m trech_studio --open ../build/dev/out_viz_refraction   # view an existi
   results. Studio edits authored JS/scene drafts and exports captures (PNG/MP4/GIF + `.json`
   sidecars) plus gated `studio/tests/reference/*.gif`; it does not turn display choices into physics facts.
 - The parsing contract is the compatibility surface: it must track
-  [`docs/output_schema.md`](../../docs/output_schema.md). A `material_frame` may declare an
+  [`docs/engine/output_schema.md`](../../docs/engine/output_schema.md). A `material_frame` may declare an
   accelerated `playback_time_s` only while retaining `physical_time_s` + `time_scale`; Studio shows
   both clocks and never fabricates acceleration.

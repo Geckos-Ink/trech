@@ -26,7 +26,7 @@ class MediaCoverage(unittest.TestCase):
     def test_repository_media_are_all_shown(self):
         report = cov.coverage(ROOT)
         self.assertGreater(report["media"], 0)
-        self.assertEqual(report["missing"], [], "embed these in their owning page or previews.md")
+        self.assertEqual(report["missing"], [], "embed these in their owning page or docs/previews.md")
 
     def test_reference_forms_resolve_relative_to_the_page(self):
         root, files, tmp = _tree({
@@ -43,10 +43,10 @@ class MediaCoverage(unittest.TestCase):
 
     def test_unreferenced_media_are_reported_and_posters_are_exempt(self):
         root, files, tmp = _tree({
-            "previews.md": "![run](previews/run.gif) [web](https://example.org/x.png)",
+            "docs/previews.md": "![run](../previews/run.gif) [web](https://example.org/x.png)",
             "previews/run.gif": "", "previews/run.png": "",
             "previews/new.gif": "", "previews/new.png": "", "previews/lone.png": "",
-            "docs/geant4-docs/_static/logo.png": "",
+            "docs/reference/geant4/_static/logo.png": "",
         })
         with tmp:
             report = cov.coverage(root, files)

@@ -3850,7 +3850,7 @@ class CntLogicGates(ValidationCase):
         "reproduce binary addition, the working semiconducting tube has healthy "
         "noise margins (outputs near the rails), a METALLIC tube built into the "
         "same topology DESTROYS the logic (outputs collapse to ~Vdd/2 -- the "
-        "manufacturing short of docs/CNT/BackToTheCarbon.md), the swing is ~60 "
+        "manufacturing short of docs/research/cnt/BackToTheCarbon.md), the swing is ~60 "
         "mV/dec, the on/off ratio is gap-controlled (semiconductor >= 1e3 and "
         ">= 1e3x the metallic tube), the on/off ratio falls / swing rises with "
         "temperature (Fermi smearing), and Geant4 transports electrons through "
@@ -3926,7 +3926,7 @@ class CntLogicGates(ValidationCase):
             references=["SWCNT metallic iff (n-m) mod 3 == 0 (Saito, Dresselhaus & Dresselhaus 1998)",
                         "static-CMOS logic: pull-up/pull-down complementary FET networks",
                         "subthreshold swing SS = ln(10) kT/q ~ 60 mV/decade at 300 K (Fermi-Dirac limit)",
-                        "metallic-tube short / sorting problem (docs/CNT/BackToTheCarbon.md)"])
+                        "metallic-tube short / sorting problem (docs/research/cnt/BackToTheCarbon.md)"])
 
 
 # ---------- analytic cross-check (classical formula vs Geant4 statistics) ----------

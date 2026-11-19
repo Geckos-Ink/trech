@@ -47,12 +47,12 @@ dated record below, and queue its residuals in the same change.
 
 ## Atomic stability research
 
-- [x] First executable slice of [IASF](../../../docs/researches/atomic_stability_research.md):
+- [x] First executable slice of [IASF](../../../docs/research/studies/atomic_stability_research.md):
   independent one-electron radial Coulomb solver in JS on installed Node/V8, reduced-mass
   center-of-mass removal, analytic validation, leading perturbative charge-radius component,
   separate mesh/box changes, and channel-resolved electronic binding with nuclear stability
   and widths left unknown. Bounded batches and runtime/source/input SHA-256 evidence support
-  repeated experiments. See [usage and limits](../../../docs/atomic_stability.md).
+  repeated experiments. See [usage and limits](../../../docs/research/atomic_stability.md).
 - [x] Real-symmetric finite-basis eigensolver and Feshbach identity on supplied matrices,
   with residual/orthogonality telemetry, pole/conditioning rejection and projected-eigenproblem
   tests. This validates mathematical composition, not physical matrix elements.
@@ -95,7 +95,7 @@ dated record below, and queue its residuals in the same change.
   exact; cross-host runs remain a residual there. Prior evidence (2026-11-16, platform libm): the same JS under Node/V8
   gives 1-ulp different results for 15 of 20 Math builtins on a fixed grid and 2/32 different
   `TRECH_RANDOM.gaussian` draws, which 40 mW MD steps amplify to 352 ulp
-  ([`docs/v8.md`](../../../docs/v8.md), CTest `trech_js_engine_differential`). Hook math replay
+  ([`docs/engine/v8.md`](../../../docs/engine/v8.md), CTest `trech_js_engine_differential`). Hook math replay
   then depended on the libm, not only on the seed.
 - [x] Step context and run ID (2026-11-10): engine `onStep` dispatches expose track/parent IDs,
   particle, pre-step volume, post-step process, pre/post positions (mm), global times (ns) and

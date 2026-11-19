@@ -409,7 +409,7 @@ globalThis.TRECH_HELPERS = (function() {
   })();
 
   // Observer-frame emission for the classic 3D viewer and Studio (`material_frame`, see
-  // docs/output_schema.md). A scenario hands over its OWN solver state — atom/parcel positions,
+  // docs/engine/output_schema.md). A scenario hands over its OWN solver state — atom/parcel positions,
   // bonds, vectors, moving apparatus — and this only packages it with the clock fields, so no
   // renderer ever has to invent motion. Colours, display radii and legend are representation.
   const observer = (function() {

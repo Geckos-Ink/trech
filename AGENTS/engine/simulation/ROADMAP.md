@@ -56,7 +56,7 @@ dated record below, and queue its residuals in the same change.
   so they are reproducible only up to last-ULP merge order (see the strict MT gap below).
   Verification: dev and Release CTest 39/39 each (new `trech_klein_nishina`); all five `analytic` cases pass,
   including the three existing ones after the first-interaction tally refactor. The full
-  validation suite was not rerun and `docs/validation_report.*` was not refreshed.
+  validation suite was not rerun and `docs/validation/validation_report.*` was not refreshed.
 - [x] Binned Klein-Nishina spectrum shape and pair-production threshold/branching (2026-11-07).
   `compton_energy_transfer` now histograms first-Compton `u = T/T_max` in 20 bins and compares
   them to the binned free-electron KN `dσ/dT` (Pearson χ², pooled to expected ≥ 5): 662 keV in
@@ -68,7 +68,7 @@ dated record below, and queue its residuals in the same change.
   `analytic_compton_transfer_cross_check` (now with the spectrum gate, p ≥ 0.001),
   `analytic_pair_fraction_cross_check` and `analytic_pair_fraction_energy_sweep`.
   Verification: dev and Release CTest 41/41 each; all seven `analytic` validator cases pass on
-  fresh runs. The full validation suite was not rerun and `docs/validation_report.*` was not
+  fresh runs. The full validation suite was not rerun and `docs/validation/validation_report.*` was not
   refreshed.
 - [x] Klein-Nishina angular distribution and energy-angle closure (2026-11-07).
   `compton_energy_transfer` now also tallies the first-Compton scattered photon's `cos θ` from the
@@ -85,7 +85,7 @@ dated record below, and queue its residuals in the same change.
   free-electron kinematics the closure makes the angle histogram a one-to-one remap of the energy
   histogram. Its independent content is the direction sampling and the closure itself. It becomes a
   separate physics test only with a bound-electron model. The full validation suite was not rerun
-  and `docs/validation_report.*` was not refreshed.
+  and `docs/validation/validation_report.*` was not refreshed.
 - [x] Photonuclear-aware photon totals and the giant-dipole branching check (2026-11-07).
   `fillAttenuationBreakdown` now adds the registered gamma inelastic cross section
   (`G4HadronicProcessStore`, the `G4GammaNuclearXS` table QBBC's general process samples) to
@@ -101,7 +101,7 @@ dated record below, and queue its residuals in the same change.
   prediction would be 0.4876 vs measured 0.4687 (z = −4.72). A serial strict rerun at 23 MeV is
   byte-identical. A 4-worker MT run gives the same `mu_pn` (master-thread query), with both checks
   at |z| < 2. Verification: Release and Debug CTest 41/41 each. The full
-  validation suite was not rerun and `docs/validation_report.*` was not refreshed. Scope: these
+  validation suite was not rerun and `docs/validation/validation_report.*` was not refreshed. Scope: these
   remain self-consistency checks of Geant4's own EM and photonuclear tables.
 - [x] Photonuclear final-state conservation, kinematic edge and photoneutron yield (2026-11-07).
   For every primary photon's first photonuclear absorption, `SteppingAction` infers the target
@@ -119,7 +119,7 @@ dated record below, and queue its residuals in the same change.
   fails when the closure or the edge excess is corrupted. Branching values and every earlier check
   are unchanged; all nine `analytic` cases pass on fresh Release runs. A serial strict 23 MeV
   rerun gives identical scores. Verification: Release and Debug CTest 42/42 each. The full
-  validation suite was not rerun and `docs/validation_report.*` was not refreshed.
+  validation suite was not rerun and `docs/validation/validation_report.*` was not refreshed.
   **Finding:** Geant4 11.4 QBBC's sub-200 MeV photonuclear model (`GammaNPreco`,
   G4LowEGammaNuclearModel; Fermi break-up for A ≤ 16) sends 16O mostly into α break-up. Per
   absorption at 23 MeV it gives 2.50 α, 0.096 p and 0.0064 n (5 neutrons in 779 absorptions);
@@ -135,7 +135,7 @@ dated record below, and queue its residuals in the same change.
   0.006/0.096/2.50 vs Bertini 0.127/0.291/0.372 (30 MeV: 0.278/0.566/0.40). Bertini is nucleon-
   dominated as measured GDR decay is, but closes energy only to |ΔE|/E ≤ 6.6e-3 (mean +1.5e-3;
   momentum still ≤ 1e-10, all edges respected). No neutron below 16O's (γ,n) threshold in either.
-  Release full-suite run 2026-11-12 (`917adc2`): passes, recorded in `docs/validation_report.*`.
+  Release full-suite run 2026-11-12 (`917adc2`): passes, recorded in `docs/validation/validation_report.*`.
 - [ ] Next analytic checks: a bound-electron Compton reference (Livermore/Monash with Doppler
   broadening, enabled by a physics-list option) graded against an independent dataset rather than
   the formula Geant4 implements (the energy-angle closure residual above is the ready-made
@@ -191,7 +191,7 @@ dated record below, and queue its residuals in the same change.
   validation case fails on an overlap and no "refuse to run" option; sampling is a bound, not a
   proof (thin slivers can be missed); a lab geometry restart reuses the first report; the
   committed `briggs_rauscher`/`magnetic_resonance_tissues` demo media and
-  `docs/validation_report.*` predate these geometry fixes.
+  `docs/validation/validation_report.*` predate these geometry fixes.
 - [x] Per-event secondary multiplicity and track-length shape (2026-11-10). `system_event_secondaries_*`
   (mean/stddev/stderr/min/max/zero fraction/skewness/excess kurtosis/`dispersion_index`) and
   `system_event_track_length_*_mm` reuse `EventMoments.hpp` (new `merge`, `dispersionIndex`;
@@ -200,7 +200,7 @@ dated record below, and queue its residuals in the same change.
   ≥ 1 secondary in 11318 ≥ 213 photoelectric-first events, dispersion 1.16, track length
   55–367 mm). Residual: no per-volume multiplicity; scores-only at the time (provenance copy landed
   2026-11-11); multi-threaded reruns differ in the
-  last float bits like the deposit shape; full validation suite and `docs/validation_report.*`
+  last float bits like the deposit shape; full validation suite and `docs/validation/validation_report.*`
   not refreshed.
 - [x] Per-species secondary multiplicity, optical photons split out (2026-11-11).
   `system_event_secondaries_<species>_*` for `gamma`/`electron`/`positron`/`optical_photon`/
@@ -214,7 +214,7 @@ dated record below, and queue its residuals in the same change.
   summary lists each produced species. Residual: compact summary per species (no min/skew/kurtosis);
   the species sum can fall short of the stepped-track total only if a primary never steps (not
   observed); no per-volume or per-process split; provenance copy landed 2026-11-11; pair/optics spot runs are
-  not validation cases; `docs/validation_report.*` not refreshed.
+  not validation cases; `docs/validation/validation_report.*` not refreshed.
 - [x] Per-volume event-deposit shape and provenance copy of the event shape (2026-11-11).
   Every `scoreEdep` volume now gets the same power-sum summary per event (`volume_event_edep`,
   `{mean_mev, stddev_mev, stderr_mev, min_mev, max_mev, zero_fraction, shape_defined, skewness,
@@ -233,7 +233,7 @@ dated record below, and queue its residuals in the same change.
   track length; per-volume
   entries are keyed by name, so repeated placements of one name share an entry; MT reruns differ
   in the last float bits like the other moments; full validation suite and
-  `docs/validation_report.*` not refreshed.
+  `docs/validation/validation_report.*` not refreshed.
 - [x] Fixed-binning per-event histograms (2026-11-11). `system_event_edep_histogram` (log10, 10
   bins/decade over 1 eV–1 TeV, zero/underflow/overflow slots) and
   `system_event_secondaries_histogram` (exact 0..15, then octaves) from the Geant4-free
@@ -251,7 +251,7 @@ dated record below, and queue its residuals in the same change.
   Residual: ~~per-volume histograms and a track-length histogram are not binned~~ (landed
   2026-11-12 below); the
   fixed grid cannot resolve structure finer than 1/10 decade (e.g. the 100 keV full-absorption
-  line is one bin); the full validation suite and `docs/validation_report.*` not refreshed.
+  line is one bin); the full validation suite and `docs/validation/validation_report.*` not refreshed.
 - [x] Track-length and per-volume deposit histograms (2026-11-12). `EventHistogram.hpp` now names
   one shared log10 grid (`logEdge`/`logSlot`; the deposit functions are aliases) that also bins
   the per-event summed track length in mm (`system_event_track_length_histogram`, 1 nm–1 km) and
@@ -272,7 +272,7 @@ dated record below, and queue its residuals in the same change.
   track-length; ~~per-species multiplicity is not binned~~ (landed 2026-11-12 below); per-volume histograms cost 124 integer
   accumulables per scored volume (19 volumes → 2,356 slots, not profiled at large volume counts);
   Studio does not list per-volume histograms; full validation suite and
-  `docs/validation_report.*` not refreshed.
+  `docs/validation/validation_report.*` not refreshed.
 - [x] Per-species secondary-multiplicity histograms (2026-11-12). Each species class
   (`gamma`/`electron`/`positron`/`optical_photon`/`neutron`/`other`) gets a
   `system_event_secondaries_<species>_histogram` on the total's integer-then-log2 layout, filled in
@@ -289,7 +289,7 @@ dated record below, and queue its residuals in the same change.
   52/52, `tests/test_system_observable_cases.py` 15/15 (new species corruptions), Studio
   `test_ui_panels.py` 22/22. Residual: ~~no per-volume multiplicity or track length~~ (landed
   2026-11-12 below); no species-resolved track length or deposit; full validation suite and
-  `docs/validation_report.*` not refreshed.
+  `docs/validation/validation_report.*` not refreshed.
 - [x] Per-volume step length and created secondaries (2026-11-12). Attribution follows the deposit:
   a step's length counts in its pre-step (deepest) volume and a secondary counts in the volume of
   its first step's pre-step point, its creation vertex. Every `scoreEdep` volume gains
@@ -310,7 +310,7 @@ dated record below, and queue its residuals in the same change.
   landed 2026-11-12 below); per-volume entries
   are keyed by name, so repeated placements of one name share an entry; secondaries created in
   zero-length steps would break the "need steps" check (none seen); Studio does not list the
-  per-volume histograms; full validation suite and `docs/validation_report.*` not refreshed.
+  per-volume histograms; full validation suite and `docs/validation/validation_report.*` not refreshed.
 - [x] Per-step scored-volume lookup cache and overhead measurement (2026-11-12). `SteppingAction`
   resolves the pre-step volume once per step through `TrechRunAction::VolumeScoreIndex`
   (per-thread `G4VPhysicalVolume*` → index map, filled lazily from the name index, cleared in
@@ -357,7 +357,7 @@ dated record below, and queue its residuals in the same change.
   Residual: the classes are the secondary-reporting bins, so protons/alphas/ions share `other`
   (a heavy-charged-particle beam would need a finer class set); no species-resolved deposit or
   track length at the system level (only scored volumes); no per-class histograms; the full
-  validation suite and `docs/validation_report.*` were not refreshed.
+  validation suite and `docs/validation/validation_report.*` were not refreshed.
 - [x] Full validation suite refreshed (2026-11-12, Release, at `917adc2`): 61 cases, 57 pass,
   4 info, 0 fail/skip; every analytic and `system_*` case above passes there, so the "suite not
   rerun / report not refreshed" residuals of the earlier entries in this file are closed for that
@@ -398,7 +398,7 @@ dated record below, and queue its residuals in the same change.
   `trech_scenario_purity_report` after regeneration), `tests/test_geometry_refusal_case.py` 4/4
   (17 corruptions), flow-preset audit pass, declarative contract 5/5 on the clean run.
   Residual: the lab refusal path still has no automated test; the full validation suite and
-  `docs/validation_report.*` were not refreshed, so the committed report has no row for the new
+  `docs/validation/validation_report.*` were not refreshed, so the committed report has no row for the new
   case; no Studio preview media exist for the new bundle. (Correction: the original entry said
   the `TRECH_FLOW` `geometry` preset missed a scalar box `sizeMm`; it already flagged it, the
   example simply did not call `validate()`. See the preset alignment entry below.)
@@ -433,7 +433,7 @@ dated record below, and queue its residuals in the same change.
   `tests/test_system_observable_cases.py` 16/16 (9 new corruptions + missing split), Studio
   pytest 295/295. Residual: protons/alphas/ions still share `other`; no per-class histograms;
   `primary_class_steps_every_event` is graded only for the gamma-beam suite run; full validation
-  suite and `docs/validation_report.*` not refreshed.
+  suite and `docs/validation/validation_report.*` not refreshed.
 - [x] Wrong-typed geometry volume fields are named parse errors (2026-11-14). `shapeFromJson`
   and `placementFromJson` read through geometry-local helpers, so a string, boolean or null where
   a number (or a string `type`/`parent`) goes throws
@@ -451,7 +451,7 @@ dated record below, and queue its residuals in the same change.
 - [x] Full validation suite refreshed (2026-11-14, Release, at `810ebd8`): 63 cases, 59 pass,
   4 info, 0 fail/skip. The new `geometry_refusal_guard_refuses_defects` passes, and the
   stepping-class split checks pass inside `system_event_multiplicity_consistent` and
-  `system_volume_event_edep_consistent`. This closes the "suite / `docs/validation_report.*` not
+  `system_volume_event_edep_consistent`. This closes the "suite / `docs/validation/validation_report.*` not
   refreshed" residuals of the 2026-11-14 entries above for that checkout (details in the
   [validation history](../../tooling/validation/history/ROADMAP.md)).
 - [x] Proton, alpha and ion particle classes (2026-11-14). `SecondarySpecies.hpp` adds `proton`

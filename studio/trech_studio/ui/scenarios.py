@@ -10,7 +10,7 @@ top-level node. A filter box narrows the tree: every whitespace-separated token 
 a scenario's file name, its folder path under the root, or its leading comment block (the
 scenario's own description). Enter in the filter opens the scenario when exactly one matches.
 Two selectors narrow by validation family and recorded validation status, read from the
-committed purity index (``docs/TRECH_current_scenarios_purity.json``, regenerated with the
+committed purity index (``docs/validation/TRECH_current_scenarios_purity.json``, regenerated with the
 purity report); the same facts are searchable as ``family:<f>``, ``validation:<s>``,
 ``grade:<g>`` and ``physics:<status>`` tokens. They describe the committed validation report's
 checkout, not the file on disk now. Activating a scenario (double-click / Enter) emits ``scenario_activated`` with
@@ -57,7 +57,7 @@ _STATUS_ROLE = 0x0104  # recorded validation status from the purity index
 _HEADER_BYTES = 1 << 20
 _HEADER_LINES = 4000
 
-PURITY_INDEX = Path("docs") / "TRECH_current_scenarios_purity.json"
+PURITY_INDEX = Path("docs") / "validation" / "TRECH_current_scenarios_purity.json"
 PURITY_INDEX_SCHEMA = "trech_scenario_purity_index_v1"
 ALL_FAMILIES = "All families"
 ANY_VALIDATION = "Any validation"

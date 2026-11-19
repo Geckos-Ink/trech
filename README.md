@@ -5,7 +5,7 @@
 (typed controls/Studio descriptions). Shared TRECH JS lives in `js/`; failure fixtures live in
 `tests/fixtures/js/`. The C++ loader loads companions for roots and nested includes; CLI/library
 and Studio share parameter validation. Source inventory includes companions. Contract:
-[`docs/scenario_bundles.md`](docs/scenario_bundles.md). Historical media identities are retained.
+[`docs/scenarios/scenario_bundles.md`](docs/scenarios/scenario_bundles.md). Historical media identities are retained.
 
 
 TRECH is a **C++/Geant4 simulation and learning toolkit**. Experiments written in
@@ -24,15 +24,15 @@ reaction cycles, biology, CNT electronics, magnetic resonance/MRI, learned opera
 [desktop Studio](#trech-studio-desktop-ui). These tracks have different levels of physical
 validation; the [scenario tables](#essential-test-scenarios) state Geant4's role in each.
 
-Initial [NaCl dehydration and compressible-airflow references](docs/process_references.md) now
+Initial [NaCl dehydration and compressible-airflow references](docs/scenarios/process_references.md) now
 exercise connected crystal growth/bookkeeping and pressure/temperature flow output. They are
 independent comparison fixtures; quantitative crystallization, metal tempering and high-speed
-structural predictions remain unvalidated. [Studio JS authoring](docs/studio_authoring.md)
+structural predictions remain unvalidated. [Studio JS authoring](docs/studio/studio_authoring.md)
 edits included process modules and reloads declarative UI descriptions on Save. An optional
-[V8 source/embedding foundation](docs/v8.md) is included under `thirds/v8`; QuickJS remains the
+[V8 source/embedding foundation](docs/engine/v8.md) is included under `thirds/v8`; QuickJS remains the
 simulation runtime and no V8 performance claim is established.
 
-The first [atomic stability research core](docs/atomic_stability.md) runs JavaScript on installed
+The first [atomic stability research core](docs/research/atomic_stability.md) runs JavaScript on installed
 Node.js/V8: numerical one-electron Coulomb states, reduced mass, a leading finite-size component,
 and finite-matrix composition experiments. Run `node tools/atomic/run.cjs` for hydrogen or use
 the opt-in C++ `trech-atomic` launcher. Results carry source/input hashes, convergence diagnostics,
@@ -91,7 +91,8 @@ Native desktop screenshots remain historical captures and are never synthesized 
 3. **Geant4 layer** runs the canonical lifecycle and emits scoring + provenance.
 4. **System aggregation** computes point-agnostic ensemble metrics for ML and multiscale stages.
 
-See [structure](docs/structure.md) for the detailed skeleton, [CHARTS.md](CHARTS.md) for
+Browse the [documentation tree](docs/README.md) for topic indexes and the preview gallery.
+See [structure](docs/architecture/structure.md) for the detailed skeleton, [CHARTS.md](CHARTS.md) for
 Mermaid dataflow diagrams, and [ROADMAP.md](ROADMAP.md) for current plans.
 The [agent reference](AGENTS.md) keeps shared principles; the categorized [handbook tree](AGENTS/AGENTS.md)
 pairs context and roadmaps for engine, scenarios, Studio, tooling and project work. Follow the
@@ -194,7 +195,7 @@ representatives, and the furnace has `cells_per_side` (total N³). The dock sepa
 mesh detail** from **Parcel merge radius**. Higher detail samples boundaries more finely;
 merge radius changes the Gaussian display width and apparent connections. Preview exports retain
 both settings. More particles alone do not establish physical convergence.
-[Commands, contracts and limits](docs/adaptive_precision.md).
+[Commands, contracts and limits](docs/engine/adaptive_precision.md).
 
 ## Scenario authoring direction
 
@@ -251,7 +252,7 @@ both settings. More particles alone do not establish physical convergence.
 - Hook callbacks receive deterministic context (`ctx.config`, `ctx.runtime`, optional `ctx.event`, optional `ctx.step`, persistent `ctx.state`, deterministic `ctx.rng.uniform/int/normal`, `ctx.emit(tag, payload)`, and — when `materialProbe` is enabled — `ctx.materials`), with per-callback emit guardrails (`hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`) and dropped-emit accounting. `onEventEnd` exposes Geant4 event metrics on `ctx.event` (`edepMeV`, track/step counts and lengths), and `ctx.materials["<name>"]` exposes Geant4-derived material composition (density, `numberDensityPerCm3.H`, electron density, mean excitation I), so hook-layer inference can consume live transport data and material physics.
 - `TRECH_PUBCHEM(name)` loads a PubChem JSON cache record from `TRECH_PUBCHEM_CACHE_DIR` first, then the legacy `data/pubchem` cache, so scenarios can use real fetched substance metadata without committing new cache files.
 - `onInit` supports deterministic config patching through return value `{ override: { ... } }`; patch application is intentionally whitelisted (`beam`, `run`, `optics`, `system`, `stratify`) and tracked in outputs.
-- [Hook API reference](docs/scenario_hooks.md): names, allowed operations and provenance requirements.
+- [Hook API reference](docs/engine/scenario_hooks.md): names, allowed operations and provenance requirements.
 
 ## Multi-scale inference cascade
 
@@ -308,13 +309,13 @@ All inference paths are deterministic and **disabled in strict mode** (enabled i
   MD/foam-bond/PBF migrations remain open roadmap rows.*
 - **`ctx.detectDomains(spec)`** — find statistical subdivisions in a live population, optionally
   within the groups from operator routing. Set `--param detect_domains=true` in the glass furnace
-  or lava lamp to record assignments per frame. [Hook contract](docs/scenario_hooks.md)
+  or lava lamp to record assignments per frame. [Hook contract](docs/engine/scenario_hooks.md)
 - **`ctx.learnDomains(spec)`** — learn *response* domains of a live population online: where one
   law stops explaining the operator's response, the engine subdivides, fits per-domain laws
   (LibTorch ridge + residual networks), grades them prequentially against a pooled law, tracks
   value and parameter tendencies and sizes itself to the host (`trech budget`). States export for
   frozen deployment. Glass furnace, lava lamp and efflux expose `learn_domains`; see
-  [the domain study](docs/multiscale_domain_study.md#online-response-domain-learning).
+  [the domain study](docs/inference/multiscale_domain_study.md#online-response-domain-learning).
 - **`ctx.lift(spec)`** — recursive group lifting of a *population*: elements → groups → groups of
   groups → observer. Each level partitions the current elements (a lattice of `cell_size`,
   explicit ids, or one group of everything) and runs a trained DeepSets/MPNN `group_lift` model
@@ -324,7 +325,7 @@ All inference paths are deterministic and **disabled in strict mode** (enabled i
   observer. Without `levels`, the engine plans the hierarchy from the declared
   `operator_role: "group_lift"` models by scale. `trech-train-hierarchy` trains all levels end to
   end, each level on the chain's own predictions. *Current scope: mechanism and trainer, tested
-  on synthetic data; no scenario uses it yet.* [Contract](docs/group_hierarchy.md).
+  on synthetic data; no scenario uses it yet.* [Contract](docs/inference/group_hierarchy.md).
 
 Missing required model inputs block the affected stage and appear in `missingInputs`; only
 actual evaluations count as inferences. Element/pair intermediates belong to their own material,
@@ -348,7 +349,7 @@ and shaking a glass. Its density coarse-graining is grounded; its cohesion/visco
 scenario families remain a standing objective in [ROADMAP.md](ROADMAP.md).
 
 Optional offline tooling uses Torch/TorchScript and the pinned `thirds/evolvo` structure-search
-adapter. Candidates still need independent testing; see [adaptive precision and Evolvo](docs/adaptive_precision.md)
+adapter. Candidates still need independent testing; see [adaptive precision and Evolvo](docs/engine/adaptive_precision.md)
 and [Torch tooling](tools/torch/README.md). `trech-evolve-arch` evolves whole torch
 architectures in Evolvo's GFSL-NN language. A genome of fixed rows, with macros such as
 `transformer(depth, heads, ff)`, is always valid. The search learns choice weights, size pressure
@@ -356,7 +357,7 @@ and per-candidate epoch stopping, and carries them between searches. *Current sc
 synthetic data only.* The engine runs it itself with `trech arch job.json`. That command
 trains a classic reference family natively in C++ (also the fallback), launches the Evolvo worker
 as a subprocess, re-scores the evolved model, and keeps it only if it beats the reference.
-[Evolved architectures](docs/evolvo_architectures.md). The current
+[Evolved architectures](docs/inference/evolvo_architectures.md). The current
 LibTorch integration limits are listed under [Dependencies](#dependencies).
 
 ## Config examples
@@ -478,7 +479,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   emits. Nothing feeds back. `glass_from_sand` declares its charge temperature the same way. See
   the [lattice handbook](AGENTS/engine/lattice/AGENTS.md).
 - [`testscenario_pascal.js`](examples/scenarios/testscenario_pascal/testscenario_pascal.js): validation scenario for
-  Pascal's principle and material deformation (`docs/testscenario_pascal-todo.md`); three vessel
+  Pascal's principle and material deformation (`docs/scenarios/testscenario_pascal-todo.md`); three vessel
   models (ideal-rigid, Hookean/plastic, finer micro/macro structural mesh — each sensor wall a grid
   of Hookean patches coupled by membrane tension with a rigid rim, around a 3D particle bath) are
   advanced through `thermalize → baseline → compress → hold → release` phases with per-bucket
@@ -656,7 +657,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   3P/R. Guarded by `efflux_first_order_kinetics` and the paired `efflux_operators_match_reference`.
 - [`testscenario_osmotic.js`](examples/scenarios/testscenario_osmotic/testscenario_osmotic.js): validation scenario for
   a biological cell osmotically dehydrating in a hypertonic bath
-  (`docs/testscenario_osmotic-todo.md`); a coarse-grained **3D** MD bath of H2O + glucose +
+  (`docs/scenarios/testscenario_osmotic-todo.md`); a coarse-grained **3D** MD bath of H2O + glucose +
   wrong-polarized ions around a **selectively permeable triangulated membrane** (642-vertex
   icosphere with 24 water-channel caps) runs inside the hook layer (one Geant4 event = one MD tick).
   The membrane moves overdamped under the **measured** collision-pressure difference across it while
@@ -727,7 +728,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   (`~exp(E_g/2kT)`), the subthreshold swing recovered from the simulated `I_d(V_gs)` lands on the
   ~60 mV/dec room-temperature Fermi limit, and a **metallic** tube dropped into the same topology
   collapses the outputs to ~Vdd/2 and breaks the logic (the metallic-short manufacturing problem of
-  `docs/CNT/BackToTheCarbon.md`). Feedback netlists of the same gates add **memory**: a NOR SR
+  `docs/research/cnt/BackToTheCarbon.md`). Feedback netlists of the same gates add **memory**: a NOR SR
   latch (two stable states), a master-slave D flip-flop that captures data only on rising clock
   edges (rejecting 16 data glitches) and a 2-bit synchronous counter (1, 2, 3, 0, …); the metallic
   tube loses the stored bit. Geant4 transports the e- beam through the representative (16,0)
@@ -890,7 +891,7 @@ Fresh recorded-data replays from the normal Studio renderer:
 ![Studio lava lamp replay](studio/previews/lava_lamp.png)
 ![Studio refraction replay](studio/previews/viz_refraction_demo.png)
 
-[All Studio images and GIFs](studio/previews/README.md) · [Engine media index](tools/viz/demos/media_index.md) · [Previews not shown elsewhere, explained](previews.md)
+[All Studio images and GIFs](studio/previews/README.md) · [Engine media index](tools/viz/demos/media_index.md) · [Previews not shown elsewhere, explained](docs/previews.md)
 
 The old NaCl parcel/tray animation has been retired from active playback and this gallery.
 The microscope target is [Ihor Panas’s NaCl photograph](https://commons.wikimedia.org/wiki/File:Sodium_chloride_crystals,_light_microscopy.jpg)
@@ -905,7 +906,7 @@ opacity, isosurface threshold and perspective/orthographic projection. These are
 `python3 scripts/validate_euler3d.py --trech build/rel/trech` for the recorded studies and replay.
 Obstacle-flow accuracy, particle-derived response and viscosity remain open; exact comparisons
 are not particle training labels. The images below retain their historical 2D identity.
-The next authoring layer is [reusable JS process libraries](docs/solution_processes.md):
+The next authoring layer is [reusable JS process libraries](docs/scenarios/solution_processes.md):
 `solution(...).mix().heat(...).evaporate(...).crystallize(...)`. That recipe executes supplied
 engine operators and reports missing models explicitly; spatial crystal growth is still unavailable.
 Shared process bindings now declare state/context units and provenance, preserve engine reports,
@@ -914,7 +915,7 @@ operator IO and carried validation metadata without running inference. Optional 
 and process `model_units` check exact named-unit labels across the complete loaded operator group,
 blocking missing or mismatched declarations before inference. Legacy models remain usable without
 that opt-in check. These labels provide no dimensional analysis, unit conversion or physical-validation
-proof; see the [unit-label contract](docs/solution_processes.md#checking-model-unit-labels).
+proof; see the [unit-label contract](docs/scenarios/solution_processes.md#checking-model-unit-labels).
 Loaded artifacts also carry path-independent byte fingerprints. Optional process `model_artifacts`
 pins block changed, missing or additional loaded models in the declared role/material group
 before inference and record the observed identities in reports. Pins accept SHA-256 as well as
@@ -925,17 +926,17 @@ optics/stratifier loaders. Studio's Run summary displays recorded SHA-256, byte 
 intentional disabled states. Stratifier workers use isolated models from one captured snapshot;
 strict mode disables both separate inference paths, retaining the independent optics extractor.
 These identities establish bytes, not physical validity. See the
-[artifact pinning contract](docs/solution_processes.md#pinning-loaded-model-artifacts).
+[artifact pinning contract](docs/scenarios/solution_processes.md#pinning-loaded-model-artifacts).
 Bindings can also read per-element material kinds from a declared process-state field, so changed
 material assignments select their own operators on the next call. A C++ selection gate blocks the
 batch before inference or reaction draws if an active kind has no compatible operator. Pins and
 unit checks cover all declared kinds; this supplies no spatial transport or validated material laws.
-See [dynamic material bindings](docs/solution_processes.md#per-element-material-kinds).
+See [dynamic material bindings](docs/scenarios/solution_processes.md#per-element-material-kinds).
 Spatial neighbour bindings now accept explicit x/y/z state arrays with a declared coordinate
 unit/cutoff and field symmetry, using engine `ctx.interact` for material-pair dispatch. Missing
 axes are rejected; truncated neighbour proposals preserve process state/clock and disclose
 inference already performed. Pins and units cover material combinations. This adds no validated
-heat/mass transport or crystal-interface model; see [spatial bindings](docs/solution_processes.md#spatial-neighbour-bindings).
+heat/mass transport or crystal-interface model; see [spatial bindings](docs/scenarios/solution_processes.md#spatial-neighbour-bindings).
 
 <details>
 <summary>Earlier diagnostic previews and reproduction instructions</summary>
@@ -945,7 +946,7 @@ typed Options, timeline and Processes readout. The runs use seed 424242 and no l
 
 <table>
 <tr><td valign="top">
-<a href="docs/images/studio-processes/aerodynamics-workspace.png"><img src="docs/images/studio-processes/aerodynamics-workspace.png" width="640" alt="Native TRECH Studio airflow workspace showing a temperature-coloured gas grid around a fixed obstacle, velocity arrows, editable JS, Mach controls and numerical temperature range"></a><br>
+<a href="docs/media/images/studio-processes/aerodynamics-workspace.png"><img src="docs/media/images/studio-processes/aerodynamics-workspace.png" width="640" alt="Native TRECH Studio airflow workspace showing a temperature-coloured gas grid around a fixed obstacle, velocity arrows, editable JS, Mach controls and numerical temperature range"></a><br>
 <b>Airflow · recorded gas temperature</b><br>
 Independent 2D ideal-gas Euler comparison at Mach 1.5: gas temperature 278.0–481.9 K after
 200 CFL steps (~0.533 ms). This is gas compression/expansion, with no viscosity, solid heating
@@ -955,7 +956,7 @@ or fracture model. Geant4's material probes remain separate.
 <img src="studio/tests/reference/aerodynamics.gif" width="360" alt="Studio-rendered animation of compressible flow developing around a fixed obstacle with gas-temperature and simulation-clock captions"><br>
 <b>Historical 2D airflow · Studio replay</b><br>
 50 recorded output intervals replayed in four display seconds, with velocity arrows and a
-disclosed temperature colour map. <a href="docs/images/studio-processes/aerodynamics-render.png">Full-size render</a>.
+disclosed temperature colour map. <a href="docs/media/images/studio-processes/aerodynamics-render.png">Full-size render</a>.
 </td></tr>
 </table>
 
@@ -971,8 +972,8 @@ and write a JSON sidecar; animation needs ffmpeg. Jobs run separately and can be
 studio/run_examples_suite.sh aerodynamics
 ```
 
-[Comparison scope](docs/process_references.md) ·
-[Native/media provenance and refresh guide](docs/images/studio-processes/README.md).
+[Comparison scope](docs/scenarios/process_references.md) ·
+[Native/media provenance and refresh guide](docs/media/images/studio-processes/README.md).
 These previews exercise implementation and rendering; quantitative physical validation remains open.
 
 </details>
@@ -985,14 +986,14 @@ the emitted Å-scale structure in 3D. Geant4 supplies isotope masses/composition
 response; natural-neutral CHNO can use the shared learned atomic → nano response. Optional
 reaction inventories use `ctx.react` with a supplied hazard model and derived atom/isotope/charge
 conservation. General stability, transferable polarization dynamics and atomistic reaction paths remain unavailable;
-no fixed valence or reaction-rate rules were added. [Usage and scope](docs/chemistry_mode.md).
+no fixed valence or reaction-rate rules were added. [Usage and scope](docs/studio/chemistry_mode.md).
 
 Chemistry now accepts **multi-molecule JSON scenes** with placements, rotations, explicit links
 and recorded density frames. Studio's view selector explores joint electron-density gradients,
 supplied probability samples, or Geant4 proton/neutron nuclear initial-state ensembles in fm.
 Open `chemistry_probability_reference.js` for water + D2: joint RHF/6-31g density is an independent
 quantum comparison along an authored approach scan, not Geant4 electron or reaction dynamics.
-[Probability views, JSON format and limits](docs/chemistry_probability.md).
+[Probability views, JSON format and limits](docs/studio/chemistry_probability.md).
 
 **Electronic reference calculation:** Studio and the terminal share an optional PySCF
 RHF/6-31g engine tool for edited JSON geometries. TRECH validates the results and emits total
@@ -1000,7 +1001,7 @@ energy, dipole, discrete orbital energies/occupations and individual orbital pro
 The **States & particles** tab shows counts and lets you select occupied/virtual states.
 Positions have continuous probability; discrete energies do not imply circular paths or fixed
 allowed radii. Nuclear views identify **one nucleus**, with species counts and sampled radial
-statistics. [Calculate and inspect quantum states](docs/chemistry_probability.md#shared-electronic-reference-calculation-and-quantum-states).
+statistics. [Calculate and inspect quantum states](docs/studio/chemistry_probability.md#shared-electronic-reference-calculation-and-quantum-states).
 
 **Nonuniform electron distributions:** **Chemistry → Atomic core/valence reference (Ne)**
 opens a computed ten-electron reference. The cloud mixes local occupied-energy contributions;
@@ -1008,7 +1009,7 @@ opens a computed ten-electron reference. The cloud mixes local occupied-energy c
 probability. Core concentration, outer peaks and nodes come from the solver, with no linear
 radial fade or fixed shell radii. **Field explorer** adds movable sections, enclosed-probability
 controls, signed orbital phase and joint-minus-isolated-molecule density comparisons.
-[Distribution details and limits](docs/chemistry_probability.md#nonuniform-occupied-level-distributions-through-an-atom).
+[Distribution details and limits](docs/studio/chemistry_probability.md#nonuniform-occupied-level-distributions-through-an-atom).
 
 ### Studio spectrum prediction mode
 
@@ -1019,7 +1020,7 @@ UV/Vis maxima. It trains a declarative catalogue of JS architectures (ridge, MLP
 message passing, with/without pooled atomic-model predictions) and exports the dense winners to
 TRECH. The dock plots measured vs learned spectra with the engine's trust badges, shows the
 architecture leaderboard and can rerun training. Predictions are learned comparisons, not Geant4
-results. [Contract, protocol and results](docs/spectrum_prediction.md).
+results. [Contract, protocol and results](docs/research/spectrum_prediction.md).
 
 ### ML model definitions and checkpoints
 
@@ -1029,7 +1030,7 @@ in [`ml/`](ml). `node tools/ml/bin/trech-ml.cjs` trains them through the existin
 keeps versioned, structure-typed checkpoints with recorded uses, last use and size, and prunes
 unused ones. Scenarios resolve a checkpoint with `TRECH_ML.modelEntry`. Studio's **Models** dock
 edits definitions with live validation and manages the store.
-[Contract, store layout and limits](docs/ml_models.md).
+[Contract, store layout and limits](docs/inference/ml_models.md).
 
 ### Studio Chemistry screenshots
 
@@ -1039,12 +1040,12 @@ Click an image to inspect the full workspace.
 <table>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/images/studio-chemistry/structure-editor.jpg"><img src="docs/images/studio-chemistry/structure-editor.jpg" width="640" alt="TRECH Studio Chemistry workspace showing water and deuterium structures beside the editable element, isotope mass number and coordinate table"></a><br>
+<a href="docs/media/images/studio-chemistry/structure-editor.jpg"><img src="docs/media/images/studio-chemistry/structure-editor.jpg" width="640" alt="TRECH Studio Chemistry workspace showing water and deuterium structures beside the editable element, isotope mass number and coordinate table"></a><br>
 <b>Atoms, isotopes and molecular structures.</b> The editor holds authored positions and
 declared bonds; the timeline replays a recorded parameter-scan frame.
 </td>
 <td width="50%" valign="top">
-<a href="docs/images/studio-chemistry/joint-density-gradient.jpg"><img src="docs/images/studio-chemistry/joint-density-gradient.jpg" width="640" alt="TRECH Studio showing joint water and deuterium density gradients, a recorded signed orbital overlay and a numerical section legend"></a><br>
+<a href="docs/media/images/studio-chemistry/joint-density-gradient.jpg"><img src="docs/media/images/studio-chemistry/joint-density-gradient.jpg" width="640" alt="TRECH Studio showing joint water and deuterium density gradients, a recorded signed orbital overlay and a numerical section legend"></a><br>
 <b>Joint density, gradients and orbital context.</b> A log-density volume and numeric section
 show the recorded distribution; orange/blue lobes overlay one orbital's signed phase.
 Joint means one electronic calculation of both molecules; it does not establish a shared bond.
@@ -1052,26 +1053,26 @@ Joint means one electronic calculation of both molecules; it does not establish 
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/images/studio-chemistry/orbital-phase-gradient.jpg"><img src="docs/images/studio-chemistry/orbital-phase-gradient.jpg" width="640" alt="TRECH Studio displaying orange and blue signed molecular-orbital lobes, a nodal plane and a numerical amplitude-gradient section"></a><br>
+<a href="docs/media/images/studio-chemistry/orbital-phase-gradient.jpg"><img src="docs/media/images/studio-chemistry/orbital-phase-gradient.jpg" width="640" alt="TRECH Studio displaying orange and blue signed molecular-orbital lobes, a nodal plane and a numerical amplitude-gradient section"></a><br>
 <b>Orbital phase, nodes and continuous probability.</b> Select a recorded orbital and move its
 section to explore signed amplitude. Orange/blue denote arbitrary wavefunction sign; the gap is
 a node. The independent RHF reference supplies the states, energies and occupations.
 </td>
 <td width="50%" valign="top">
-<a href="docs/images/studio-chemistry/nuclear-ensemble.jpg"><img src="docs/images/studio-chemistry/nuclear-ensemble.jpg" width="640" alt="TRECH Studio showing eight red protons and eight blue neutrons in an oxygen-16 Geant4 initial-state ensemble with engine-result and nonphysical-clock labels"></a><br>
+<a href="docs/media/images/studio-chemistry/nuclear-ensemble.jpg"><img src="docs/media/images/studio-chemistry/nuclear-ensemble.jpg" width="640" alt="TRECH Studio showing eight red protons and eight blue neutrons in an oxygen-16 Geant4 initial-state ensemble with engine-result and nonphysical-clock labels"></a><br>
 <b>One O-16 nucleus: 8 protons + 8 neutrons.</b> The selected Geant4 initial configuration
 appears beside its particle inventory, RMS distances and sampled radial-count distribution. Grey extent guides and glyph sizes are display choices; configuration index is separate from physical time.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/images/studio-chemistry/electron-level-diameter.jpg"><img src="docs/images/studio-chemistry/electron-level-diameter.jpg" width="640" alt="Neon occupied-level density through its diameter: narrow orange core, cyan nodal outer contribution and purple p-state density beside the 3D cutaway"></a><br>
+<a href="docs/media/images/studio-chemistry/electron-level-diameter.jpg"><img src="docs/media/images/studio-chemistry/electron-level-diameter.jpg" width="640" alt="Neon occupied-level density through its diameter: narrow orange core, cyan nodal outer contribution and purple p-state density beside the 3D cutaway"></a><br>
 <b>Density through the diameter.</b> Ne's computed occupied-energy groups contain 2, 2 and 6
 electrons. Their nonuniform contributions and nodes are shown on a log scale; white dashed is
 the total. Colors blend in the cloud where states overlap.
 </td>
 <td width="50%" valign="top">
-<a href="docs/images/studio-chemistry/electron-level-radial.jpg"><img src="docs/images/studio-chemistry/electron-level-radial.jpg" width="640" alt="Neon spherical radial electron distribution with a narrow core peak and broader outer-state peaks at distinct computed radii"></a><br>
+<a href="docs/media/images/studio-chemistry/electron-level-radial.jpg"><img src="docs/media/images/studio-chemistry/electron-level-radial.jpg" width="640" alt="Neon spherical radial electron distribution with a narrow core peak and broader outer-state peaks at distinct computed radii"></a><br>
 <b>Radial probability resolves core and outer distributions.</b> The spherical volume measure
 4πr² changes the profile: a narrow core peak and broader outer peaks emerge from the reference.
 No fixed shell radii are drawn; orbital eigenvalues are not measured excitation energies.
@@ -1079,7 +1080,7 @@ No fixed shell radii are drawn; orbital eigenvalues are not measured excitation 
 </tr>
 <tr>
 <td colspan="2" valign="top" align="center">
-<a href="docs/images/studio-chemistry/density-redistribution.jpg"><img src="docs/images/studio-chemistry/density-redistribution.jpg" width="800" alt="Joint-minus-isolated-fragment density showing orange increases and blue decreases with a quantitative signed section"></a><br>
+<a href="docs/media/images/studio-chemistry/density-redistribution.jpg"><img src="docs/media/images/studio-chemistry/density-redistribution.jpg" width="800" alt="Joint-minus-isolated-fragment density showing orange increases and blue decreases with a quantitative signed section"></a><br>
 <b>What changes when the molecules are calculated together?</b> Orange/blue show increased/decreased
 density against independently solved isolated fragments. This RHF comparison includes fragment-basis
 differences and is not proof of bonding, entanglement or a predicted reaction.
@@ -1087,7 +1088,7 @@ differences and is not proof of bonding, entanglement or a predicted reaction.
 </tr>
 </table>
 
-[Screenshot provenance and capture instructions](docs/images/studio-chemistry/README.md).
+[Screenshot provenance and capture instructions](docs/media/images/studio-chemistry/README.md).
 
 
 ## Outputs
@@ -1098,17 +1099,17 @@ differences and is not proof of bonding, entanglement or a predicted reaction.
 - `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
 - `trech_event_features.jsonl`: per-event features when `stratify.dumpFeatures` is true.
 - TorchScript models consume the feature vector in `FeaturePipeline::kSchemaId` order (`trech_event_features_v1`: `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`).
-- `trech_resim_queue.jsonl`: exceptional event queue when `stratify.enable` and `stratify.dumpResimQueue` are true. Opt-in `stratify.resimOnLowConfidence`, `resimOnStarvation` and `resimOnScaleMismatch` also queue events with out-of-domain, sparse-training or wrong-scale inference in `onEventEnd`; records retain the triggering causes. These are candidates for rerunning, not automatic resimulations. See the [inference policy contract](docs/scenario_hooks.md#per-stage-trust-profile-low-confidence-flags-carried-with-the-model).
+- `trech_resim_queue.jsonl`: exceptional event queue when `stratify.enable` and `stratify.dumpResimQueue` are true. Opt-in `stratify.resimOnLowConfidence`, `resimOnStarvation` and `resimOnScaleMismatch` also queue events with out-of-domain, sparse-training or wrong-scale inference in `onEventEnd`; records retain the triggering causes. These are candidates for rerunning, not automatic resimulations. See the [inference policy contract](docs/engine/scenario_hooks.md#per-stage-trust-profile-low-confidence-flags-carried-with-the-model).
 
 By default these are written to the current working directory; use `--output` to redirect.
-Schema details: `docs/output_schema.md`.
+Schema details: `docs/engine/output_schema.md`.
 System aggregation uses `system.volumeMm3` when provided; otherwise it derives volume from the medium box (if present) or the world cube.
 Hook registrations are recorded in the config JSON; determinism and stratify model provenance fields are emitted directly by the runtime.
 
 ## Testing and validation
 
-[Validation report](docs/validation_report.md) · [Generated summary](docs/validation_summary.md) ·
-[Scenario purity](docs/TRECH_current_scenarios_purity.md) · [Scenario guards](#essential-test-scenarios) · [Benchmark references](#benchmark-references)
+[Validation report](docs/validation/validation_report.md) · [Generated summary](docs/validation/validation_summary.md) ·
+[Scenario purity](docs/validation/TRECH_current_scenarios_purity.md) · [Scenario guards](#essential-test-scenarios) · [Benchmark references](#benchmark-references)
 
 These reports describe the builds and run inputs recorded in them. They do not establish
 compatibility with the updated dependency checkout; see [Dependencies](#dependencies).
@@ -1141,9 +1142,9 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 scripts/run_validation.sh
 ```
 
-Env overrides: `BUILD_PRESET` (default `dev`), `EVENTS` (default `100`), `SCORES_FILE` (default `trech_scores.jsonl`), `PROVENANCE_FILE` (default `trech_provenance.jsonl`), `SUMMARY_FILE` (default `docs/validation_summary.md`).
+Env overrides: `BUILD_PRESET` (default `dev`), `EVENTS` (default `100`), `SCORES_FILE` (default `trech_scores.jsonl`), `PROVENANCE_FILE` (default `trech_provenance.jsonl`), `SUMMARY_FILE` (default `docs/validation/validation_summary.md`).
 Requires Ninja, a C++ compiler, Python 3, and Geant4 for the H2O run.
-Successful runs write `docs/validation_summary.md` via `scripts/update_validation_summary.py`.
+Successful runs write `docs/validation/validation_summary.md` via `scripts/update_validation_summary.py`.
 
 ### Full scenario suite
 
@@ -1151,7 +1152,7 @@ Successful runs write `docs/validation_summary.md` via `scripts/update_validatio
 scripts/run_validation_suite.sh
 ```
 
-Re-runs the scenario guards and regenerates `docs/validation_report.md`. Slow scenarios and
+Re-runs the scenario guards and regenerates `docs/validation/validation_report.md`. Slow scenarios and
 individual validators have `SKIP_<NAME>` environment controls; consult the script and
 [benchmark conventions](#benchmark-references) before selecting a subset.
 
@@ -1162,7 +1163,7 @@ exercises, grouped by **how much each one learns from Geant4 vs. relies on a
 pre-written law**. The project thesis (see the top of this file) is to obtain
 behaviour from Geant4 particle transport and use classical formulas only for
 **comparison/validation** — so each scenario below is labelled with Geant4's
-role. Re-run them all and regenerate `docs/validation_report.md` with
+role. Re-run them all and regenerate `docs/validation/validation_report.md` with
 `scripts/run_validation_suite.sh`; each row's **validation case** is the
 pass/fail guard. Honest scope is stated per tier — Geant4 transports particles
 but cannot itself form bound molecules, compute band structure, or evolve a
@@ -1344,9 +1345,9 @@ All 18 untouched composition/energy/geometry cases pass unchanged error gates, w
 RMSE **0.00491 / 0.00293**; another 18 Geant4 realizations pass too. The first failed candidate
 and explicit development/final split remain auditable. This is an experimental unit-density
 cube/source benchmark: sparse-training warnings remain visible, and no experimental accuracy,
-real material density or molecular-dynamics claim follows. [Scope, data and commands](docs/particle_observer.md). The optional study checkpoints exercise routed
+real material density or molecular-dynamics claim follows. [Scope, data and commands](docs/inference/particle_observer.md). The optional study checkpoints exercise routed
 atomic specialists and recursive nano/meso set models with independent Geant4 transport.
-[Study and replay](docs/multiscale_domain_study.md).
+[Study and replay](docs/inference/multiscale_domain_study.md).
 
 The generic engine/trainer also support v2 sigmoid fraction links (`--logit-outputs`), with
 stable bounds and atomic overflow rejection; bounds do not certify model accuracy.
@@ -1375,7 +1376,7 @@ quantum/PubChem labels, and their held-out maximum relative error is below **0.6
 Three independent **30,000-photon Geant4 runs** check the learned molecular attenuation:
 absolute transmission gaps are 0.0033–0.0039. This first learned lift covers CHNO photon
 response under Geant4's independent-atom approximation; correlated electronic/bond/torsion
-inference remains open. [Data, validation and all six new GIFs](docs/particle_molecule.md),
+inference remains open. [Data, validation and all six new GIFs](docs/inference/particle_molecule.md),
 including [acetamide torsion](tools/viz/demos/molecular_acetamide.gif) and
 [its particle-response scan](tools/viz/demos/molecular_particle_acetamide.gif).
 
@@ -1396,12 +1397,12 @@ Independent minima differ from [PubChem 3D conformers](https://pubchem.ncbi.nlm.
 by 0.009–0.012 Å in mean bond length. Mulliken–PubChem MMFF94 charge differences are also
 reported (0.087–0.222 e); they use different charge definitions. These bounded comparison
 prototypes do not establish general molecular or experimental accuracy.
-[Scenarios, sources, validation and regeneration](docs/molecular_series.md) ·
+[Scenarios, sources, validation and regeneration](docs/scenarios/molecular_series.md) ·
 [Ethane control animation](tools/viz/demos/molecular_ethane.gif).
 
 ## Benchmark references
 
-Long-form validation benchmarks live under `docs/benchmarks/` as plain
+Long-form validation benchmarks live under `docs/validation/benchmarks/` as plain
 text snapshots. They are the canonical baselines that future commits
 diff against: when a run moves any number, the `.txt` shows the delta
 inline in the PR so engine regressions or improvements are caught in
@@ -1412,8 +1413,8 @@ Conventions for adding a benchmark:
 
 - The scenario lives under `examples/scenarios/<name>/<name>.js`.
 - The validator lives under `scripts/validate_<name>.py` and emits
-  three artifacts in one pass: `docs/<name>.md` (markdown report),
-  `docs/<name>.json` (sidecar), `docs/benchmarks/<name>.txt`
+  three artifacts in one pass: `docs/validation/<name>.md` (markdown report),
+  `docs/validation/<name>.json` (sidecar), `docs/validation/benchmarks/<name>.txt`
   (committed reference). The `.txt` must be deterministic given the
   same run inputs so the diff stays clean.
 - The validator is wired into `scripts/run_validation_suite.sh` with
@@ -1421,7 +1422,7 @@ Conventions for adding a benchmark:
 
 | Benchmark | Scenario | Validator | Reference | Status |
 |---|---|---|---|---|
-| Glass-of-Water optical inverse | [validation_glass_of_water.js](examples/scenarios/validation_glass_of_water/validation_glass_of_water.js) | [validate_glass_of_water.py](scripts/validate_glass_of_water.py) | [`docs/benchmarks/validation_glass_of_water.txt`](docs/benchmarks/validation_glass_of_water.txt) | informational; after the f-sum valence oscillator the engine derives n_water ≈ 1.331 / n_glass ≈ 1.472 (≈99% / ≈103% of handbook, up from ≈1.001) — inverse-Snell recovers n within ≤1.1% rel err at every interface (4000 events / seed 20260525) |
+| Glass-of-Water optical inverse | [validation_glass_of_water.js](examples/scenarios/validation_glass_of_water/validation_glass_of_water.js) | [validate_glass_of_water.py](scripts/validate_glass_of_water.py) | [`docs/validation/benchmarks/validation_glass_of_water.txt`](docs/validation/benchmarks/validation_glass_of_water.txt) | informational; after the f-sum valence oscillator the engine derives n_water ≈ 1.331 / n_glass ≈ 1.472 (≈99% / ≈103% of handbook, up from ≈1.001) — inverse-Snell recovers n within ≤1.1% rel err at every interface (4000 events / seed 20260525) |
 
 Future benchmarks should be appended as new rows. Tighten the status
 column to `pass` / `fail` once a benchmark has a numeric tolerance the
@@ -1439,7 +1440,7 @@ js                    Shared TRECH JS modules
 projects/             Self-contained JS subprojects (spectrum_prediction)
 ml/                   JS model definitions and structure searches (trech-ml)
 tests/                unit tests
-docs/                 roadmap and structure
+docs/                 categorized documentation with recursive README indexes
 tools/viz/            Python 3D viewer (PyVista) + demo renderers
 studio/               TRECH Studio — desktop UI (3D scenario editor + viewer + code editor)
 thirds/               submodules and vendored dependencies
@@ -1448,7 +1449,7 @@ thirds/               submodules and vendored dependencies
 ## Roadmap
 
 - Engine, scenarios, tools and Studio: [ROADMAP.md](ROADMAP.md) (shared editable source of truth)
-- Initial roadmap concept: `docs/trech-roadmap.md` (reference-only)
+- Initial roadmap concept: `docs/project/trech-roadmap.md` (reference-only)
 - H2O experiment spec (initial): `examples/scenarios/h2o_fluid/h2o_fluid_spec.md`
 - CNT parallel track for schema/physics coherence: `ROADMAP.md`
 
@@ -1457,7 +1458,7 @@ thirds/               submodules and vendored dependencies
 - **Sputnik:** H2O fluid behaviour with as much subatomic grounding as practical; accurate
   photon transport, scattering, absorption, refraction and colour response.
 - **Vostok:** CNT structure, chirality, diameter and electron behaviour comparisons, including
-  band gaps and CNTFET logic; see [the CNT reference](docs/CNT/BackToTheCarbon.md) and examples.
+  band gaps and CNTFET logic; see [the CNT reference](docs/research/cnt/BackToTheCarbon.md) and examples.
 - **Scale-up:** distinguish predictable events from outliers that need re-simulation; reach
   large molecule counts through learned acceleration, variance reduction and reduced models
   (including candidate methods such as Lattice Boltzmann).

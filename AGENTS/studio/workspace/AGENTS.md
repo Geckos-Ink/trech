@@ -36,7 +36,7 @@ residual).
   `None`, reported as unrecorded); showing an unmeasured accuracy as 0 — absent must read as absent;
   collapsing `joint_measured is None` (not checked) into "not starved".
 - **Observer comparisons:** `ScaleLadder.comparisons` (`ObserverComparison`, `BasisValue`) reads
-  a payload's top-level `observer_comparisons` list ([convention](../../../docs/scenario_hooks.md)):
+  a payload's top-level `observer_comparisons` list ([convention](../../../docs/engine/scenario_hooks.md)):
   inferred value, independent reference, unit, lower-scale basis and `stage_output`. The last emit
   wins per (tag, quantity). `relative_gap` is plain arithmetic on the two recorded numbers; a
   `null` or zero reference is reported as not graded/undefined, never as agreement. Stage trust
@@ -77,7 +77,7 @@ whitespace tokens over file name, folder path under the root and the file's lead
 folders with no match, shows "k of N", survives Refresh, and Enter opens the scenario only when
 exactly one matches; family and validation-status selectors plus `family:`/`validation:`/`grade:`/
 `physics:` tokens come from `load_purity_index()` over the committed
-`docs/TRECH_current_scenarios_purity.json`, keyed by entry path and labelled with the report's
+`docs/validation/TRECH_current_scenarios_purity.json`, keyed by entry path and labelled with the report's
 recorded git sha; without an index the selectors are disabled),
 [`cascade.py`](../../../studio/trech_studio/ui/cascade.py) (the **Scale ladder** dock: every recorded inference pass,
 its bands, its Geant4-derived seed facts and each stage's engine-set trust badges + measured
@@ -133,7 +133,7 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   file SHA-256 equals the run's recorded `sha256` (`Registry.checkpoint_for_sha256`), or "not a
   stored checkpoint"; without a readable registry nothing is claimed. Rows also show a
   TorchScript `io_sidecar_sha256`.
-  Every store change goes through the CLI ([contract](../../../docs/ml_models.md)).
+  Every store change goes through the CLI ([contract](../../../docs/inference/ml_models.md)).
   Tests: `studio/tests/test_models.py`.
 - **Scale ladder — Shipped (2026-08-15).** The `Scale ladder` dock (tabbed with Console/Run
   summary/Emits) reads every `ctx.cascade` / `ctx.evolve` / `ctx.react` / `ctx.interact` trace out of

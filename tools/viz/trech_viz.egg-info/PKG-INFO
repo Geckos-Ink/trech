@@ -108,4 +108,4 @@ Useful flags:
 
 ## Notes
 
-The viewer is intentionally simple — it is a debug / demo surface, not a production renderer. If you need photoreal output use the JSONL artefacts as input to whatever pipeline you prefer; the data layer is documented in `docs/output_schema.md` (sections `trech_viz_scene.json`, `trech_viz_trajectories.jsonl`, and `trech_hook_emits.jsonl`).
+The viewer is intentionally simple — it is a debug / demo surface, not a production renderer. If you need photoreal output use the JSONL artefacts as input to whatever pipeline you prefer; the data layer is documented in `docs/engine/output_schema.md` (sections `trech_viz_scene.json`, `trech_viz_trajectories.jsonl`, and `trech_hook_emits.jsonl`).

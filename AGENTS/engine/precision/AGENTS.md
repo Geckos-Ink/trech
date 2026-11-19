@@ -23,4 +23,4 @@ Read the root principles and the parent handbook first; then open only the subca
   `requested_events`, budget, wall time and stop reason are conditional metadata. Strict rejects
   timing budgets. `ScaleCascade` chooses dependency-ready stages within a band, with registration
   order breaking ties; optional third-argument `ctx.cascade` limits (`maxStages`, `targetOutputs`)
-  disclose every omitted stage. No three-stage cap. Full contract: [`docs/adaptive_precision.md`](../../../docs/adaptive_precision.md).
+  disclose every omitted stage. No three-stage cap. Full contract: [`docs/engine/adaptive_precision.md`](../../../docs/engine/adaptive_precision.md).

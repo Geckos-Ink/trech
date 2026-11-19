@@ -2,7 +2,7 @@
 
 JavaScript definitions of learned models (`*.model.js`) and structure searches (`*.search.js`),
 trained and managed with `node tools/ml/bin/trech-ml.cjs` and editable live in Studio's **Models**
-dock. Contract, store layout and honesty rules: [`docs/ml_models.md`](../docs/ml_models.md).
+dock. Contract, store layout and honesty rules: [`docs/inference/ml_models.md`](../docs/inference/ml_models.md).
 
 | Path | Content |
 | --- | --- |
@@ -30,7 +30,7 @@ node tools/ml/bin/trech-ml.cjs list
 ```
 
 Add `--validate` to `train`/`search` (or run `trech-ml validate <name>`) to grade the result with
-the independent validator ([gates](../docs/ml_models.md#validating-a-model)).
+the independent validator ([gates](../docs/inference/ml_models.md#validating-a-model)).
 
 On the 2026-11-11 checkout (torch 2.8), the search evaluated 19 structures (silu/tanh × uniform/
 tapered widths, plus linear) with 3 seeds each. The one-standard-error rule selected

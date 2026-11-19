@@ -49,7 +49,7 @@ dated record below, and queue its residuals in the same change.
   backend. Upstream build, runtime/API/replay parity and performance validation remain engine work in this
   roadmap. No training or Geant4 logic moves into Studio's viewer/render layer.
 
-Contracts: `docs/studio_authoring.md`, `docs/process_references.md`, `docs/v8.md`.
+Contracts: `docs/studio/studio_authoring.md`, `docs/scenarios/process_references.md`, `docs/engine/v8.md`.
 Behavioural tests: `studio/tests/test_authoring.py` (real-engine reinspection plus Qt editor/stream checks).
 Source-guard verification: full pytest 106 passed, one GPU-detail check skipped because the sandbox
 exposes no Metal adapter. Tests preserve dormant/visible drafts and active jobs on Cancel/failed

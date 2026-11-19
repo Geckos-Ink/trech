@@ -4,7 +4,7 @@ Dataset
 -------
 
 Consumes run directories produced by `trech run` with `stratify.enable` +
-`stratify.dumpFeatures` (see `docs/output_schema.md`): each line of
+`stratify.dumpFeatures` (see `docs/engine/output_schema.md`): each line of
 `trech_event_features.jsonl` carries the ordered `trech_event_features_v1`
 feature vector plus a teacher label.  The bootstrap teacher is the engine's
 deterministic thresholds (`stratify.*Threshold`); once a model is deployed

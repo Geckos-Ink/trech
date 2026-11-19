@@ -21,7 +21,7 @@
 //        * ON/OFF current ratio ~ exp(E_g / 2kT): a wide-gap (small-diameter)
 //          tube switches cleanly; a METALLIC tube (E_g ~ 0) cannot be turned
 //          off -- it is a permanent short. This is exactly the manufacturing
-//          problem in docs/CNT/BackToTheCarbon.md: metallic tubes mixed into a
+//          problem in docs/research/cnt/BackToTheCarbon.md: metallic tubes mixed into a
 //          forest behave as invisible wires that destroy the logic.
 //
 //   3. DEVICE -> GATE. Each CNTFET is a switch with channel resistance R_on
@@ -1041,7 +1041,7 @@ globalThis.TRECH_HOOKS = {
       references: {
         subthreshold_swing: "SS = ln(10) kT/q ~ 60 mV/decade at 300 K (Fermi-Dirac limit)",
         on_off_vs_gap: "on/off ~ exp(E_g/2kT); metallic (E_g~0) cannot switch off",
-        manufacturing: "metallic tubes short the channel (docs/CNT/BackToTheCarbon.md)"
+        manufacturing: "metallic tubes short the channel (docs/research/cnt/BackToTheCarbon.md)"
       }
     });
     return { override: { system: { ensemble: "cnt_logic_gates" } } };
@@ -1206,7 +1206,7 @@ globalThis.TRECH_HOOKS = {
       references: {
         metallicity_rule: "(n-m) mod 3 == 0 => metallic (Saito/Dresselhaus 1998)",
         subthreshold_swing: "SS = ln(10) kT/q ~ 60 mV/decade at 300 K",
-        manufacturing: "metallic tubes short the device (docs/CNT/BackToTheCarbon.md)"
+        manufacturing: "metallic tubes short the device (docs/research/cnt/BackToTheCarbon.md)"
       },
       validation: Object.assign(
         TRECH_CHECKS["cnt_logic_gates"]["checks0"](allGatesCorrect, cntLogicGatesOk, fermiTrendOk, fullAdderCorrect, geant4DrivePresent, halfAdderCorrect, metallicBreaksLogic, noiseMarginHealthy, onOffGapControlled, rippleAdderCorrect, round4, semiWorstRail, swingNear60),

@@ -150,7 +150,7 @@ loop, `GeantLabRunner`); `Inspect` → prints `{config, parameters}` JSON; `Run`
   `hooks.registered`/`models`/`optics.spectrum`/`analytic.checks`/`nuclear.cycles` →
   [`src/core/Config.cpp`](../../../src/core/Config.cpp).
 - **Lab protocol:** `patch`/`simulate`/`snapshot`/`help`/`quit` → [`src/core/LabSession.cpp`](../../../src/core/LabSession.cpp).
-- **Output files** (schemas in [`docs/output_schema.md`](../../../docs/output_schema.md)):
+- **Output files** (schemas in [`docs/engine/output_schema.md`](../../../docs/engine/output_schema.md)):
   `trech_scores.jsonl`/`trech_provenance.jsonl` (core writers), `trech_event_scores.jsonl`
   (stratifier), `trech_hook_emits.jsonl` (hook emits), `trech_viz_scene.json` +
   `trech_viz_trajectories.jsonl` (`VizRecorder`, gated on `viz.enable`).

@@ -30,7 +30,7 @@ comparison/clock/scalar captions. They sample recorded states directly without i
 NaCl's clock is a comparison step index; airflow retains its SI solver time. Neither is a
 Geant4-trained phase-change/aerodynamics prediction. Their JSON sidecars retain frame sampling,
 source run/config identity, representation choices and final emitted readouts. See the
-[native screenshots and media manifest](../../../docs/images/studio-processes/README.md).
+[native screenshots and media manifest](../../../docs/media/images/studio-processes/README.md).
 
 ## They are NOT regenerated on every run
 

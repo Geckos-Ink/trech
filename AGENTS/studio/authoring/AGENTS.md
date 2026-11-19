@@ -9,7 +9,7 @@ Read the root principles and the parent handbook first; then open only the subca
 edit/save/re-inspect them while Run stays bound to the root. Built-in Chemistry/atomic-reference actions resolve the bundled physics entry points.
 Browser discovery hides companions
 and shared `trech_*.js` modules. Typed parameter factories work identically outside Studio.
-Contract: [`docs/scenario_bundles.md`](../../../docs/scenario_bundles.md).
+Contract: [`docs/scenarios/scenario_bundles.md`](../../../docs/scenarios/scenario_bundles.md).
 
 **Completion catalog:** `code_editor.py` `_MEMBERS`/`_CONFIG_MEMBERS` mirror the executable
 surface only: `ctx.step` lists the engine step detail and `ctx.runtime.runId`, `TRECH_GEOMETRY`
@@ -28,7 +28,7 @@ recovery and atomic multi-file disk writes remain roadmap work.
 `studio/trech_studio/ui/processes.py` displays declared process roles and configured models, never starts training.
 It also selects recorded material streams. Material comparison streams may declare step-index
 clocks and hide unrelated Geant4 probe geometry via `show_geant4_scene:false`, reported in capture
-metadata. Full contract: [`docs/studio_authoring.md`](../../../docs/studio_authoring.md).
+metadata. Full contract: [`docs/studio/studio_authoring.md`](../../../docs/studio/studio_authoring.md).
 
 **Transport-scene export:** `studio/trech_studio/scene/writer.py` exposes pure
 `scene_to_config` / `scene_to_js`. Loaded scenes require the full provenance config;

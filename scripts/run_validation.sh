@@ -5,7 +5,7 @@ BUILD_PRESET="${BUILD_PRESET:-dev}"
 EVENTS="${EVENTS:-100}"
 SCORES_FILE="${SCORES_FILE:-trech_scores.jsonl}"
 PROVENANCE_FILE="${PROVENANCE_FILE:-trech_provenance.jsonl}"
-SUMMARY_FILE="${SUMMARY_FILE:-docs/validation_summary.md}"
+SUMMARY_FILE="${SUMMARY_FILE:-docs/validation/validation_summary.md}"
 
 if ! command -v cmake >/dev/null 2>&1; then
   echo "Missing cmake. Install CMake before running validation." 1>&2

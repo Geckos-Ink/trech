@@ -20,12 +20,12 @@ dated record below, and queue its residuals in the same change.
 
 - **P1** · R3 · Route the remaining multi-method engine paths through the domain-free `MethodArbiter`: `ctx.react` overlapping rivals (hazards; the `DiscreteTransition` draw must stay deterministic), `ctx.interact` pair operators (which do not route yet), and `ctx.predict`/`ctx.cascade` rival models for the same output (today last-writer-wins). `ctx.evolveField` and `ctx.evolve` rivals are done. Each path needs a method registry or rival set, so a model or algorithm added later joins without scenario changes. Strict mode stays inference-free. ([detail](AGENTS.md))
 - **P2** · R3 · No scenario has overlapping `ctx.evolve` rivals today: the glass furnace's trained laws split its population cleanly, so rival arbitration is exercised only by `trech_state_evolution`. Exercise it on a family with two candidate operator families for one quantity and an evidence source that is not one of the rivals (a held-out Geant4-derived or measured rate). The scenario-chosen `physics_source` families of the furnace are the obvious place to retire into emergent selection. ([detail](AGENTS.md))
-- **P2** · R3 · Rival arbitration covers rate outputs only. Intermediates and `set_` assignments of every covering rival still apply, so a chosen rival's higher-band consumers may read a rejected rival's intermediate. Arbitrate the whole rival output, and re-run the higher bands from the chosen rival's intermediates. ([detail](../../../docs/scenario_hooks.md))
+- **P2** · R3 · Rival arbitration covers rate outputs only. Intermediates and `set_` assignments of every covering rival still apply, so a chosen rival's higher-band consumers may read a rejected rival's intermediate. Arbitrate the whole rival output, and re-run the higher bands from the chosen rival's intermediates. ([detail](../../../docs/engine/scenario_hooks.md))
 - **P2** · R4 · Rival and field arbiters live for one run only. Export and restore their learned state (as `ctx.learnDomains` does) so a later run can deploy them frozen, which is also the held-out test of the choice. ([detail](AGENTS.md))
-- **P1** · R2 · Close residual CHNO observer coverage holes and validate transfer across composition, geometry and source context. The larger campaign reduced error and measured sparse coverage, and 29 of 48 new conditions still show per-feature starvation with 10 jointly starved. ([study](../../../docs/multiscale_domain_study.md#final-runs-and-validation))
+- **P1** · R2 · Close residual CHNO observer coverage holes and validate transfer across composition, geometry and source context. The larger campaign reduced error and measured sparse coverage, and 29 of 48 new conditions still show per-feature starvation with 10 jointly starved. ([study](../../../docs/inference/multiscale_domain_study.md#final-runs-and-validation))
 - **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
-- **P2** · R2 · Improve recursive hierarchy transfer and calibration. The experimental CHNO scenario runs Geant4-trained atom → nano group → meso observer chains with both atomic backends. Their error and interval coverage lag the dense observer on unseen compositions. ([study](../../../docs/multiscale_domain_study.md#final-runs-and-validation))
+- **P2** · R2 · Improve recursive hierarchy transfer and calibration. The experimental CHNO scenario runs Geant4-trained atom → nano group → meso observer chains with both atomic backends. Their error and interval coverage lag the dense observer on unseen compositions. ([study](../../../docs/inference/multiscale_domain_study.md#final-runs-and-validation))
 - **P2** · R2 · Domain routing beyond glass from sand: route a second family (lava lamp wax/carrier, membrane efflux) and measure routing domains from particle-derived rows rather than from the scenario's own labelled harvest; let elements outside every envelope queue a Geant4 experiment plan and a `trech arch` job for the uncovered regime. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit; route `ctx.interact` pairs from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Particle-derived teachers for the online domain learner. `ctx.learnDomains` now learns dynamically changing operator responses (furnace thermal law, lamp parcels, efflux transport), but every teacher is an authored or distilled operator. Feed Geant4-derived rows (CHNO observer, atomic tables) and grade the learned domains against held-out Geant4 runs. Expose the TorchScript specialist index in engine traces and turn recurring uncovered regimes into experiment requests. ([detail](#online-response-domain-learning-2026-11-18))
@@ -92,7 +92,7 @@ dated record below, and queue its residuals in the same change.
   (6.7 × 10⁻¹⁶), `trech_js_runtime`, `trech_state_evolution`, `trech_cli_parse`. Default runs of the
   furnace, lamp and efflux are byte-identical to HEAD's scenario sources with learning off.
   Results and the faults found live in the
-  [domain study](../../../docs/multiscale_domain_study.md#online-response-domain-learning).
+  [domain study](../../../docs/inference/multiscale_domain_study.md#online-response-domain-learning).
 - [x] Warm-started learners no longer re-serialise their stored state every call (options are read
   only on creation); this fault stalled the second efflux training run for 3+ hours. Efflux campaign: training on
   seeds 101/102, frozen held-out seed 201 at 73–78% (position rate) and 85–91% (velocity) steady
@@ -109,7 +109,7 @@ dated record below, and queue its residuals in the same change.
     a losing model keeps the reference. Since the mandatory-LibTorch change, every other
     outcome fails the job (see below). The engine-native-only mode and the classic fallback
     were removed then.
-  - Contract in [`docs/evolvo_architectures.md`](../../../docs/evolvo_architectures.md#in-the-engine-trech-arch).
+  - Contract in [`docs/inference/evolvo_architectures.md`](../../../docs/inference/evolvo_architectures.md#in-the-engine-trech-arch).
 - Verification:
   - CTest `trech_architecture_generator` (fake workers cover accept, lying-reject, mismatch,
     unavailable, crash and timeout), `trech_architecture_evolvo_live` and `trech_cli_parse`.
@@ -201,7 +201,7 @@ dated record below, and queue its residuals in the same change.
 - [x] The projected-gap trainer freezes recurring populations and dispatches named TorchScript
   specialists in LibTorch. On two withheld CHNO energy grids it selected both atomic experts.
   The furnace thermal teacher selected the pooled affine fit. See the
-  [multi-scale domain study](../../../docs/multiscale_domain_study.md).
+  [multi-scale domain study](../../../docs/inference/multiscale_domain_study.md).
 
 ## Required LibTorch (2026-11-18)
 
@@ -237,7 +237,7 @@ dated record below, and queue its residuals in the same change.
   never truncated. Missing features/context/positions stop the hierarchy with a named reason.
   Out-of-domain and starved lineage propagate to the observer. Without `levels`, the engine plans
   the hierarchy from declared `operator_role: "group_lift"` models by scale. Contract:
-  [`docs/group_hierarchy.md`](../../../docs/group_hierarchy.md).
+  [`docs/inference/group_hierarchy.md`](../../../docs/inference/group_hierarchy.md).
 - [x] Trainer `trech_torch.hierarchy` (`trech-train-hierarchy`): all levels end to end in torch,
   each on the chain's own predictions, with mixed supervised/latent outputs, whole-run selection
   early stopping, chained holdout and a run-level interval measured on the exported JSON.
@@ -251,7 +251,7 @@ dated record below, and queue its residuals in the same change.
   **worse** than g × Σ of its own predicted block energies (R² 0.620; 0.875 with true block
   labels). The cross-scale correction does not yet pay for itself, and the block level is the
   bottleneck. A first 800-system DeepSets run without early stopping overfit (system 0.35). See
-  [the demo record](../../../docs/group_hierarchy.md#synthetic-demonstration-architecture-only).
+  [the demo record](../../../docs/inference/group_hierarchy.md#synthetic-demonstration-architecture-only).
 - [ ] Residuals, queued above: no Geant4-harvested hierarchy and no scenario user; no
   propagated per-group uncertainty; groups do not see neighbouring groups; one fixed lattice per
   level.
@@ -303,7 +303,7 @@ dated record below, and queue its residuals in the same change.
   unrelated Geant4 mm scene. GPU frame caches are bounded; malformed bond rows are dropped.
 - **[validated]** `ctest --preset dev` 17/17; Studio's pure/UI suites and four Mac-GPU
   animation/capture tests pass. A real molecular-run capture was visually checked. Refreshed
-  `docs/validation_report.{md,json}`: 49 cases, **42 pass / 0 fail/error / 4 info / 3 skip**;
+  `docs/validation/validation_report.{md,json}`: 49 cases, **42 pass / 0 fail/error / 4 info / 3 skip**;
   efflux, H2O-cycle, polyurethane and glass operator/reference gates all pass. The skips are the
   slow bulk-water, diffusion-temperature and shaken-glass scenarios; they were not rerun here.
 - **[landed] Offline validation inputs.** `PUBCHEM_MODE=cache-only` preflights the selected
@@ -380,7 +380,7 @@ from the former to the latter.
    run, with no attenuation/deposition formula supplying either target or runtime behavior.
    A failed first campaign remains archived; 192 fitting / 12 explicit development / 18 untouched
    whole-composition/energy/geometry final cases pass unchanged acceptance gates. Fresh Geant4
-   realizations pass too. [Details and limits](../../../docs/particle_observer.md).
+   realizations pass too. [Details and limits](../../../docs/inference/particle_observer.md).
    **Still open:** fourteen of eighteen fresh observer queries are per-feature-starved and five
    jointly starved, despite passing bounded error checks. Sample those gaps and reserve fresh
    independent conditions before broader promotion. Physical measurement validation, varied
@@ -472,7 +472,7 @@ from the former to the latter.
 - **Stages flagged jointly starved** (in range on every axis, far from any training point) and the
   count of committed models that carry a joint reference at all — an unchecked model is not a clean
   one. `plan_experiments --models` converts both into the operating points to simulate next.
-  The generated [model audit](../../../docs/ml_model_audit.md) tracks the count (14 of 50 on
+  The generated [model audit](../../../docs/validation/ml_model_audit.md) tracks the count (14 of 50 on
   2026-11-11) together with complete/partial/absent trust profiles (14/8/28).
 - **Fraction of final cascade outputs with held-out RMSE or a calibrated interval** is recorded
   as `measuredUncertaintyFraction` and carried into the affected validation cases. A zero fraction

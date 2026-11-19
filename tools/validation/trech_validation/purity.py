@@ -1,6 +1,6 @@
 """Scenario purity report: how much behaviour is inferred versus authored.
 
-Writes ``docs/TRECH_current_scenarios_purity.md`` with one section per scenario
+Writes ``docs/validation/TRECH_current_scenarios_purity.md`` with one section per scenario
 bundle under ``examples/scenarios/``. The report is generated only from
 committed inputs, so its content is deterministic and ``--check`` can guard it:
 
@@ -14,9 +14,9 @@ committed inputs, so its content is deterministic and ``--check`` can guard it:
 * the provenance of every model file the scenario references
   (Geant4-trained, distilled from an authored teacher, anchor-trained or
   hand-authored);
-* recorded performance: ``docs/validation_report.json`` cases mapped to
+* recorded performance: ``docs/validation/validation_report.json`` cases mapped to
   scenarios through the suite's run names, plus other committed
-  ``docs/validation_*.json`` reports attributed through their validator.
+  ``docs/validation/validation_*.json`` reports attributed through their validator.
 
 The static evidence is a heuristic. It does not run the engine and cannot prove
 that a code path is reached; the reviewed ledger stays authoritative and the
@@ -41,8 +41,8 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 ROOT = Path(__file__).resolve().parents[3]
 SCENARIOS_DIR = ROOT / "examples" / "scenarios"
 AUDIT_PATH = ROOT / "tools" / "validation" / "js_law_audit.json"
-VALIDATION_REPORT = ROOT / "docs" / "validation_report.json"
-DEFAULT_OUTPUT = ROOT / "docs" / "TRECH_current_scenarios_purity.md"
+VALIDATION_REPORT = ROOT / "docs" / "validation" / "validation_report.json"
+DEFAULT_OUTPUT = ROOT / "docs" / "validation" / "TRECH_current_scenarios_purity.md"
 INDEX_SCHEMA = "trech_scenario_purity_index_v1"
 SCHEMA = "trech_scenario_purity_v1"
 
@@ -644,10 +644,10 @@ RE_ERR_KEY = re.compile(r"(rel_error|relative_error|^mae|_mae$|mae_|^r2|rmse|^de
 
 
 def aux_reports(scenarios: Sequence[str]) -> Dict[str, List[Tuple[str, List[str]]]]:
-    """Other committed ``docs/validation_*.json`` reports, attributed via their validator."""
+    """Other committed ``docs/validation/validation_*.json`` reports, attributed via their validator."""
     out: Dict[str, List[Tuple[str, List[str]]]] = {s: [] for s in scenarios}
     scen_re = re.compile(r"examples/scenarios/([A-Za-z0-9_]+)")
-    for report in sorted((ROOT / "docs").glob("validation_*.json")):
+    for report in sorted((ROOT / "docs" / "validation").glob("validation_*.json")):
         if report.name == VALIDATION_REPORT.name:
             continue
         validator = ROOT / "scripts" / f"validate_{report.stem[len('validation_'):]}.py"
@@ -897,10 +897,10 @@ def render(reports: Sequence[ScenarioReport], meta: Dict[str, str]) -> str:
     w("     PYTHONPATH=tools/validation python3 -m trech_validation.purity")
     w(f"     schema: {SCHEMA} -->")
     w("")
-    w("This report shows, for every bundle in [`examples/scenarios/`](../examples/scenarios), how much of "
+    w("This report shows, for every bundle in [`examples/scenarios/`](../../examples/scenarios), how much of "
       "its behaviour comes from **TRECH statistical inference over the Geant4 base** and how much is "
       "**forced by authored laws, fixed constants and closed-form functions**. It follows the "
-      "[engine thesis](../AGENTS.md#essential-project-principles): elementary Geant4 truth is lifted scale by "
+      "[engine thesis](../../AGENTS.md#essential-project-principles): elementary Geant4 truth is lifted scale by "
       "scale through learned models, and classical formulas stay comparison/validation references only.")
     w("")
     w("It is regenerated from committed inputs only, so it is reproducible and guarded by CTest "
@@ -914,7 +914,7 @@ def render(reports: Sequence[ScenarioReport], meta: Dict[str, str]) -> str:
     w("")
     w("### Purity grade")
     w("")
-    w("The reviewed law ledger ([`tools/validation/js_law_audit.json`](../tools/validation/js_law_audit.json)) "
+    w("The reviewed law ledger ([`tools/validation/js_law_audit.json`](../../tools/validation/js_law_audit.json)) "
       "is authoritative. Bundles outside the ledger fall back to the `physics_status` declared in their "
       "`.validation.js` companion. Model provenance then decides between A and B (or A and M).")
     w("")
@@ -951,7 +951,7 @@ def render(reports: Sequence[ScenarioReport], meta: Dict[str, str]) -> str:
       "`note.teacher` and `note.geant4_trained`.")
     w("")
     if meta:
-        w(f"Performance source: [`docs/validation_report.json`](validation_report.json), generated "
+        w(f"Performance source: [`docs/validation/validation_report.json`](validation_report.json), generated "
           f"{meta.get('generated', '?')} at `{meta.get('git_sha', '?')}` (totals {meta.get('counts', '{}')}). "
           "Bundles that the suite does not run show *none recorded*. Their dedicated validators "
           "(when declared) are listed per section.")
@@ -986,7 +986,7 @@ def render(reports: Sequence[ScenarioReport], meta: Dict[str, str]) -> str:
     for r in reports:
         w(f"### {r.name}")
         w("")
-        w(f"**Grade {r.grade} — {GRADE_TITLES[r.grade]}** · entry [`{r.entry}`](../{r.entry})")
+        w(f"**Grade {r.grade} — {GRADE_TITLES[r.grade]}** · entry [`{r.entry}`](../../{r.entry})")
         w("")
         if r.scope:
             w(f"> {esc(r.scope)}")
@@ -1041,7 +1041,7 @@ def render(reports: Sequence[ScenarioReport], meta: Dict[str, str]) -> str:
                 for m in normal:
                     r2 = "—" if m.r2_min is None else f"{m.r2_min:.4f}"
                     n = "—" if m.holdout_n is None else str(m.holdout_n)
-                    w(f"| [`{m.path}`](../{m.path}) | {m.label} | {m.scale or '—'} | {r2} | {n} |")
+                    w(f"| [`{m.path}`](../../{m.path}) | {m.label} | {m.scale or '—'} | {r2} | {n} |")
                 w("")
             teachers = [m for m in r.models if not m.normal_path]
             if teachers:
@@ -1058,9 +1058,9 @@ def render(reports: Sequence[ScenarioReport], meta: Dict[str, str]) -> str:
         else:
             w("- No case in the committed validation report runs this bundle.")
         for report, lines in r.aux:
-            w(f"- [`{report}`](../{report}): " + ("; ".join(lines) if lines else "recorded"))
+            w(f"- [`{report}`](../../{report}): " + ("; ".join(lines) if lines else "recorded"))
         if r.validator and r.validator != "tools/validation/trech_validation/cases.py":
-            w(f"- Dedicated validator: [`{r.validator}`](../{r.validator})")
+            w(f"- Dedicated validator: [`{r.validator}`](../../{r.validator})")
         w("")
         if r.flags:
             w("**Review flags**")
@@ -1133,7 +1133,7 @@ RELEVANT_PREFIXES = (
     "tools/validation/",
     "scripts/",
 )
-RE_RELEVANT_DOC = re.compile(r"^docs/validation_[^/]*\.json$")
+RE_RELEVANT_DOC = re.compile(r"^docs/validation/validation_[^/]*\.json$")
 DEFAULT_MAX_AGE_DAYS = 30
 
 
@@ -1201,7 +1201,7 @@ def pre_commit(output: Path, max_age_days: float) -> int:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m trech_validation.purity",
-        description="Write docs/TRECH_current_scenarios_purity.md (scenario inference purity + performance) "
+        description="Write docs/validation/TRECH_current_scenarios_purity.md (scenario inference purity + performance) "
                     "and its JSON index (.json next to it).")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--check", action="store_true",

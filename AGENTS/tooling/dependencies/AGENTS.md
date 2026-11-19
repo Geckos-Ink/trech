@@ -51,13 +51,13 @@ Read the root principles and the parent handbook first; then open only the subca
   not built and not the hook backend. `TRECH_ENABLE_V8_PROBE` defaults OFF; its standalone C++
   compile/code-cache probe is syntax-checked against pinned headers, not linked/run. Normal
   builds retain QuickJS; full host parity and performance are unvalidated. See
-  [`docs/v8.md`](../../../docs/v8.md); never trigger a heavy upstream build implicitly.
+  [`docs/engine/v8.md`](../../../docs/engine/v8.md); never trigger a heavy upstream build implicitly.
 - **Atomic research V8 host:** `TRECH_ENABLE_ATOMIC_RESEARCH` defaults OFF and requires an
   already-installed Node.js >=18 with V8. It builds only the `trech-atomic` C++ process launcher,
   never upstream V8; numerical research lives in JS. This is separate from the optional native
   V8 probe and the QuickJS simulation host. Configure/runtime/source paths are recorded or
   documented; source-tree relocation and Windows execution remain unvalidated. See
-  [`docs/atomic_stability.md`](../../../docs/atomic_stability.md).
+  [`docs/research/atomic_stability.md`](../../../docs/research/atomic_stability.md).
 
 #### [`CMakeLists.txt`](../../../CMakeLists.txt) · [`cmake/`](../../../cmake) · [`CMakePresets.json`](../../../CMakePresets.json)
 
@@ -89,8 +89,8 @@ mutates `build/dev/out_*` + the committed validation report — has `SKIP_*` gat
 
 ```bash
 scripts/run_smoke.sh                 # build + ctest
-scripts/run_validation.sh            # H2O validation run; updates docs/validation_summary.md
-scripts/run_validation_suite.sh      # full regression suite → docs/validation_report.md
+scripts/run_validation.sh            # H2O validation run; updates docs/validation/validation_summary.md
+scripts/run_validation_suite.sh      # full regression suite → docs/validation/validation_report.md
 ```
 
 Python tools install with `pip install -e tools/<pkg>` (`trech-viz`, `trech-train-*`,

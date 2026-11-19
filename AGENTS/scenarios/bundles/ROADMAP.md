@@ -22,11 +22,11 @@ dated record below, and queue its residuals in the same change.
 
 - [x] The experimental `particle_observer_cascade` adds a complete four-file bundle (64 total),
   exposing recorded pre-transport predictions and a labelled static inference diagram. The
-  [observer contract](../../../docs/particle_observer.md) owns its scientific scope and open gaps.
+  [observer contract](../../../docs/inference/particle_observer.md) owns its scientific scope and open gaps.
 
 - [x] Split all 63 scenario entry points into per-scenario physics/view/validation/UI bundles;
   move shared TRECH JS to `js/`, update CLI/library nested loading, Studio browsing/editor,
-  capture registries and validation consumers. Contract: [docs/scenario_bundles.md](../../../docs/scenario_bundles.md).
+  capture registries and validation consumers. Contract: [docs/scenarios/scenario_bundles.md](../../../docs/scenarios/scenario_bundles.md).
 - [partial: 18 families + 3 multi-run sweeps exported 2026-11-09] Export Python family-validation
   evaluators/tolerances as a common declarative runner schema. **Multi-run sweeps (2026-11-09):**
   `family_sweeps` declare ordered runs with exact `--param` identity (checked against provenance
@@ -39,7 +39,7 @@ dated record below, and queue its residuals in the same change.
   Remaining: photonuclear final-state and Bertini model-comparison gates (per-ejectile edge and
   closure lists across runs), operator/reference pair gates and lava/foam/chemistry
   multi-condition gates (sweeps now give them a schema), and regenerating
-  `docs/validation_report.*`. **Derived statistics (2026-11-09):** `derive`
+  `docs/validation/validation_report.*`. **Derived statistics (2026-11-09):** `derive`
   (`abs/difference/ratio/list_sum/list_length/chi2_sf`, nestable, per projected element) exports
   the Klein-Nishina Compton gate (18 checks: availability, tolerance, |z| < 4 for mean transfer
   and `<cos θ>`, edge ratio in [0.98, 1+1e-9], histogram completeness/entry counts, χ² p ≥ 0.001
@@ -65,7 +65,7 @@ dated record below, and queue its residuals in the same change.
   a corrupted Pascal contrast flips the suite case to fail. Remaining: analytic cross-checks
   (χ²/z-score/sweep statistics need aggregate operators), operator/reference pair gates,
   lava/foam/chemistry multi-condition gates and the Python-driver MR tissue/brain aggregates,
-  plus regenerating `docs/validation_report.*` with the new verdict notes.
+  plus regenerating `docs/validation/validation_report.*` with the new verdict notes.
 - [ ] Full-horizon physics/media regression of the split bundles remains deliberate work;
   migration checks cover config/parameter parity and first-event/end-hook replay. Historical
   media source hashes/paths retain the identity of their actual captures.

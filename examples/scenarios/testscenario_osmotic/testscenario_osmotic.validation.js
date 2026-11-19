@@ -2,7 +2,7 @@
 TRECH_VALIDATIONS["testscenario_osmotic"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "testscenario_osmotic",
-  "scope": "Validation scenario: Osmotic Dehydration via Dimensional & Polarity Exclusion. See docs/testscenario_osmotic-todo.md.",
+  "scope": "Validation scenario: Osmotic Dehydration via Dimensional & Polarity Exclusion. See docs/scenarios/testscenario_osmotic-todo.md.",
   "checks": [
     {
       "file": "trech_scores.jsonl",

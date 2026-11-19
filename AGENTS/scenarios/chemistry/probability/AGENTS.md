@@ -20,7 +20,7 @@ Read the root principles and the parent handbook first; then open only the subca
   Natural mixtures and single-proton internal distributions are not invented. Tests verify exact
   replay, nucleon counts, RNG preservation and identical transported tallies with sampling on/off.
   `chemistry_probability_reference.js` adds a joint water/D2 RHF/6-31g **comparison** density;
-  this is not Geant4-trained electronic dynamics. See [the probability contract](../../../../docs/chemistry_probability.md).
+  this is not Geant4-trained electronic dynamics. See [the probability contract](../../../../docs/studio/chemistry_probability.md).
 
 **Electronic reference service and state views:** `tools/quantum/build_density_scene.py --scene`
 calculates optional independent PySCF RHF/6-31g joint density, occupied/LUMO probability grids,
@@ -33,4 +33,4 @@ C++ `NuclearSpatialProbe` adds exact inventory, centroid/species RMS distances a
 radial counts; one-nucleus fm guides remain display choices. Full scene restore uses hashed
 `provenance.config_json.hooks.inputs.scene`; summary emits avoid repeating every grid. These are
 independent reference/diagnostic improvements, not a Geant4-trained electronic lift. Scope and
-remaining open-shell/correlation/dynamics work: [probability contract](../../../../docs/chemistry_probability.md) and [paired roadmap](ROADMAP.md).
+remaining open-shell/correlation/dynamics work: [probability contract](../../../../docs/studio/chemistry_probability.md) and [paired roadmap](ROADMAP.md).

@@ -1,5 +1,5 @@
 // Validation scenario: Pascal's Principle & Material Deformation.
-// See docs/testscenario_pascal-todo.md.
+// See docs/scenarios/testscenario_pascal-todo.md.
 //
 // Two sub-scenarios share one config so both run under the same provenance
 // envelope. Each Geant4 event acts as one MD tick; the hook layer evolves a
@@ -94,7 +94,7 @@ const PASCAL = {
   // wall stiffness per area (N^2*k held constant) and per-patch mass scaled
   // by area. This approximates a structural mesh refinement, a step toward
   // the Geant4-DNA-style micro/macro statistical limit referenced in
-  // docs/testscenario_pascal-todo.md.
+  // docs/scenarios/testscenario_pascal-todo.md.
   macroWallSegments: 28,
   macroWallStiffness: 0.009,
   macroWallMass: 4.0,

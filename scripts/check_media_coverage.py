@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Report committed media that no tracked Markdown page shows.
 
-`previews.md` is the gallery for committed GIFs and images that no other page
+`docs/previews.md` is the gallery for committed GIFs and images that no other page
 displays. It is hand-written, so a newly committed preview can silently go
 missing from every page. This check lists every tracked image/animation and
 every tracked Markdown file, resolves each Markdown reference (inline links and
@@ -11,8 +11,8 @@ its page, and reports media that nothing references.
 Rules:
 
 * a PNG/JPG is covered when a GIF with the same stem in the same directory is
-  covered (it is that GIF's poster frame, see ``previews.md``);
-* vendored documentation trees (``docs/geant4-docs/``) are exempt.
+  covered (it is that GIF's poster frame, see ``docs/previews.md``);
+* vendored documentation trees (``docs/reference/geant4/``) are exempt.
 
 ``--include-untracked`` also checks new, non-ignored files, so the media
 refresh can flag a preview it just wrote before it is committed.
@@ -33,7 +33,7 @@ from urllib.parse import unquote
 
 MEDIA_SUFFIXES = {".gif", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".mp4", ".webm"}
 POSTER_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
-EXEMPT_PREFIXES = ("docs/geant4-docs/",)
+EXEMPT_PREFIXES = ("docs/reference/geant4/",)
 
 # Inline [text](target "title") and ![alt](target); the target ends at
 # whitespace or the closing parenthesis.

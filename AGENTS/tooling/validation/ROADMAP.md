@@ -19,7 +19,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 dated record below, and queue its residuals in the same change.
 
 - **P2** · R5 · `h2o_bulk_water_structure` passes, but on 2026-11-18 its Green-Kubo self-diffusion (4.06e-9 m²/s) no longer agrees with the Einstein estimate (1.43e-9; experiment 2.3e-9), where 2026-11-14 had 2.57/2.79. `green_kubo_consistent_with_einstein` is reported, not gated: find which change moved the MD and decide whether the check should gate. ([detail](#in-progress))
-- **P2** · R5 · The full scenario suite (`scripts/run_validation_suite.sh`, ~1 h 40 min) last ran at `9026a7e` (2026-11-18). Ten commits since then (online domain learning, the efflux campaign, engine-owned lattice/`ctx.evolveField`, the method registry and `MethodArbiter`, `ctx.evolve` rival arbitration) were verified by CTest and focused cases only. Rerun it on current `main`, regenerate `docs/validation_report.md`, and fix the stale header in `docs/validation_summary.md`, which still cites the 2026-11-14 run at `bb1c3f1`. ([detail](#in-progress))
+- **P2** · R5 · The full scenario suite (`scripts/run_validation_suite.sh`, ~1 h 40 min) last ran at `9026a7e` (2026-11-18). Ten commits since then (online domain learning, the efflux campaign, engine-owned lattice/`ctx.evolveField`, the method registry and `MethodArbiter`, `ctx.evolve` rival arbitration) were verified by CTest and focused cases only. Rerun it on current `main`, regenerate `docs/validation/validation_report.md`, and fix the stale header in `docs/validation/validation_summary.md`, which still cites the 2026-11-14 run at `bb1c3f1`. ([detail](#in-progress))
 - **P2** · R5 · Bring single-family validators (molecular series, particle observer, spectrum prediction) into the full validation report with machine-readable sidecars. ([detail](#in-progress))
 - **P2** · R5 · Strict-config coverage: rerun the three unchecked PubChem invocations with a cache. ([detail](#in-progress))
 - **P2** · R3 · Seven bundles graded B–D still run hand-authored response surfaces on the normal path; `spectrum_prediction` has no statically resolvable model (ledger owns the migrations). ([detail](#in-progress))
@@ -60,7 +60,7 @@ in the [statistical domain validation workflow](AGENTS.md#statistical-domain-val
   `polyurethane_foam` runs failed in `onRunStart`, after the strict config check, while
   `beaker_water_n_pentane` and both `testscenario_h2o_electrolysis_combustion` runs failed while
   the scenario was still evaluating, so their configs are unchecked. The full suite was not
-  rerun and `docs/validation_report.*` was not refreshed. Residuals:
+  rerun and `docs/validation/validation_report.*` was not refreshed. Residuals:
   - [ ] Confirm the three unchecked PubChem invocations under the flag with a cache.
   - [x] `run_magnetic_resonance_tissues.py` and `run_magnetic_resonance_brain.py` start `trech`
     themselves; since 2026-11-17 they pass `--strict-config` (default, `--no-strict-config`
@@ -69,19 +69,19 @@ in the [statistical domain validation workflow](AGENTS.md#statistical-domain-val
     50 events, all seven flags true).
 
 - [x] Purity JSON index (2026-11-17): the generator also writes
-  `docs/TRECH_current_scenarios_purity.json` (grade, declared status, case families and a
+  `docs/validation/TRECH_current_scenarios_purity.json` (grade, declared status, case families and a
   validation summary per bundle) for Studio's gallery; `--check`, the pre-commit hook and CTest
   `trech_scenario_purity_report` treat it like the Markdown file. On the committed report, 35 of
   71 bundles have an attributed passing case and 36 none.
 - [x] Scenario purity report (2026-11-11): `trech_validation.purity` generates
-  `docs/TRECH_current_scenarios_purity.md` for all 68 bundles, and CTest
+  `docs/validation/TRECH_current_scenarios_purity.md` for all 68 bundles, and CTest
   `trech_scenario_purity_report` fails while it is stale. Residuals:
   - [ ] The static evidence is lexical. It cannot tell input feature scaling
     (`Math.log1p` normalisation) or render-surface math from an authored law. It does not
     analyse expressions inside template literals and cannot see whether a branch is reached.
     Calibrate with `--explain` and move true positives into comparison-named functions.
   - [ ] Model paths built at run time (`path: plan.modelPath`) are counted, not graded.
-  - [ ] Performance is only what the committed `docs/validation_report.json` holds (refreshed
+  - [ ] Performance is only what the committed `docs/validation/validation_report.json` holds (refreshed
     2026-11-18 in the dev Debug build with the required LibTorch: 63 cases, 60 pass, 3 info,
     0 fail/skip; the info-only `event_feature_stats_torch_backed` case was removed with the
     flag it read, and `glass_domain_routing_matches_declared` was added with the
@@ -128,7 +128,7 @@ in the [statistical domain validation workflow](AGENTS.md#statistical-domain-val
   records the self-verified snapshot digest and record count (`pubchem_inputs`, also flags an
   edited or unreadable snapshot `invalid`); `ReportSnapshotTests` covers recorded/invalid/absent.
   Residual: refresh mode records no snapshot, per-run `trech_provenance.jsonl` does not carry
-  the digest, the committed `docs/validation_report.*` has not been regenerated with the new
+  the digest, the committed `docs/validation/validation_report.*` has not been regenerated with the new
   line, and hashes do not authenticate records against PubChem itself.
 
 - [x] A reusable manual inference resim gate exercises independent hull/starvation/band policies,
@@ -158,7 +158,7 @@ in the [statistical domain validation workflow](AGENTS.md#statistical-domain-val
   x/y/azimuth transport, retained parcel-scale lineage, fluid-interface coalescence/fission,
   temporally coherent topology, dense README cadence, independent precision axes, and
   fixed-inventory refinement convergence. Expand coverage as new outputs/scenarios land. Treat
-  `docs/validation_report.md` as a regression artefact: re-generate via
+  `docs/validation/validation_report.md` as a regression artefact: re-generate via
   `scripts/run_validation_suite.sh` whenever the engine or scenarios change, and commit the
   regenerated report alongside the code change.
 - **Torch surrogate adoption**: the `OpticsSurrogate` C++ path + the Python trainer are wired (LibTorch has been required since 2026-11-18). (a) curated dataset **landed** (`optics_training_panel.js` + engine-emitted `element_mass_fractions` + `data/optics_handbook_anchors.json`); (c) held-out validation **landed** (`scripts/validate_optics_surrogate.py`, in `run_validation_suite.sh`); (d) **transport feed landed without LibTorch** — a ridge `.json` backend (`data/optics_surrogate_ridge.json`) makes the validated model feed transport in a stock build (`TRECH_ENABLE_TORCH` no longer required for the surrogate path), cross-checked C++↔Python and guarded by `tests/test_optics_surrogate.cpp`; (b) **CI retrain/re-export landed** — `run_validation_suite.sh` re-fits + re-exports the ridge model from the freshly-derived panel each run (so `git diff data/optics_surrogate_ridge.json` flags drift), and a new end-to-end suite case (`optics_surrogate_transport_applied`, via `examples/scenarios/optics_surrogate_demo/optics_surrogate_demo.js`) asserts the learned NaI n (~1.77, where the f-sum extractor fails at ~1.33) actually reaches transport's RINDEX samples. (e) **event-stratifier learned path + dimension-scale tooling landed 2026-07-02** (see the [recorded landing note](history/ROADMAP.md)): a LibTorch-free logistic `.json` stratifier backend, a shared dataset harvester, an event-stratifier trainer, an improved optics trainer, and an active-learning Geant4 experiment planner. (f) **generic surrogate — Torch usable in ANY scenario landed 2026-07-02** (see the [recorded landing note](history/ROADMAP.md)): `models: [{name, path}]` config + `ctx.predict` hook API + `GenericSurrogate` C++ + `trech-train-surrogate`, so any scenario (present or future) attaches a learned model without new engine call-sites. (g) **multi-scale inference cascade landed 2026-07-05** — `ScaleCascade` + `ModelConfig.scale` + `ctx.cascade` generalize the per-call `ctx.predict` point-predictors into an auto-chained, Geant4-seeded ladder (the general-purpose direction of the "Multi-scale statistical inference" standing objective); the remaining work there is training real per-band stages, not more plumbing. (h) **canonical glass-of-water cascade landed 2026-07-11** — `examples/scenarios/glass_of_water_shaken/glass_of_water_shaken.js` is the first *worked, rendered* observer-scale cascade: a nano MD measures water's number density + H-bond coordination, `ctx.cascade` lifts them nano→micro→macro into the fluid parameters of a Position-Based-Fluid (spatial grid, ~4,300 particles at ~6 mm) that pours ~1 L into a wide glass, settles, and shakes it (waves/splashes, contained, stable), with **no macroscopic water property typed** and the recovered rest density (999 kg/m³) landing 0.1% off measured as a check; stage models `data/glass_cascade/` (density grounded, cohesion/viscosity illustrative), guarded by `glass_of_water_shaken_waves`, rendered `tools/viz/demos/render_glass_of_water_shaken.py` (2 mm metaball isosurface). Remaining: multi-output (abs, scat) optics models; resim-confirmed teacher labels feeding stratifier retraining.

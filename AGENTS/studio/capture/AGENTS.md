@@ -11,7 +11,7 @@ from Preview (image / GIF+MP4 / cancel), preserving a selected material stream a
 standard fixed camera. Pure `render/frame_notes.py` supplies held phase/clock/HUD/legend text to
 Processes and the optional Qt capture footer. The two comparison scenarios are registered in the
 capture suite; their gated GIFs retain JSON sidecars. Native windows and renderer PNGs in
-`docs/images/studio-processes/` have SHA-256/source/run provenance; they are not painted mockups.
+`docs/media/images/studio-processes/` have SHA-256/source/run provenance; they are not painted mockups.
 Keep quantitative comparison limitations in captions and refresh media deliberately.
 
 **Preview export and readouts:** `studio/trech_studio/engine/preview.py` owns the cancellable QProcess export job;
@@ -20,7 +20,7 @@ Keep quantitative comparison limitations in captions and refresh media deliberat
 that pure layer. The Processes dock follows timeline and stream changes. Exports use the final
 frame/full horizon and a standard camera, not an implicit viewport screenshot. Missing video
 artifacts are reported as incomplete. Compact reference captures retain their JSON sidecars.
-Native experiment screenshots and manifests live in `docs/images/studio-processes/`, separately
+Native experiment screenshots and manifests live in `docs/media/images/studio-processes/`, separately
 from chemistry and the gated reference GIFs. Relative engine overrides resolve before changing
 to a scenario subprocess directory. Default side docks are bounded and non-chemistry scenarios
 hide the Chemistry dock so native previews retain a usable viewport.

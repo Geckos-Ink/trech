@@ -1,7 +1,7 @@
 """The honest run header: what the engine actually recorded for one run.
 
 Every row here is a straight read of ``trech_provenance.jsonl`` / ``trech_scores.jsonl`` (the
-schema in ``docs/output_schema.md``). Studio derives **nothing physical**: the only computed
+schema in ``docs/engine/output_schema.md``). Studio derives **nothing physical**: the only computed
 numbers are the binomial standard error of a fraction the engine already tallied and simple
 percentages of counts the engine already emitted, and both are labelled as such.
 

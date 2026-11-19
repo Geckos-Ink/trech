@@ -78,10 +78,10 @@ Authority order when sources disagree (inspect and fix the mismatch within task 
 stale docs in the same change; if unsafe to resolve, record it as a gap and ask):
 
 1. **Honesty + engine-thesis principles** (this file's [Essential principles](#essential-project-principles)) — a running result never overrides "grade the gap / Geant4 is the base of truth."
-2. **Executable specs & tests** — [`docs/output_schema.md`](docs/output_schema.md) (output contracts), [`tests/`](tests) (esp. `test_config_roundtrip.cpp`), [`CMakeLists.txt`](CMakeLists.txt).
+2. **Executable specs & tests** — [`docs/engine/output_schema.md`](docs/engine/output_schema.md) (output contracts), [`tests/`](tests) (esp. `test_config_roundtrip.cpp`), [`CMakeLists.txt`](CMakeLists.txt).
 3. **Current source** — C++ under [`src/`](src) + [`include/trech/`](include/trech), JS under [`js/`](js) + [`examples/scenarios/`](examples/scenarios) + JS subprojects in [`projects/`](projects), Python/WGSL under [`studio/trech_studio/`](studio/trech_studio) + [`tools/`](tools), and build config.
-4. **User docs** — [`README.md`](README.md), [`CHARTS.md`](CHARTS.md) (Mermaid dataflow), [`docs/structure.md`](docs/structure.md), [`docs/scenario_hooks.md`](docs/scenario_hooks.md), [`docs/viz_refraction.md`](docs/viz_refraction.md), [`studio/README.md`](studio/README.md) (desktop use), [`studio/tests/reference/README.md`](studio/tests/reference/README.md) (committed reference-GIF policy).
-5. **Roadmap / backlog / validation reports** — [`ROADMAP.md`](ROADMAP.md) (the shared editable source of truth, including [Studio milestones](AGENTS/studio/ROADMAP.md#studio-desktop-ui)), [`docs/validation_report.md`](docs/validation_report.md) + [`docs/validation_summary.md`](docs/validation_summary.md). [`docs/trech-roadmap.md`](docs/trech-roadmap.md) is the **reference-only** initial concept (do not edit).
+4. **User docs** — [documentation index](docs/README.md), [`README.md`](README.md), [`CHARTS.md`](CHARTS.md) (Mermaid dataflow), [`docs/architecture/structure.md`](docs/architecture/structure.md), [`docs/engine/scenario_hooks.md`](docs/engine/scenario_hooks.md), [`docs/studio/viz_refraction.md`](docs/studio/viz_refraction.md), [`studio/README.md`](studio/README.md) (desktop use), [`studio/tests/reference/README.md`](studio/tests/reference/README.md) (committed reference-GIF policy).
+5. **Roadmap / backlog / validation reports** — [`ROADMAP.md`](ROADMAP.md) (the shared editable source of truth, including [Studio milestones](AGENTS/studio/ROADMAP.md#studio-desktop-ui)), [`docs/validation/validation_report.md`](docs/validation/validation_report.md) + [`docs/validation/validation_summary.md`](docs/validation/validation_summary.md). [`docs/project/trech-roadmap.md`](docs/project/trech-roadmap.md) is the **reference-only** initial concept (do not edit).
 6. **Historical notes & git history** — the full chronology of landed work (this file records current state, not the timeline).
 
 Rules: a roadmap does not prove a feature exists; a README does not prove a command still works;
@@ -175,6 +175,6 @@ JS → JSON → C++ boundary stable; hooks are a deterministic sideband, never d
 ### Provenance-first & reproducible
 
 Every run writes config JSON + hash + seed + Geant4/runtime versions + determinism mode + hook/
-stratify/predict counters to [`trech_provenance.jsonl`](docs/output_schema.md). New config fields
+stratify/predict counters to [`trech_provenance.jsonl`](docs/engine/output_schema.md). New config fields
 are **conditionally serialized** so byte-identical config hashes hold for scenarios that don't use
 them (round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp)).

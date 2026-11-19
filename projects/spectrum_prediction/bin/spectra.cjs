@@ -41,7 +41,7 @@ Options
   -h, --help          show this help
 
 Labels are measured spectra (NIST ASD, PubChem/HSDB). Trained models are learned comparisons,
-not Geant4 results. See docs/spectrum_prediction.md.
+not Geant4 results. See docs/research/spectrum_prediction.md.
 `;
 
 function parseArgs(argv) {

@@ -1,5 +1,5 @@
 // Validation scenario: Osmotic Dehydration via Dimensional & Polarity Exclusion.
-// See docs/testscenario_osmotic-todo.md.
+// See docs/scenarios/testscenario_osmotic-todo.md.
 //
 // The TRECH C++ runtime (Geant4 transport + provenance) drives a deterministic
 // event lifecycle. We piggyback a coarse-grained 3D molecular-dynamics tick
@@ -46,7 +46,7 @@ if (!helpers) {
 const units = helpers.units;
 const geometry = helpers.geometry;
 
-// --- Simulation parameters (relative units per docs/testscenario_osmotic-todo.md) ---
+// --- Simulation parameters (relative units per docs/scenarios/testscenario_osmotic-todo.md) ---
 // Velocity / time units are chosen so a "tick" corresponds to roughly the
 // time for a water molecule to travel its own diameter (the scenario doc's
 // coarse-grained convention).

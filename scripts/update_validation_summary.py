@@ -30,7 +30,7 @@ def format_value(value):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Update docs/validation_summary.md from TRECH JSONL outputs."
+        description="Update docs/validation/validation_summary.md from TRECH JSONL outputs."
     )
     parser.add_argument(
         "--scores",
@@ -44,8 +44,8 @@ def main():
     )
     parser.add_argument(
         "--output",
-        default=os.path.join("docs", "validation_summary.md"),
-        help="Output markdown path (default: docs/validation_summary.md).",
+        default=os.path.join("docs", "validation", "validation_summary.md"),
+        help="Output markdown path (default: docs/validation/validation_summary.md).",
     )
     args = parser.parse_args()
 

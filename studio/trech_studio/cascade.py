@@ -338,7 +338,7 @@ class ScaleLadder:
         }
 
 
-# The per-event Geant4 tallies `buildAmbientGeant4Seed` puts in the seed (docs/scenario_hooks.md).
+# The per-event Geant4 tallies `buildAmbientGeant4Seed` puts in the seed (docs/engine/scenario_hooks.md).
 _EVENT_SEED_KEYS = frozenset(
     {
         "edep_mev",

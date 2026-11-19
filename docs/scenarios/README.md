@@ -1,0 +1,17 @@
+# Scenarios and processes
+
+[Documentation index](../README.md)
+
+JavaScript bundles, reusable processes, molecular examples and scenario validation designs.
+
+## Files
+
+| Document or asset | Purpose |
+| --- | --- |
+| [Molecular series](molecular_series.md) | Scenarios, sources, validation and media regeneration. |
+| [Independent process references](process_references.md) | NaCl interface and airflow comparisons and their limits. |
+| [Scenario bundles](scenario_bundles.md) | Physics roots and presentation/validation companions. |
+| [Reusable solution processes](solution_processes.md) | Process-library declarations, model bindings and units. |
+| [Passive membrane efflux](testscenario_efflux.md) | Biological clearance comparison and scenario design. |
+| [Osmotic-dehydration design](testscenario_osmotic-todo.md) | Original objectives and implementation notes; retain the comparison labels. |
+| [Pascal-principle design](testscenario_pascal-todo.md) | Original mechanics validation proposal and acceptance goals. |

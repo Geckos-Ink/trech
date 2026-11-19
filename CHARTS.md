@@ -4,7 +4,7 @@ Scenario authoring is now a bundle: `examples/scenarios/<name>/<name>.{ui,view,v
 registers typed inputs, rendering and acceptance checks before `<name>.js` runs physics.
 The C++ loader uses this path for CLI/library roots and nested includes; Studio consumes its
 source/parameter/validation metadata. Shared JS modules live in `js/`.
-See [the bundle contract](docs/scenario_bundles.md).
+See [the bundle contract](docs/scenarios/scenario_bundles.md).
 
 ## Independent atomic research path
 
@@ -18,7 +18,7 @@ flowchart LR
   Matrix --> Output
 ```
 
-This [research reference](docs/atomic_stability.md) has no Geant4 or learned-cascade input.
+This [research reference](docs/research/atomic_stability.md) has no Geant4 or learned-cascade input.
 The simulation hook runtime remains QuickJS; nuclear/QED matrix construction and cascade
 integration are unfinished research work.
 
@@ -1123,7 +1123,7 @@ Over-capacity groups and groups with blocked members are blocked (NaN, `valid:fa
 member feature or context input stops the hierarchy. The trainer
 ([`trech_torch/hierarchy.py`](tools/torch/trech_torch/hierarchy.py)) replays the same partition
 and trains all levels end to end on chained predictions. Status: mechanism and trainer tested on
-synthetic data ([contract](docs/group_hierarchy.md)); no scenario uses it yet.
+synthetic data ([contract](docs/inference/group_hierarchy.md)); no scenario uses it yet.
 
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 
@@ -1213,7 +1213,7 @@ The source domain is a unit-density homogeneous cube with a central +z gamma sou
 labels; the observer learns actual Monte Carlo count/energy outcomes. No attenuation law drives
 the observer. A failed first model is archived; development selection and frozen final-test
 evidence are explicit. Passing bounded error gates does not remove the measured sparse-training
-warnings or establish experimental accuracy. [Contract and residuals](docs/particle_observer.md).
+warnings or establish experimental accuracy. [Contract and residuals](docs/inference/particle_observer.md).
 
 ## Recorded interfaces and 3D scalar inspection
 

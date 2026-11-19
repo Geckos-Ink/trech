@@ -276,7 +276,7 @@ def main():
                     asset.write_text(json.dumps(portable(json.loads(asset.read_text())), indent=2) + "\n")
                     item.update(sha256=sha(asset), bytes=asset.stat().st_size)
     # Preserve historical native screenshots, updating only explicitly refreshed reference assets.
-    linked_path = ROOT / "docs/images/studio-processes/manifest.json"
+    linked_path = ROOT / "docs/media/images/studio-processes/manifest.json"
     linked = json.loads(linked_path.read_text())
     for path, item in linked["media"].items():
         if not path.startswith("studio/tests/reference/"):
@@ -322,14 +322,14 @@ def main():
         "schema": report["schema"], "source_identity": identity,
         "classic": published["classic"]}), indent=2) + "\n")
     failed = [(group, key) for group in ("classic", "studio", "references") for key, e in report[group].items() if e["status"] == "failed"]
-    # previews.md is hand-written: name any refreshed medium that no Markdown page shows yet.
+    # docs/previews.md is hand-written: name any refreshed medium that no Markdown page shows yet.
     # Advisory only (media are the refresh's output); CTest trech_media_coverage gates commits.
     import check_media_coverage
     coverage = check_media_coverage.coverage(ROOT, include_untracked=True)
     report["markdown_coverage"] = {key: coverage[key] for key in ("schema", "media", "shown", "posters", "missing")}
     save()
     for path in coverage["missing"]:
-        print(f"Not shown by any Markdown page (add it to its owning page or previews.md): {path}", flush=True)
+        print(f"Not shown by any Markdown page (add it to its owning page or docs/previews.md): {path}", flush=True)
     print(f"Finished: {report_path}; failures={failed}", flush=True)
     return 1 if failed else 0
 

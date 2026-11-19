@@ -3,7 +3,7 @@
 #
 # Builds the engine if needed, runs the scenarios the validation cases consume,
 # then invokes the Python validation runner, which writes
-# docs/validation_report.{md,json}.
+# docs/validation/validation_report.{md,json}.
 #
 # Env overrides:
 #   BUILD_PRESET    (default: dev)            CMake preset to use
@@ -29,12 +29,12 @@
 #                                             (also used per energy by its 10-100 keV sweep)
 #   N_EVENTS_COMPTON (default: 20000)  gammas for the Klein-Nishina Compton-transfer cross-check
 #   N_EVENTS_PAIR (default: 50000)  gammas per pair-production branching run (10 MeV + sweep)
-#   REPORT_MD       (default: docs/validation_report.md)
-#   REPORT_JSON     (default: docs/validation_report.json)
-#   REPORT_GOW_MD   (default: docs/validation_glass_of_water.md)
-#   REPORT_GOW_JSON (default: docs/validation_glass_of_water.json)
+#   REPORT_MD       (default: docs/validation/validation_report.md)
+#   REPORT_JSON     (default: docs/validation/validation_report.json)
+#   REPORT_GOW_MD   (default: docs/validation/validation_glass_of_water.md)
+#   REPORT_GOW_JSON (default: docs/validation/validation_glass_of_water.json)
 #   REPORT_OPTICS_MD / REPORT_OPTICS_JSON / REPORT_OPTICS_TXT (optional optics report paths)
-#   REPORT_GOW_TXT  (default: docs/benchmarks/validation_glass_of_water.txt)
+#   REPORT_GOW_TXT  (default: docs/validation/benchmarks/validation_glass_of_water.txt)
 #   STRICT_CONFIG   (default: 1)              every scenario run passes --strict-config, so a
 #                                             config key the engine never reads, or an onInit
 #                                             override path it did not apply, stops the suite;
@@ -87,14 +87,14 @@ N_EVENTS_CSDA="${N_EVENTS_CSDA:-5000}"
 N_EVENTS_PHOTO_FRACTION="${N_EVENTS_PHOTO_FRACTION:-20000}"
 N_EVENTS_COMPTON="${N_EVENTS_COMPTON:-20000}"
 N_EVENTS_PAIR="${N_EVENTS_PAIR:-50000}"
-REPORT_MD="${REPORT_MD:-docs/validation_report.md}"
-REPORT_JSON="${REPORT_JSON:-docs/validation_report.json}"
-REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation_glass_of_water.md}"
-REPORT_GOW_JSON="${REPORT_GOW_JSON:-docs/validation_glass_of_water.json}"
-REPORT_GOW_TXT="${REPORT_GOW_TXT:-docs/benchmarks/validation_glass_of_water.txt}"
-REPORT_OPTICS_MD="${REPORT_OPTICS_MD:-docs/validation_optics_surrogate.md}"
-REPORT_OPTICS_JSON="${REPORT_OPTICS_JSON:-docs/validation_optics_surrogate.json}"
-REPORT_OPTICS_TXT="${REPORT_OPTICS_TXT:-docs/benchmarks/validation_optics_surrogate.txt}"
+REPORT_MD="${REPORT_MD:-docs/validation/validation_report.md}"
+REPORT_JSON="${REPORT_JSON:-docs/validation/validation_report.json}"
+REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation/validation_glass_of_water.md}"
+REPORT_GOW_JSON="${REPORT_GOW_JSON:-docs/validation/validation_glass_of_water.json}"
+REPORT_GOW_TXT="${REPORT_GOW_TXT:-docs/validation/benchmarks/validation_glass_of_water.txt}"
+REPORT_OPTICS_MD="${REPORT_OPTICS_MD:-docs/validation/validation_optics_surrogate.md}"
+REPORT_OPTICS_JSON="${REPORT_OPTICS_JSON:-docs/validation/validation_optics_surrogate.json}"
+REPORT_OPTICS_TXT="${REPORT_OPTICS_TXT:-docs/validation/benchmarks/validation_optics_surrogate.txt}"
 STRICT_CONFIG="${STRICT_CONFIG:-1}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_SCENARIOS="${SKIP_SCENARIOS:-0}"
@@ -619,7 +619,7 @@ fi
 
 # The scenario purity report reads the committed validation report and every
 # bundle's sources; refresh it whenever the default report was rewritten.
-if [[ "${REPORT_JSON}" == "docs/validation_report.json" ]]; then
-  echo "==> Refreshing docs/TRECH_current_scenarios_purity.md"
+if [[ "${REPORT_JSON}" == "docs/validation/validation_report.json" ]]; then
+  echo "==> Refreshing docs/validation/TRECH_current_scenarios_purity.md"
   PYTHONPATH="${ROOT}/tools/validation:${PYTHONPATH:-}" "${PY}" -m trech_validation.purity
 fi

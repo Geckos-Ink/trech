@@ -835,8 +835,8 @@ def audit_markdown(data: dict, regenerate: str) -> str:
         "",
         "Static validation of every committed `generic_surrogate` model under "
         + ", ".join(f"`{d}/`" for d in data["scanned"]) + " by "
-        "[`validate_model.py`](../tools/torch/trech_torch/validate_model.py) "
-        "([contract](ml_models.md#validating-a-model)). It checks that each model loads under the engine's rules, "
+        "[`validate_model.py`](../../tools/torch/trech_torch/validate_model.py) "
+        "([contract](../inference/ml_models.md#validating-a-model)). It checks that each model loads under the engine's rules, "
         "stays finite across its own trained domain, and carries the trust blocks the engine grades predictions "
         "with. It does **not** re-measure accuracy: that needs the model's independent test runs "
         "(`trech-ml validate`). A complete trust profile is not a validity claim; `measured:false` models are "
@@ -916,7 +916,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         root = Path(args.root)
         data = audit([root / d for d in args.scan], root)
         regenerate = ("python3 -m trech_torch.validate_model --scan " + " ".join(args.scan) +
-                      " --audit-json docs/ml_model_audit.json --audit-md docs/ml_model_audit.md"
+                      " --audit-json docs/validation/ml_model_audit.json --audit-md docs/validation/ml_model_audit.md"
                       " (with PYTHONPATH=tools/torch)")
         rendered = {args.audit_json: json.dumps(data, indent=2, sort_keys=True) + "\n" if args.audit_json else None,
                     args.audit_md: audit_markdown(data, regenerate) if args.audit_md else None}

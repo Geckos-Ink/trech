@@ -32,7 +32,7 @@ Read the root principles and the parent handbook first; then open only the subca
   "chained_predictions"`, run-level interval from calibration samples. Changing the grouping
   order, synthesized features, or padding rule means changing `GroupHierarchy.cpp` and regenerating
   `tests/fixtures/ml_group_hierarchy/` (`regenerate.py`, torch venv). Contract:
-  [`docs/group_hierarchy.md`](../../../docs/group_hierarchy.md).
+  [`docs/inference/group_hierarchy.md`](../../../docs/inference/group_hierarchy.md).
 
 - **Error bars on separate runs:** `--calibration-runs` / `training.calibrationRuns` set the
   carried `prediction_interval` (+ calibration RMSE, runs listed in the block). The trainer
@@ -56,16 +56,16 @@ Read the root principles and the parent handbook first; then open only the subca
   saw and regenerating the original holdout to detect producer drift. Engine recipes give each
   run its operating point (`seed_params`), may carry `env` (e.g. `TRECH_PUBCHEM_CACHE_DIR`) and
   may regenerate recorded training runs (`training.seeds`). Regenerate
-  [`docs/ml_model_recheck.md`](../../../docs/ml_model_recheck.md) (+ `.json`) whenever a recipe or a
+  [`docs/validation/ml_model_recheck.md`](../../../docs/validation/ml_model_recheck.md) (+ `.json`) whenever a recipe or a
   re-checked model changes; CTest `trech_ml_model_recheck` guards staleness without NumPy.
 
 - **Independent validation:** [`validate_model.py`](../../../tools/torch/trech_torch/validate_model.py)
   (`trech-validate-surrogate`, `trech-ml validate`) grades a model with named pass/warn/fail/skip
-  gates ([contract](../../../docs/ml_models.md#validating-a-model)). Static gates are pure Python;
+  gates ([contract](../../../docs/inference/ml_models.md#validating-a-model)). Static gates are pure Python;
   run-based gates (leakage by directory and by replayed provenance configuration, test accuracy,
   holdout reproduction, ridge baseline, σ calibration, domain coverage) need NumPy and the model's
   training/test runs; TorchScript parity needs torch. `--scan` writes the committed audit
-  [`docs/ml_model_audit.md`](../../../docs/ml_model_audit.md) (+ `.json`), guarded by CTest
+  [`docs/validation/ml_model_audit.md`](../../../docs/validation/ml_model_audit.md) (+ `.json`), guarded by CTest
   `trech_ml_model_audit`: regenerate it whenever a committed model under `data/`/`projects/`
   changes. A verdict never upgrades a trust label.
 
@@ -80,7 +80,7 @@ Read the root principles and the parent handbook first; then open only the subca
   `generic_surrogate_v1`; other architectures export as TorchScript + sidecar plus a
   non-loadable `trech_evolved_arch_v1` record. The general language/search lives in Evolvo; the
   adapter only harvests, scales, exports and records provenance
-  ([contract](../../../docs/evolvo_architectures.md)). Pull Evolvo before using it (Evolvo workflow).
+  ([contract](../../../docs/inference/evolvo_architectures.md)). Pull Evolvo before using it (Evolvo workflow).
   `tools/torch/trech_torch/arch_worker.py` is the engine's worker (`trech arch`): request/result
   `trech_arch_request_v1`/`_result_v1` and classic seed genomes. The worker always searches the
   whole language, because LibTorch is required. It refuses the removed `engine_native_only`. The
@@ -93,7 +93,7 @@ Read the root principles and the parent handbook first; then open only the subca
   baseline on each of at least two selection runs. The fused TorchScript artifact applies frozen
   membership planes and per-domain support before dispatch. The final report keeps both routed
   and pooled errors per domain and run. See the
-  [study and handoff recipe](../../../docs/multiscale_domain_study.md).
+  [study and handoff recipe](../../../docs/inference/multiscale_domain_study.md).
 
 - **Online domain learner companion:** [`domain_learner.py`](../../../tools/torch/trech_torch/domain_learner.py)
   (`trech-domain-learner`) never re-decides a domain. `budget` reads `trech budget`; `extract` copies
@@ -159,7 +159,7 @@ Read the root principles and the parent handbook first; then open only the subca
 
 ### JS model definitions and checkpoint store — [`tools/ml/`](../../../tools/ml) · [`js/trech_ml.js`](../../../js/trech_ml.js) · [`ml/`](../../../ml)
 
-Contract: [`docs/ml_models.md`](../../../docs/ml_models.md). `js/trech_ml.js` is host-neutral
+Contract: [`docs/inference/ml_models.md`](../../../docs/inference/ml_models.md). `js/trech_ml.js` is host-neutral
 (QuickJS + Node). It provides `defineModel`/`defineSearch` validation, `structure_id` (FNV-1a-64
 over the exported layer plan + IO + links), deterministic candidates, objectives/ranking,
 `checkpointSignature`, read-only `resolve`/`modelEntry`, the repeated-seed `lossStats` /
@@ -197,9 +197,9 @@ winner on all fold runs and validates it against those runs. `store.js` counts p
 
 Source-of-truth learned models and fixtures (NOT generated build output): the bounded quantum-reference
 models/rows and pinned PubChem comparison fixtures under [`data/molecular_series/`](../../../data/molecular_series)
-(see `docs/molecular_series.md`), the Geant4-trained shared atom/molecular particle-response
+(see `docs/scenarios/molecular_series.md`), the Geant4-trained shared atom/molecular particle-response
 models and pinned labels under [`data/particle_molecule/`](../../../data/particle_molecule)
-(see `docs/particle_molecule.md`), and cascade stage models
+(see `docs/inference/particle_molecule.md`), and cascade stage models
 ([`data/cascade_demo/`](../../../data/cascade_demo), [`data/glass_cascade/`](../../../data/glass_cascade),
 [`data/beaker_cascade/`](../../../data/beaker_cascade), [`data/lava_lamp_cascade/`](../../../data/lava_lamp_cascade),
 [`data/briggs_rauscher_cascade/`](../../../data/briggs_rauscher_cascade),

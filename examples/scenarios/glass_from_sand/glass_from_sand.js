@@ -105,7 +105,7 @@ if ((learnDomains === "deploy" || learnDomains === "evaluate") && !LEARNER_STATE
 }
 // `declared` names each cell's material for the per-cell thermal and chemistry
 // operators; `domain` names none and lets the engine route by measured training
-// domain (docs/scenario_hooks.md, domain routing). Conduction stays declared:
+// domain (docs/engine/scenario_hooks.md, domain routing). Conduction stays declared:
 // ctx.interact does not route.
 const grouping = TRECH_PARAMETER("grouping");
 const routeByDomain = grouping === "domain";

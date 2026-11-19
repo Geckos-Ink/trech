@@ -55,8 +55,8 @@ from .validate_model import _round, load_model, validate
 SCHEMA = "trech_ml_recheck_v1"
 RECIPES_SCHEMA = "trech_ml_recheck_recipes_v1"
 REGENERATE = ("PYTHONPATH=tools/torch python3 -m trech_torch.recheck_models "
-              "--recipes data/ml_recheck_recipes.json --json docs/ml_model_recheck.json "
-              "--md docs/ml_model_recheck.md (needs NumPy)")
+              "--recipes data/ml_recheck_recipes.json --json docs/validation/ml_model_recheck.json "
+              "--md docs/validation/ml_model_recheck.md (needs NumPy)")
 
 
 def _canonical(value) -> str:
@@ -255,10 +255,10 @@ def markdown(data: dict) -> str:
         "     CTest `trech_ml_model_recheck` fails when a model or recipe changed since. -->",
         "",
         "Each model below has a reproducible data producer recorded in "
-        "[`data/ml_recheck_recipes.json`](../data/ml_recheck_recipes.json). "
-        "[`recheck_models.py`](../tools/torch/trech_torch/recheck_models.py) produced new runs with seeds the "
+        "[`data/ml_recheck_recipes.json`](../../data/ml_recheck_recipes.json). "
+        "[`recheck_models.py`](../../tools/torch/trech_torch/recheck_models.py) produced new runs with seeds the "
         "model was never trained or held out on and graded the **committed** model on them with the independent "
-        "validator ([gates](ml_models.md#validating-a-model)). Models without a recipe are only statically audited "
+        "validator ([gates](../inference/ml_models.md#validating-a-model)). Models without a recipe are only statically audited "
         "([audit](ml_model_audit.md)). A re-check grades what the model learned from its own data source: for "
         "`measured:false` operators that source is an authored teacher, so a pass says the distillation "
         "generalises to new operating points, not that the teacher is physically right.",

@@ -2,7 +2,7 @@
 
 Learn the light spectra of atoms and molecules from measured data, compare ML architectures
 written in JavaScript, and run the best dense models inside TRECH. The contract, data
-representations, protocol and current results are in [`docs/spectrum_prediction.md`](../../docs/spectrum_prediction.md).
+representations, protocol and current results are in [`docs/research/spectrum_prediction.md`](../../docs/research/spectrum_prediction.md).
 
 ```
 catalog/molecules.json   candidate compounds (curation families for leave-one-family-out CV)

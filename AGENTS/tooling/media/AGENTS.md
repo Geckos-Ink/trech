@@ -13,7 +13,7 @@ static-only scenarios must not receive invented motion. Script invocation delibe
 updating the gated Studio GIF set. Native Chemistry/process screenshots are separate historical
 captures and are not automatically regenerated or composited.
 
-- **Studio Chemistry README screenshots** live in `docs/images/studio-chemistry/` with a
+- **Studio Chemistry README screenshots** live in `docs/media/images/studio-chemistry/` with a
   capture guide and SHA-256 manifest. They are unmodified native-window captures, including
   the Metal viewport, distinct from the gated animation references under `studio/tests/reference/`.
   Refresh deliberately; preserve captions separating authored structures, independent quantum
@@ -39,11 +39,11 @@ captures and are not automatically regenerated or composited.
   from real runs — **no scripted 2D renderer remains; do not add one** (a figure that cannot come
   from emitted state is a gap in the scenario's emits, not a job for a drawing script).
 
-**Root [`previews.md`](../../../previews.md)** is the hand-written gallery for committed media
+**[`docs/previews.md`](../../../docs/previews.md)** is the hand-written gallery for committed media
 that no other Markdown page embeds, each with a short explanation. GIF poster PNGs are left out.
 Stills of an empty stage are linked from a table rather than embedded, and the retired NaCl and
 historical 2D-airflow captures are shown under a "not current output" label. When a refresh adds
-a preview that no page embeds, add it to `previews.md` with an honest caption.
+a preview that no page embeds, add it to `docs/previews.md` with an honest caption.
 `scripts/check_media_coverage.py` (CTest `trech_media_coverage`) fails when a tracked medium is
 neither referenced by any Markdown page nor the poster PNG of a referenced same-stem GIF; the
 media refresh runs it over new files too and lists what is missing.

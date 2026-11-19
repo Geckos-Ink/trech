@@ -158,7 +158,7 @@ struct OpticsDeriveConfig {
   // (valence electron density, exact from the Geant4 material composition) and
   // its resonance sits at valenceResonanceEv.  This is a physics model, not a
   // handbook lookup: one global resonance energy recovers ~100% of water/glass
-  // refraction (see docs/viz_refraction.md).  The residual is reported.
+  // refraction (see docs/studio/viz_refraction.md).  The residual is reported.
   bool valenceOscillator = true;
   double valenceResonanceEv = 22.0;
   // Torch surrogate model path (TorchScript). When mode == "surrogate" and the

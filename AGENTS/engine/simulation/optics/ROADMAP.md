@@ -77,7 +77,7 @@ Two distinct degeneration failure modes, tracked separately:
 - **Training** (feed the surrogate real signal)
   - [landed] f-sum-rule valence oscillator in `MolecularOptics.cpp` fixed the
     `n≈1` root cause physics-side (recovery ~1% → ~100% for water/glass; root
-    cause + model in `docs/viz_refraction.md`). KK-floor lowering was tried and
+    cause + model in `docs/studio/viz_refraction.md`). KK-floor lowering was tried and
     *rejected* (sub-100 eV Geant4 photoabsorption is 1/E^3.5 garbage).
   - [landed] Curated material→optical dataset: `optics_training_panel.js`
     derives optics for 14 materials; the engine now emits
@@ -123,7 +123,7 @@ run's `trech_viz_trajectories.jsonl` (+ `trech_viz_scene.json` for optics).
   ~1%); the glass-of-water demo rays now coincide. Remaining work is the
   *material-specific* residual on a broader panel (polymers under-, fluorides
   over-recover) — tracked by `scripts/validate_optics_surrogate.py`.
-- [landed] Added as explicit validation cases so `docs/validation_report.md`
+- [landed] Added as explicit validation cases so `docs/validation/validation_report.md`
   traces the trend: `sampling_diversity_non_degenerate` (category
   `degeneration`) runs `glass_of_water_varied` and asserts >1 distinct exit
   point / incidence-angle stddev >0 / wavelength stddev >0 (vs the degenerate
@@ -137,5 +137,5 @@ run's `trech_viz_trajectories.jsonl` (+ `trech_viz_scene.json` for optics).
 - Phase 2: map water optical properties (absorption, scattering, refraction) into materials.
 - Phase 3: add photon-focused scoring summaries and validation runs.
 - Phase 4: support spectral optics tables (energy/wavelength dependent properties) for color response.
-- Phase 5: derive material optical constants statistically from Geant4 atomic cross sections (photoelectric + Compton + Rayleigh) and Kramers-Kronig dispersion — no hardcoded n at run time. See `docs/viz_refraction.md`.
+- Phase 5: derive material optical constants statistically from Geant4 atomic cross sections (photoelectric + Compton + Rayleigh) and Kramers-Kronig dispersion — no hardcoded n at run time. See `docs/studio/viz_refraction.md`.
 - Phase 6: 3D visualization pipeline: sampled photon trajectory capture (`trech_viz_trajectories.jsonl`) + scene manifest (`trech_viz_scene.json`) + accessible Python viewer in `tools/viz/`. Materials forced as visualization-only on tagged volumes (`viz_emitter`, `viz_forced_white`).

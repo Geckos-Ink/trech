@@ -1,6 +1,6 @@
 # trech-validation
 
-Validation suite for TRECH. Runs a battery of physics consistency checks against the JSONL/JSON artefacts the engine emits, then writes a stable Markdown report to `docs/validation_report.md` (plus a `docs/validation_report.json` sidecar for tooling). The Markdown layout is deterministic so `git diff` between commits shows clean validation deltas.
+Validation suite for TRECH. Runs a battery of physics consistency checks against the JSONL/JSON artefacts the engine emits, then writes a stable Markdown report to `docs/validation/validation_report.md` (plus a `docs/validation/validation_report.json` sidecar for tooling). The Markdown layout is deterministic so `git diff` between commits shows clean validation deltas.
 
 ## Install
 
@@ -9,8 +9,8 @@ Standard library only — no extra dependencies. You can run the package directl
 ```bash
 python -m trech_validation \
   --runs-dir build/dev \
-  --report docs/validation_report.md \
-  --json docs/validation_report.json
+  --report docs/validation/validation_report.md \
+  --json docs/validation/validation_report.json
 ```
 
 Optional `pip install -e tools/validation` exposes a `trech-validation` console script.
@@ -19,7 +19,7 @@ Optional `pip install -e tools/validation` exposes a `trech-validation` console 
 
 1. Run the scenarios listed in `trech_validation.cases.REQUIRED_RUNS` (e.g. `viz_refraction_demo.js`, `config_nitrogen_carbon_cycle.js`, plus a `determinism_replay` second copy). Each must be invoked with the expected output directory name under `--runs-dir`.
 2. Invoke `python -m trech_validation`. The runner loads the relevant JSONL/JSON files, evaluates each case, and writes the report.
-3. Commit the regenerated `docs/validation_report.md` and `docs/validation_report.json`. The committed history is the regression record.
+3. Commit the regenerated `docs/validation/validation_report.md` and `docs/validation/validation_report.json`. The committed history is the regression record.
 
 The orchestrator script `scripts/run_validation_suite.sh` does steps 1 and 2 in one shot.
 It also fetches PubChem records needed by reaction scenarios into a build-local
@@ -62,7 +62,7 @@ The checker accepts the same `--snapshot PATH` / `--write-snapshot PATH` options
 snapshot proves byte identity with the pinned records; it does not authenticate them.
 
 Cases whose scenario companion declares `family_checks` take their verdict from those
-declarations (see [`docs/scenario_bundles.md`](../../docs/scenario_bundles.md)); the runner reads
+declarations (see [`docs/scenarios/scenario_bundles.md`](../../docs/scenarios/scenario_bundles.md)); the runner reads
 them through `RUNS_DIR/trech inspect` or `TRECH_BIN`. Aggregated list checks
 (`list[*]`, `list[?key=value]` with `aggregate: count|min|max|max_abs|sum|mean|all|any`) let
 a companion grade every analytic check or driver-recorded tissue row; `derive`
@@ -76,7 +76,7 @@ an edited/unreadable snapshot `invalid`; without one it says no snapshot was rec
 
 ## Scenario purity report
 
-`python -m trech_validation.purity` writes `docs/TRECH_current_scenarios_purity.md`, with one section
+`python -m trech_validation.purity` writes `docs/validation/TRECH_current_scenarios_purity.md`, with one section
 per `examples/scenarios/` bundle. Each section grades how much behaviour comes from engine inference
 versus authored laws, fixed constants and closed-form functions. It shows static normal-path
 evidence and model provenance, and lists the recorded results of this suite's cases for that
@@ -99,8 +99,8 @@ git config core.hooksPath scripts/git-hooks
 
 The hook (`python -m trech_validation.purity --pre-commit`) regenerates only in two cases: the
 commit stages a path that can change the report (`examples/scenarios/`, `js/`, `data/`,
-`projects/`, `tools/validation/`, `scripts/`, `docs/validation_*.json`), or the benchmarks in
-`docs/validation_report.json` are older than `TRECH_PURITY_MAX_AGE_DAYS` (default 30). Stale
+`projects/`, `tools/validation/`, `scripts/`, `docs/validation/validation_*.json`), or the benchmarks in
+`docs/validation/validation_report.json` are older than `TRECH_PURITY_MAX_AGE_DAYS` (default 30). Stale
 benchmarks also print a reminder to run `scripts/run_validation_suite.sh`, because regenerating the
 report cannot refresh them. The hook never blocks a commit; skip it once with
 `TRECH_PURITY_HOOK=0 git commit …`.

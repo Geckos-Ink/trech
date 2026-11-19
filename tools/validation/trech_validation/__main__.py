@@ -15,7 +15,7 @@ from .cases import FOAM_MECHANICS_CANDIDATE_CASES
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m trech_validation",
-        description="Run TRECH validation cases and write docs/validation_report.{md,json}.",
+        description="Run TRECH validation cases and write docs/validation/validation_report.{md,json}.",
     )
     parser.add_argument(
         "--suite", choices=("default", "foam-mechanics-candidate"), default="default",
@@ -28,11 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--report",
-        help="Markdown path (default: docs/validation_report.md; candidate: RUNS_DIR/promotion_report.md).",
+        help="Markdown path (default: docs/validation/validation_report.md; candidate: RUNS_DIR/promotion_report.md).",
     )
     parser.add_argument(
         "--json",
-        help="JSON path (default: docs/validation_report.json; candidate: RUNS_DIR/promotion_report.json).",
+        help="JSON path (default: docs/validation/validation_report.json; candidate: RUNS_DIR/promotion_report.json).",
     )
     parser.add_argument(
         "--list-required-runs",
@@ -57,9 +57,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error(f"runs-dir not found: {runs_dir}")
         return 2
     args.report = args.report or str(runs_dir / "promotion_report.md" if cases is not None
-                                    else Path("docs/validation_report.md"))
+                                    else Path("docs/validation/validation_report.md"))
     args.json = args.json or str(runs_dir / "promotion_report.json" if cases is not None
-                                else Path("docs/validation_report.json"))
+                                else Path("docs/validation/validation_report.json"))
 
     results = run_all(runs_dir, cases)
     write_report(

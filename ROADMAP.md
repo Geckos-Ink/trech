@@ -3,7 +3,7 @@
 This is the shared editable roadmap for the engine, JavaScript scenarios, tools and Studio.
 Detailed checklists and validation records live in the categorized [AGENTS/ roadmap tree](AGENTS/ROADMAP.md), paired with context and contracts in each directory.
 Track every gap in its owning workstream and link other affected owners. Keep plans updated as items land or are re-scoped; keep this root focused on shared objectives and navigation.
-The [root principles](AGENTS.md) govern every branch. `docs/trech-roadmap.md` remains the reference-only initial concept (do not edit).
+The [root principles](AGENTS.md) govern every branch. `docs/project/trech-roadmap.md` remains the reference-only initial concept (do not edit).
 Dated verification records describe their recorded checkout, not validation of later changes; a roadmap entry never proves a feature exists.
 
 > ## ⭐ Engine thesis — the "why" behind every milestone (keep this alive)

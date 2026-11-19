@@ -13,7 +13,7 @@ native-Å `material_frame`, and optional conserved `chemistry_reaction_step` rec
 displays engine facts/traces and restores loaded structure/reaction inputs as drafts. It computes
 no valence, stability, polarization, reaction rates or isotope effects. 3D remains a held authored
 structure; discrete inventories do not imply atomistic reaction paths. Scope/contract:
-[`docs/chemistry_mode.md`](../../../docs/chemistry_mode.md). Tests: `studio/tests/test_chemistry.py`.
+[`docs/studio/chemistry_mode.md`](../../../docs/studio/chemistry_mode.md). Tests: `studio/tests/test_chemistry.py`.
 Atom row labels are zero-based; omitted bond order stays unknown. Chemistry opens with bounded
 side docks and a scrollable atom table; source headers show filenames with full-path tooltips.
 
@@ -24,7 +24,7 @@ shared field owners, source and emitted clocks. Scalar grids feed `density_surfa
 never Gaussian orbital guesses; missing fields clear the last surface rather than silently hold
 stale density. Transparent density overlays use a display palette and threshold, not material
 optics. Nuclear views are separate fm ensembles; timelines label ensemble/parameter clocks as
-nonphysical. Tests: `test_probability.py`, `test_chemistry.py`; contract: `docs/output_schema.md`.
+nonphysical. Tests: `test_probability.py`, `test_chemistry.py`; contract: `docs/engine/output_schema.md`.
 
 **States and particle diagnostics:** `studio/trech_studio/ui/probability_details.py` reports engine-emitted inventories,
 orbital energies/occupations/dipole and nuclear centroid/RMS/radial counts, updating on the held
@@ -61,7 +61,7 @@ the recorded 3D density. Studio's `studio/trech_studio/ui/electron_levels.py` pl
 spherical radial measure (4πr²), while the Field explorer colors local energy contributions and
 exposes cut faces. `chemistry_atomic_levels_reference.js` / `neon_atom.json` provide a Ne-20
 core/valence comparison. No preset shell radii, linear electron distribution, atomic quantum-number
-assignment or Geant4 bound-electron prediction is implied. See [the probability contract](../../../docs/chemistry_probability.md).
+assignment or Geant4 bound-electron prediction is implied. See [the probability contract](../../../docs/studio/chemistry_probability.md).
 
 Electron-level and particle-detail panels scroll within the Chemistry dock so complete spectra/profiles do not force the native window beyond the screen. Native gradient/profile captures and their source/run hashes extend the documentation gallery.
 

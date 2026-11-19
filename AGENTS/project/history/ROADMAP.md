@@ -45,12 +45,12 @@ Dated records apply to their captured checkout. Current contracts, code and test
 - Event summary accumulables now feed system moment metrics (event count + energy mean/variance/stddev) in `trech_scores.jsonl` and `trech_provenance.jsonl`.
 - Generic nuclear cycle config + Geant-backed analyzer added (`nuclear.cycles`): reaction participant mass/Q evaluation, charge/baryon conservation checks, and macro phase/density consistency metrics in scores/provenance.
 - Validation automation script added (`scripts/run_validation.sh`).
-- Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
+- Validation summary template + updater script added (`docs/validation/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
 - Smoke test script added (`scripts/run_smoke.sh`).
-- Output JSON schema documented (`docs/output_schema.md`).
+- Output JSON schema documented (`docs/engine/output_schema.md`).
 - Minimal batch macro example added (`examples/macros/minimal.mac`) and `--ui` flag implemented.
 - Config example experiments added (optics, stratify, ML stub, chemistry stub, multiscale stub, nitrogen-carbon cycle).
-- Hook API proposal documented (`docs/scenario_hooks.md`).
+- Hook API proposal documented (`docs/engine/scenario_hooks.md`).
 - JS helper module and multi-beam unit conversion example added (`js/trech_helpers.js`, `examples/scenarios/config_multi_beam_units/config_multi_beam_units.js`).
 - JS helpers expanded with physical constants + material presets (including SMILES placeholders).
 - JS include helper (`TRECH_INCLUDE`) added to load scenario modules with stable file/line references.

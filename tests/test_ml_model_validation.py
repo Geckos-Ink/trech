@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ML model validation: committed-model audit staleness, static gates, run-based gates.
 
-1. docs/ml_model_audit.{json,md} must equal a fresh static audit of data/ + projects/
+1. docs/validation/ml_model_audit.{json,md} must equal a fresh static audit of data/ + projects/
    (pure Python: runs in every CTest environment).
 2. Static gates catch what the engine would silently accept or mis-run: unknown activations
    (the C++ loader maps them to identity), broken layer chains, v1 models carrying links,
@@ -15,7 +15,7 @@
    malformed layouts fail `structure`. With torch: a trained MPNN's TorchScript twin matches.
 6. Error bars: `--calibration-runs` carries a split-conformal interval set on runs disjoint from
    the test runs, and `sigma_calibration` reports that check as independent.
-7. Fresh-run re-checks: docs/ml_model_recheck.json is current for data/ml_recheck_recipes.json
+7. Fresh-run re-checks: docs/validation/ml_model_recheck.json is current for data/ml_recheck_recipes.json
    (pure Python); recipes reusing a training seed are refused; with NumPy a python and an
    engine producer (a stand-in binary) produce fresh runs that grade a model end to end.
 """
@@ -38,9 +38,9 @@ SET_FIXTURES = ROOT / "tests/fixtures/ml_set_networks"
 
 
 def check_audit_fresh() -> None:
-    code = vm.main(["--scan", "data", "projects", "--root", str(ROOT), "--audit-json", "docs/ml_model_audit.json",
-                    "--audit-md", "docs/ml_model_audit.md", "--check"])
-    assert code == 0, "docs/ml_model_audit.* is stale or a committed model fails a static gate"
+    code = vm.main(["--scan", "data", "projects", "--root", str(ROOT), "--audit-json", "docs/validation/ml_model_audit.json",
+                    "--audit-md", "docs/validation/ml_model_audit.md", "--check"])
+    assert code == 0, "docs/validation/ml_model_audit.* is stale or a committed model fails a static gate"
 
 
 def base_model(**extra) -> dict:
@@ -333,8 +333,8 @@ for r in rows: r["y"] = slope * r["a"] + offset
 
 def check_recheck() -> None:
     code = rc.main(["--recipes", "data/ml_recheck_recipes.json", "--root", str(ROOT), "--json",
-                    "docs/ml_model_recheck.json", "--check"])
-    assert code == 0, "docs/ml_model_recheck.* is stale: a re-checked model or its recipe changed"
+                    "docs/validation/ml_model_recheck.json", "--check"])
+    assert code == 0, "docs/validation/ml_model_recheck.* is stale: a re-checked model or its recipe changed"
     good = {"model": "m.json", "producer": {"kind": "python", "script": "p.py", "function": "f"},
             "harvest": {"source": "hook_emits"}, "used_seeds": [1, 2], "fresh_seeds": [3, 4]}
     assert rc.recipe_problems(good) == []

@@ -61,7 +61,7 @@ dated record below, and queue its residuals in the same change.
 - [x] Named modules carry measured input coverage and optional routing domains. The checkpoint
   store versions, verifies and tracks optional sidecars alongside registered twins. The particle
   observer scenario accepts a fitted `.pt` checkpoint through `observer_model`. See the
-  [multi-scale study](../../../docs/multiscale_domain_study.md).
+  [multi-scale study](../../../docs/inference/multiscale_domain_study.md).
 - [ ] Torch deployment extensions: cross-platform/accelerator
   validation, production-model parity/performance and the newly checked-out Geant4 revision remain
   separate work. Normal presets keep Torch disabled; no dependency was bumped or rebuilt here.
@@ -98,6 +98,6 @@ dated record below, and queue its residuals in the same change.
   install G4EMLOW 9.0 (installed: 8.8). Revalidate `DNA_Opt4` (electrons now to 10 MeV), EM-option-2
   lists (`ApplyCuts` on), DNA chemistry yields (multiple ionisation) and
   `primaries_photoelectric_first_fraction` (`G4GammaGeneralProcess` refactor). Full list:
-  [`docs/GEANT4_features_and_limits.md` §6](../../../docs/GEANT4_features_and_limits.md#6-migration-items-for-the-pinned-checkout).
+  [`docs/engine/GEANT4_features_and_limits.md` §6](../../../docs/engine/GEANT4_features_and_limits.md#6-migration-items-for-the-pinned-checkout).
 
 - Third-party dependency refresh landed (2026-06-30): **nlohmann/json v3.12.0** (was 3.11.2; header-only, no source changes), **QuickJS 2026-06-04 release** (`04be246`; internal `quickjs.h` layout only — public C API unchanged, bindings recompiled as-is), **Geant4 v11.4.2** (was 11.4.0; patch series, no public API changes → no call-site migration; incremental rebuild into `build/geant4-install`). trech rebuilt + relinked; `ctest --preset dev` 9/9; `cnt_logic_gates` reproduces byte-identical Geant4 transport against 11.4.2. LibTorch (`thirds/torch`) deferred at 1.2.0 (x86_64, off-by-default, ridge backend covers it; 1.2→2.x is binary-swap-only since our torch API usage is stable).

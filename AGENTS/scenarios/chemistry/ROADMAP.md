@@ -17,10 +17,10 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   photon and deposited-energy fractions. Predictions precede independent transport; strict mode
   returns nulls/zero inference. Eighteen untouched whole-material/energy/geometry cases and a fresh
   MC realization pass unchanged numerical gates; the failed first attempt remains auditable.
-  [Scope, metrics and commands](../../../docs/particle_observer.md).
+  [Scope, metrics and commands](../../../docs/inference/particle_observer.md).
 - [x] The larger off-grid Geant4 campaign produced a lower-error TorchScript candidate and
   exercised an atom → element group → observer hierarchy with two atomic backends.
-  [Final runs and validation](../../../docs/multiscale_domain_study.md#final-runs-and-validation).
+  [Final runs and validation](../../../docs/inference/multiscale_domain_study.md#final-runs-and-validation).
 - [ ] Twenty-nine of forty-eight newly held-out conditions retain per-feature starvation and
   ten retain joint starvation. Coverage and calibration transfer remain experimental.
 
@@ -60,7 +60,7 @@ dated record below, and queue its residuals in the same change.
   response gates; they do not validate chemical stability, polarization or reaction rates.
 - [x] Studio Chemistry menu/dock edits atoms/A/coordinates/charge/bonds, loads six independent
   quantum scaffolds, runs TRECH and displays emitted native-unit 3D structures and results;
-  saved run structures/reaction plans can be restored as drafts. See `docs/chemistry_mode.md`.
+  saved run structures/reaction plans can be restored as drafts. See `docs/studio/chemistry_mode.md`.
 - [ ] **Next physical deliverable:** learn geometry/charge/isotope-conditioned electronic and
   bond response driven by Geant4 particle/ionization histories; train across molecules and
   isotope substitutions with separate molecule/geometry/energy holdouts and independent

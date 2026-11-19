@@ -11,7 +11,7 @@ const usage = `Usage: trech-atomic [--input request.json | --composition matrice
 Runs an independent one-electron quantum research reference on Node.js/V8.
 With no input: hydrogen 1s. --composition analyzes supplied finite-basis matrices.
 Input: one request or {"cases":[request,...]} (max 32).
-See docs/atomic_stability.md for units, supported fields, and scientific limits.
+See docs/research/atomic_stability.md for units, supported fields, and scientific limits.
 This output is not a Geant4 result, nuclear lifetime, or theory of everything.
 `;
 function sha(text) { return crypto.createHash('sha256').update(text).digest('hex'); }

@@ -11,7 +11,7 @@ collects measured atomic/molecular light spectra and trains a declarative catalo
 architectures. Dense exports run in TRECH through
 [`examples/scenarios/spectrum_prediction/`](../../../examples/scenarios/spectrum_prediction); Studio's
 Spectra dock is its optional UI extension mode. Contract and current numbers:
-[`docs/spectrum_prediction.md`](../../../docs/spectrum_prediction.md).
+[`docs/research/spectrum_prediction.md`](../../../docs/research/spectrum_prediction.md).
 
 ## Source map
 

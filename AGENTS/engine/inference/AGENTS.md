@@ -60,7 +60,7 @@ merges outputs back. Non-owning over the `JsRuntime`'s registry.
 #### [`src/ml/ArchitectureGenerator.cpp`](../../../src/ml/ArchitectureGenerator.cpp) · [`ArchitectureGenerator.hpp`](../../../include/trech/ml/ArchitectureGenerator.hpp)
 
 Engine-side **ML architecture generation**, run by `trech arch <job.json>` (`CliCommand::Arch`).
-Contract: [`docs/evolvo_architectures.md`](../../../docs/evolvo_architectures.md#in-the-engine-trech-arch).
+Contract: [`docs/inference/evolvo_architectures.md`](../../../docs/inference/evolvo_architectures.md#in-the-engine-trech-arch).
 Status: shipped. Tested on synthetic tables only; no scenario requests it.
 
 - **Classic reference family (always, C++):**
@@ -110,7 +110,7 @@ Recursive **group lifting** of a population, exposed as `ctx.lift` (`jsHookLift`
 lattice from `origin`, explicit ids, or one group of everything) and evaluates a v3 set model with
 a `group_lift` block on every group's members. The groups become the next level's elements:
 features are the model outputs, position is the members' weight-centroid and weight is the sum.
-Contract: [`docs/group_hierarchy.md`](../../../docs/group_hierarchy.md). Status: mechanism +
+Contract: [`docs/inference/group_hierarchy.md`](../../../docs/inference/group_hierarchy.md). Status: mechanism +
 trainer tested on synthetic data only; no scenario uses it.
 
 - **Member inputs:** level-below features by name, or engine-synthesized `present`, `weight` and
@@ -261,7 +261,7 @@ never retry a changed path. RunAction emits the captured FNV hash instead of has
 
 JS model definitions, structure searches and the versioned checkpoint store that feed
 `models[]` are owned by [training tools](../../tooling/training/AGENTS.md#js-model-definitions-and-checkpoint-store--toolsml--jstrech_mljs--ml)
-([contract](../../../docs/ml_models.md)). They change nothing in the C++ loaders: a resolved
+([contract](../../../docs/inference/ml_models.md)). They change nothing in the C++ loaders: a resolved
 checkpoint is an ordinary `generic_surrogate` path.
 
 ### Multi-scale cascade & surrogates — Shipped (mechanism), Experimental (trained stages)
@@ -274,9 +274,9 @@ current-run MC. The new observer uses actual Geant4 MC labels, with 192 fitting 
 All final and fresh-realization error gates pass; fourteen of eighteen fresh queries still flag
 per-feature starvation and five joint starvation. It stays experimental within the unit-density
 cube/source/energy domain, with no experimental-accuracy or molecular-dynamics claim.
-The [observer contract](../../../docs/particle_observer.md) owns metrics, training/validation and
+The [observer contract](../../../docs/inference/particle_observer.md) owns metrics, training/validation and
 engine-carried global residuals; the [chemistry handbook](../../scenarios/chemistry/AGENTS.md)
-owns its shared JS helper. The [expanded Geant4 study](../../../docs/multiscale_domain_study.md)
+owns its shared JS helper. The [expanded Geant4 study](../../../docs/inference/multiscale_domain_study.md)
 quantifies the opt-in dense TorchScript observer and first particle-trained recursive hierarchy.
 The dense candidate had the lowest new-panel RMSE. Both recursive paths ran in native replay
 and retained gaps in interval coverage on new compositions.
@@ -333,7 +333,7 @@ group is its path of covering rivals, with id `d` + FNV-1a-32 of that path. `gro
 opts out, and `ctx.interact` does not route. `glass_from_sand.js` `grouping: "domain"` is the
 worked scenario (validation `glass_domain_routing_matches_declared`). Tests:
 `trech_state_evolution`, `trech_discrete_transition`, `trech_js_runtime`, `trech_routing_domain`. Contract:
-[scenario hooks](../../../docs/scenario_hooks.md).
+[scenario hooks](../../../docs/engine/scenario_hooks.md).
 
 **Live statistical subdivision:** [`DomainDiscovery.cpp`](../../../src/ml/DomainDiscovery.cpp)
 implements recursive projected-gap detection over live per-element facts for `ctx.detectDomains`.
@@ -351,7 +351,7 @@ statistical subdivisions using mutual-majority overlap and record predecessor co
 `trech-train-domain-specialists` fits projected populations from distinct runs and freezes their
 split planes, support and trained models together. Its TorchScript forward selects a supported
 expert or delegates to the pooled model. See the
-[multi-scale domain study](../../../docs/multiscale_domain_study.md).
+[multi-scale domain study](../../../docs/inference/multiscale_domain_study.md).
 **Method arbitration:** [`MethodArbiter.cpp`](../../../src/ml/MethodArbiter.cpp)
 ([`MethodArbiter.hpp`](../../../include/trech/ml/MethodArbiter.hpp)) is the engine-wide,
 domain-free selection among prediction methods. A path that owns several ways to predict the same
@@ -431,7 +431,7 @@ block-wise density discovery, capacity) and `trech_domain_learner_numpy` (NumPy 
 [`domain_learner.py`](../../../tools/torch/trech_torch/domain_learner.py)). Density discovery for
 `ctx.detectDomains` is now evaluated block-wise (identical distances, ~32 MiB per block) up to
 65,536 rows per parent. Campaigns: [`study_domain_learning.py`](../../../tools/torch/study_domain_learning.py);
-results in the [multi-scale domain study](../../../docs/multiscale_domain_study.md#online-response-domain-learning).
+results in the [multi-scale domain study](../../../docs/inference/multiscale_domain_study.md#online-response-domain-learning).
 **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
 determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,

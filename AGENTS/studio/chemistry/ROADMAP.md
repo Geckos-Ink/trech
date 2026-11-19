@@ -74,7 +74,7 @@ dated record below, and queue its residuals in the same change.
   state tracking across geometries remain open. Energy eigenstates must not become guessed
   circular trajectories, imposed radial shells or persistent electron identities.
 - [ ] PySCF service accuracy/coverage limits and general learned electronic/nuclear/reaction
-  dynamics belong to engine/model work; see the [probability workstream](../../scenarios/chemistry/probability/ROADMAP.md) and [chemistry probability contract](../../../docs/chemistry_probability.md).
+  dynamics belong to engine/model work; see the [probability workstream](../../scenarios/chemistry/probability/ROADMAP.md) and [chemistry probability contract](../../../docs/studio/chemistry_probability.md).
 
 
 ## Chemistry workspace — initial implementation

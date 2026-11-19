@@ -163,7 +163,7 @@ overrides). Parsed by `scene.model.RenderHint`:
   override track/segment caps and detail without timing adaptation. Actual detail and timing are
   visible in the dock; run summary/precision reports include completed/requested event counts.
   `cascade.py` displays engine `skipReason` badges for deliberately limited stages. Full contract:
-  [`docs/adaptive_precision.md`](../../../docs/adaptive_precision.md). Test: `studio/tests/test_adaptive.py`.
+  [`docs/engine/adaptive_precision.md`](../../../docs/engine/adaptive_precision.md). Test: `studio/tests/test_adaptive.py`.
 
 - **Fused lava surface — Shipped (representation-only).** `render_surface` contract → Gaussian
   splat → marching-tetrahedra mesh via the same depth-tested `surface.wgsl`; disclosed in precision

@@ -5,8 +5,8 @@ The molecular track also has two standalone builders:
 atomic/nano response from Geant4 particle-interaction probes (NumPy + Geant4; no QM/PubChem
 training labels). [`build_molecular_series.py`](build_molecular_series.py) builds the separate
 RHF/STO-3G charge/torsion comparison fixtures (RDKit + PySCF). Their sources and scientific
-limits are documented in [`docs/particle_molecule.md`](../../docs/particle_molecule.md) and
-[`docs/molecular_series.md`](../../docs/molecular_series.md).
+limits are documented in [`docs/inference/particle_molecule.md`](../../docs/inference/particle_molecule.md) and
+[`docs/scenarios/molecular_series.md`](../../docs/scenarios/molecular_series.md).
 
 Torch-side companion tools for TRECH: harvest Geant4 run outputs into training
 sets, fit the surrogate/stratifier models the engine runs inference with, and
@@ -169,7 +169,7 @@ the model never saw (a Python producer such as
 `distill_discrete_scenario_operators.fresh_run`, or `trech run <scenario> --seed` with per-seed
 operating points `seed_params` and an optional `env`), regenerates
 the original holdout to prove the producer has not drifted, and grades the committed model with
-the validator ([report](../../docs/ml_model_recheck.md)).
+the validator ([report](../../docs/validation/ml_model_recheck.md)).
 
 `PYTHONPATH=tools/torch python tools/torch/distill_foam_mechanics.py` reproduces the experimental
 foam constitutive model from independent synthetic teacher samples (18,006 fitting / 6,006 held
@@ -295,7 +295,7 @@ trech-validate-surrogate --model build/dev/my_surrogate.json \
 
 `--scan data projects --audit-json … --audit-md …` audits every committed
 model statically (pure Python). The gates and the committed audit are described
-in [`docs/ml_models.md`](../../docs/ml_models.md#validating-a-model);
+in [`docs/inference/ml_models.md`](../../docs/inference/ml_models.md#validating-a-model);
 `trech-ml validate` runs the same validator on store checkpoints.
 
 ## Evolvo structure search
@@ -306,7 +306,7 @@ The CLI requires disjoint `--runs`, `--validation-runs`, and `--test-runs`, name
 `--out-json`; generation/population, width/depth, parameter and soft time bounds control work.
 It exports the existing portable GenericSurrogate format with final untouched-test accuracy.
 The ordinary trainer also accepts `--depth N` instead of fixing two hidden layers. See
-[the full contract and examples](../../docs/adaptive_precision.md#evolvo-model-definitions-and-search).
+[the full contract and examples](../../docs/engine/adaptive_precision.md#evolvo-model-definitions-and-search).
 
 ## Routing domains
 
@@ -314,7 +314,7 @@ The ordinary trainer also accepts `--depth N` instead of fixing two hidden layer
 `routing_domain` from harvested rows: the min/max/std of per-element facts the law does not read
 (a phase fraction, a composition ratio) over the population it was trained on. The engine's
 domain routing uses it to tell which elements a law applies to when rival laws read the same
-inputs ([contract](../../docs/scenario_hooks.md)). Example (glass from sand, teacher harvest):
+inputs ([contract](../../docs/engine/scenario_hooks.md)). Example (glass from sand, teacher harvest):
 
 ```bash
 PYTHONPATH=tools/torch python -m trech_torch.routing_domain --runs build/glass_routing/train_* \
@@ -330,4 +330,4 @@ architectures in Evolvo's GFSL-NN language (primitives plus `mlp`/`resmlp`/`tran
 stopping, on disjoint train/selection/test runs. Dense chains export as native
 `generic_surrogate_v1` JSON; anything else exports as TorchScript + sidecar. `--knowledge`
 carries what one search learned into the next. Contract, outputs and the synthetic
-demonstration: [`docs/evolvo_architectures.md`](../../docs/evolvo_architectures.md).
+demonstration: [`docs/inference/evolvo_architectures.md`](../../docs/inference/evolvo_architectures.md).

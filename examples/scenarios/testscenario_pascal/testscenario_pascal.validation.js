@@ -2,7 +2,7 @@
 TRECH_VALIDATIONS["testscenario_pascal"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "testscenario_pascal",
-  "scope": "Validation scenario: Pascal's Principle & Material Deformation. See docs/testscenario_pascal-todo.md.",
+  "scope": "Validation scenario: Pascal's Principle & Material Deformation. See docs/scenarios/testscenario_pascal-todo.md.",
   "checks": [
     {
       "file": "trech_scores.jsonl",

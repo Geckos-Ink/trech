@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard docs/TRECH_current_scenarios_purity.md and its JSON index.
+"""Guard docs/validation/TRECH_current_scenarios_purity.md and its JSON index.
 
 Fails when the committed purity report differs from a fresh generation, so any
 added/removed/edited scenario bundle, law-ledger entry, referenced model or
@@ -72,10 +72,10 @@ def check_pre_commit_rules() -> None:
     from datetime import datetime, timedelta, timezone
     relevant = ["examples/scenarios/lava_lamp/lava_lamp.js", "js/trech_water_md.js",
                 "data/lava_lamp_cascade/nano_material_response.json", "tools/validation/js_law_audit.json",
-                "docs/validation_report.json", "scripts/run_validation_suite.sh",
+                "docs/validation/validation_report.json", "scripts/run_validation_suite.sh",
                 "projects/spectrum_prediction/lib/index.js"]
     irrelevant = ["studio/trech_studio/app.py", "src/engine.cpp", "README.md",
-                  "docs/validation_report.md", "AGENTS/tooling/validation/ROADMAP.md"]
+                  "docs/validation/validation_report.md", "AGENTS/tooling/validation/ROADMAP.md"]
     for path in relevant:
         if not purity.is_relevant(path):
             fail(f"pre-commit filter: {path} should be relevant")

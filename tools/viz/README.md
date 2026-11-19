@@ -142,7 +142,7 @@ point or invents a track:
 ## material_frame contract extensions
 
 Beyond positions/RGBA/clocks/`render_surface`, a frame may carry (all optional, see
-`docs/output_schema.md`): `length_unit` (+ `positions` alias) for Å/nm/solver-unit frames,
+`docs/engine/output_schema.md`): `length_unit` (+ `positions` alias) for Å/nm/solver-unit frames,
 `up_axis`, per-point `radii` (true-size spheres), `bonds` (index pairs → ball-and-stick),
 `vectors` (arrows), `apparatus` (moving boxes/cylinders/spheres/segments/triangle `mesh`es),
 `legend`, `hud_lines`, `clock_text` for non-SI solver clocks, and `stream` to keep several
@@ -169,4 +169,4 @@ Useful flags:
 
 ## Notes
 
-The viewer is intentionally simple — it is a debug / demo surface, not a production renderer. If you need photoreal output use the JSONL artefacts as input to whatever pipeline you prefer; the data layer is documented in `docs/output_schema.md` (sections `trech_viz_scene.json`, `trech_viz_trajectories.jsonl`, and `trech_hook_emits.jsonl`).
+The viewer is intentionally simple — it is a debug / demo surface, not a production renderer. If you need photoreal output use the JSONL artefacts as input to whatever pipeline you prefer; the data layer is documented in `docs/engine/output_schema.md` (sections `trech_viz_scene.json`, `trech_viz_trajectories.jsonl`, and `trech_hook_emits.jsonl`).

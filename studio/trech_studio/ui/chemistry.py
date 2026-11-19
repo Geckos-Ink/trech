@@ -127,7 +127,7 @@ class ChemistryPanel(QWidget):
         text.setWordWrap(True)
         reaction_layout.addWidget(text)
         self.reaction = QPlainTextEdit()
-        self.reaction.setPlaceholderText('Leave empty for structure inspection. See docs/chemistry_mode.md for the reaction contract.')
+        self.reaction.setPlaceholderText('Leave empty for structure inspection. See docs/studio/chemistry_mode.md for the reaction contract.')
         reaction_layout.addWidget(self.reaction)
         self.tabs.addTab(reaction, "Reaction experiment")
         self.results = QPlainTextEdit()

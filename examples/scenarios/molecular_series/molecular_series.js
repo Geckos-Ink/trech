@@ -1,4 +1,4 @@
-// First bounded electronic/torsional prediction group. See docs/molecular_series.md.
+// First bounded electronic/torsional prediction group. See docs/scenarios/molecular_series.md.
 // Geant4 supplies live elemental identity + neutral-electron bookkeeping and
 // actual particle transport. QM-trained surfaces supply charges/energies.
 // Coordinates are imposed rigid scan samples, NOT predicted molecular dynamics.

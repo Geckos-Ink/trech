@@ -43,7 +43,7 @@ dated record below, and queue its residuals in the same change.
   had capped converted silica at 75% in every refined cell, below the class threshold.
 - [x] The refined candidate captures operator inputs at the correct call boundaries. It restores
   coverage for fully converted glass and matches the declared observables at two held-out
-  high-precision settings. [Study and recipe](../../../docs/multiscale_domain_study.md).
+  high-precision settings. [Study and recipe](../../../docs/inference/multiscale_domain_study.md).
 
 
 - [x] Observe statistical subdivisions within the furnace thermal groups across successive
@@ -200,7 +200,7 @@ volume/slice/surface GPU tests pass. Historical full-3D Metal captures also veri
 2664-triangle surface. These are implementation/numerical checks, not external physical
 validation. Synthetic interface fixtures remain test-only.
 
-See `docs/solution_processes.md`. Current visual/data limitations are stated above the folded historical README
+See `docs/scenarios/solution_processes.md`. Current visual/data limitations are stated above the folded historical README
 diagnostic gallery. No new preview is substituted for unavailable physical/spatial models.
 Spatial-binding verification: Debug and Release CTest 34/34 pass. Synthetic host coverage
 includes 3D cutoff geometry, scalar/dynamic pair kinds, both field symmetries, Float64Array
