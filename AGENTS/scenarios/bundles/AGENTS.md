@@ -7,8 +7,9 @@ Related owners: [JavaScript host and live lab](../../engine/runtime/AGENTS.md) Â
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
 **Scenario bundles:** all 71 scenario entry points live in `examples/scenarios/<name>/` with
-`<name>.js` (physics), `.view.js` (presentation), `.validation.js` (expectations), and `.ui.js`
-(typed controls/Studio descriptions). Shared TRECH JS lives in `js/`; failure fixtures live in
+`<name>.js` (physics), `.view.js` (presentation), `.validation.js` (expectations and
+validation-only declarations), and `.ui.js` (typed controls/Studio descriptions, data
+categorization and rendering indications). Shared TRECH JS lives in `js/`; failure fixtures live in
 `tests/fixtures/js/`. The C++ loader loads companions for roots and nested includes; CLI/library
 and Studio share parameter validation. Source inventory includes companions. Contract:
 [`docs/scenarios/scenario_bundles.md`](../../../docs/scenarios/scenario_bundles.md). Historical media identities are retained.

@@ -146,9 +146,12 @@ It must then label that purpose in code and records (`reference`, `validation`, 
   physical setup: the materials, their composition and structure (geometry), and the
   conditions. How the engine organises that setup emerges from TRECH: which elements group into
   kinds or domains, which systems they form and, possibly, the continuum fields it evolves.
-  Anything else a scenario writes is for validation or UI data categorization: element-kind
-  labels, group names, field layouts, categories. The engine must not need it to run and must
-  not take it as an instruction. Where a scenario still forces such a choice, that is debt in
+  Anything else a scenario writes is for validation, UI data categorization or rendering:
+  element-kind labels, group names, field layouts, categories, display hints. Validation
+  belongs in `<name>.validation.js`. Data categorization and rendering indications (how to
+  group, label, colour or draw recorded data) belong in the UI companions, `<name>.ui.js` and
+  `<name>.view.js`. The engine must not need any of it to run and must not take it as an
+  instruction; a rendering indication never changes physics, RNG or emitted physical fields. Where a scenario still forces such a choice, that is debt in
   the owning roadmap, never a pattern to copy. Today:
   - **Grouping:** domain routing (`group_by: "domain"`, the furnace's `grouping: "domain"`) lets
     grouping emerge, but several scenarios still select operators through declared

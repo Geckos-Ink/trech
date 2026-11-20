@@ -7,7 +7,7 @@ Every shipped scenario has its own folder under `examples/scenarios/<name>/`:
 | `<name>.js` | Materials, geometry, physical inputs, interactions, inference, state evolution and engine hooks |
 | `<name>.view.js` | Recorded-state presentation, visualization tags, colors, legends, HUD, display clocks and render surfaces |
 | `<name>.validation.js` | Expected behavior, comparison references, numerical acceptance predicates, output checks and validation-only engine declarations (continuum fields) |
-| `<name>.ui.js` | Typed parameter definitions, documentation, bounds, units, choices and optional Studio panel/process descriptions |
+| `<name>.ui.js` | Typed parameter definitions, documentation, bounds, units, choices, optional Studio panel/process descriptions, data categorization and rendering indications |
 
 Reusable TRECH JavaScript modules live in `js/`; committed data modules/models stay in `data/`.
 Intentional include-error fixtures live in `tests/fixtures/js/`. There are 71 scenario
@@ -72,7 +72,9 @@ Validation companions register JSON metadata in `TRECH_VALIDATIONS["example"]` a
 predicates/reference factories in `TRECH_CHECKS["example"]`. Predicates retain the original
 summary fields and tolerances. They grade observed state; they do not advance it. A scenario forces
 nothing about how the engine organises its system: grouping, systems and possibly fields emerge
-from the engine, and labels a scenario writes are for validation and UI categorization. A
+from the engine. Labels a scenario writes are for validation, UI data categorization and
+rendering. Categorization and rendering indications live in `.ui.js` and `.view.js`, and never
+change physics, RNG or emitted physical fields. A
 scenario never declares a continuum field. A companion may: its
 `TRECH_CHECKS[name].observeFrame(ctx, observed)`, called by the physics script at each output
 frame with its observed state, may call `ctx.evolveField` with a reference to grade the engine's

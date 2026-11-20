@@ -33,8 +33,9 @@ Read the root principles and the parent handbook first; then open only the subca
 - **Force nothing about how the engine organises the system.** A scenario states materials,
   composition, structure and conditions. Grouping (kinds, domains), systems and possibly fields
   emerge from the engine (root principle *A scenario forces nothing*). Labels a scenario writes,
-  such as `element_kind`, group names or categories, are for validation and UI data
-  categorization. The engine must not need them: prefer domain routing over declared kinds, and
+  such as `element_kind`, group names or categories, are for validation, UI data
+  categorization and rendering. The `.ui.js` and `.view.js` companions may carry
+  categorization and rendering indications; they never feed physics. The engine must not need them: prefer domain routing over declared kinds, and
   treat a declared kind that selects the operator as debt. A scenario never declares a
   continuum field. Only a `<name>.validation.js` companion may call `ctx.evolveField`, to grade
   the engine's methods against a reference. The physics script calls the companion's generic
