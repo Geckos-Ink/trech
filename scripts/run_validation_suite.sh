@@ -435,7 +435,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     echo "  - glass_from_sand at 1820 K driven by the frozen learned-domain thermal law"
     rm -rf "${RUNS_DIR}/out_glass_from_sand_hot_learned_deploy"
     trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
-      --param furnace_temperature_k=1820 --param learn_domains='"deploy"' --param grouping='"declared"' \
+      --param furnace_temperature_k=1820 --param learn_domains='"deploy"' \
       --param domain_learner_model='"data/glass_furnace_domain_learner/thermal.json"' \
       --output "${RUNS_DIR}/out_glass_from_sand_hot_learned_deploy" >/dev/null 2>&1
 

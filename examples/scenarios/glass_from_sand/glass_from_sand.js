@@ -696,6 +696,40 @@ function learnThermal(ctx, rates, start, kinds, dt, subStepIndex) {
   }
 }
 
+// Per cell: does the operator that applies to it rate `field`? Read from the call's own report:
+// the routed group path of each cell (domain grouping) or the stage bound to the cell's
+// material (declared grouping); a kind-free stage applies to every cell.
+function operatorRatesField(report, kinds, field) {
+  const mask = new Uint8Array(CELL_COUNT);
+  if (!report) return mask;
+  const ratesOf = {};
+  for (const stage of report.trace || []) {
+    ratesOf[stage.model] = (stage.integratedFields || []).indexOf(field) >= 0;
+  }
+  if (report.routing) {
+    const pathOf = {};
+    for (const group of report.routing.groups) pathOf[group.id] = group.path;
+    // A kind-free stage that belongs to no rival set runs on every cell.
+    const rivals = new Set();
+    for (const set of report.routing.sets) for (const model of set.models) rivals.add(model);
+    for (const stage of report.trace || []) {
+      if (!stage.elementKind && ratesOf[stage.model] && !rivals.has(stage.model)) mask.fill(1);
+    }
+    for (let i = 0; i < CELL_COUNT; ++i) {
+      const path = pathOf[report.routing.elementGroups[i]] || [];
+      if (path.some((model) => ratesOf[model])) mask[i] = 1;
+    }
+    return mask;
+  }
+  for (const stage of report.trace || []) {
+    if (!ratesOf[stage.model]) continue;
+    for (let i = 0; i < CELL_COUNT; ++i) {
+      if (!stage.elementKind || stage.elementKind === kinds[i]) mask[i] = 1;
+    }
+  }
+  return mask;
+}
+
 function deployThermal(ctx, cells, start, thermalSpec, dt, subStepIndex) {
   const features = thermalFeatures(start);
   const report = ctx.learnDomains({
@@ -705,12 +739,19 @@ function deployThermal(ctx, cells, start, thermalSpec, dt, subStepIndex) {
     options: learnerOptions(true)
   });
   if (!report) throw new Error("learn_domains=deploy requires determinism.mode=predictive");
-  // Shadow: the declared operator on a copy, never applied.
+  // Shadow: the thermal operator on a copy, never applied. Under domain grouping the engine
+  // routes it like the applied call, so its routing is graded the same way.
   const shadow = { temperature_k: cells.temperature_k.slice(), melt_fraction: cells.melt_fraction.slice() };
-  ctx.evolve(thermalSpec(shadow));
+  const shadowReport = ctx.evolve(thermalSpec(shadow));
+  recordRouting(shadowReport, "thermal_", (kind) => "thermal_" + kind, start);
+  // The learner stands in for the thermal operator, so it drives a field only on the cells
+  // whose operator rates that field (the glass law rates temperature, never melt fraction).
+  const rated = (field) => operatorRatesField(shadowReport, cells.kind, field);
   const applied = TRECH_DOMAIN_LEARNING.applyRates(report, [
-    { rate: "d_temperature_k_dt", values: cells.temperature_k, min: 0.0, max: 4000.0 },
-    { rate: "d_melt_fraction_dt", values: cells.melt_fraction, min: 0.0, max: 1.0 }
+    { rate: "d_temperature_k_dt", values: cells.temperature_k, min: 0.0, max: 4000.0,
+      mask: rated("temperature_k") },
+    { rate: "d_melt_fraction_dt", values: cells.melt_fraction, min: 0.0, max: 1.0,
+      mask: rated("melt_fraction") }
   ], dt);
   const s = state.shadow;
   s.calls += 1;

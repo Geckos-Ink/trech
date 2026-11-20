@@ -56,10 +56,12 @@ They feed two cases in `cases.py`:
   the learner only observes. The learned domains must agree with the material classes they never
   read (ARI ≥ 0.5, purity ≥ 0.9). In steady state, the prequential error must beat the pooled law
   by ≥ 50 % for melt and ≥ 25 % for heating.
-- `glass_domain_learner_deploy_held_out_1820k`: the frozen learner drives the thermal update, and
-  the products must stay within the declared tolerances. The shadow temperature RMSE must be
+- `glass_domain_learner_deploy_held_out_1820k`: the frozen learner drives the thermal update. It
+  drives a field only on cells whose operator rates that field, so it adds no melt rate to glass.
+  The products must stay within the declared tolerances. The shadow temperature RMSE must be
   ≤ 1.5 K, every element-step must be predicted, and the scenario's own checks must pass. The
-  mean and maximum temperature gaps are reported but not gated.
+  mean and maximum temperature gaps are reported but not gated. Since 2026-11-20 it fails 9/10:
+  the minimum fusion temperature misses by 5.13 K against 5 K (learner bias, inference queue).
 
 The full campaign (training, freezing, specialists, held-out evaluate/deploy, NumPy parity) is
 `tools/torch/study_domain_learning.py --scenario furnace|lamp|efflux`. A published learner carries

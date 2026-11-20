@@ -167,6 +167,9 @@
   // Integrate a frozen learner's predicted rates in place (explicit Euler at
   // the caller's step, then the caller's bounds). Elements without a
   // prediction stay untouched and are counted.
+  // A field may carry `mask` (per element, truthy = apply): a learned law that stands in for an
+  // operator drives a field only where that operator rates it, so it never invents a rate the
+  // operator does not have (a masked element keeps its value for that field).
   function applyRates(report, fields, dt) {
     let applied = 0, untouched = 0;
     const n = report.elementDomains.length;
@@ -178,6 +181,7 @@
       }
       if (!ok) { untouched += 1; continue; }
       for (const f of fields) {
+        if (f.mask && !f.mask[i]) continue;
         const next = f.values[i] + report.predictions[f.rate][i] * dt;
         f.values[i] = Math.min(f.max, Math.max(f.min, next));
       }

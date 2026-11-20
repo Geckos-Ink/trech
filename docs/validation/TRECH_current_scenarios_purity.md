@@ -772,7 +772,7 @@ Performance source: [`docs/validation/validation_report.json`](validation_report
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Ledger note: Material-creation scenario. The default physics_source=operator runs the distilled trained per-material thermal/chemistry family (measured meso hull + independent holdout); the hand-authored illustrative family it was distilled from is reachable only with physics_source=reference and is the harvest/audit teacher. Cell-to-cell conduction deliberately stays in the reference family: its law is exactly linear in the temperature difference.
 - Inference sites: 6 (`cascade` 1, `evolve` 3, `react` 1, `interact` 1) · law-shaped math: 0 · inference share: 100%
-- Embedded coefficients: 8 in 1274 code lines (0.6/100) · top-level literals: 25 · geometry math: 5
+- Embedded coefficients: 8 in 1308 code lines (0.6/100) · top-level literals: 25 · geometry math: 5
 - Geant4 fact reads: 2 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): functions `harvestTeacherRows`
 - Inherited from modules: `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
@@ -1083,7 +1083,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: thermal, phase, pair-interface and buoyancy/drag state evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 7 · inference share: 12%
-- Embedded coefficients: 63 in 1241 code lines (5.1/100) · top-level literals: 40 · geometry math: 26
+- Embedded coefficients: 63 in 1242 code lines (5.1/100) · top-level literals: 40 · geometry math: 26
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
 - Inherited from modules: `js/trech_domain_tracking.js`, `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
@@ -1523,7 +1523,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Inference sites: 2 (`evolve` 1, `react` 1) · law-shaped math: 2 · inference share: 50%
-- Embedded coefficients: 15 in 965 code lines (1.6/100) · top-level literals: 23 · geometry math: 10
+- Embedded coefficients: 15 in 966 code lines (1.6/100) · top-level literals: 23 · geometry math: 10
 - Geant4 fact reads: 0 · seeded RNG draws: 6 · hooks: yes
 - Comparison-only (excluded): 2 law-shaped sites in comparison code; functions `eventFactsWithReferenceActivation`, `referenceAdvectionVelocity`, `referenceStepCleared`, `referenceStepInside`, `referenceStepRandomVelocity`
 - Inherited from modules: `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients

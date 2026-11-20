@@ -28,8 +28,11 @@ dated record below, and queue its residuals in the same change.
 - [x] `learn_domains=learn|evaluate|deploy` learns the thermal law's response domains from the
   operator's pre-bound rates (no material label). A five-run campaign produced
   [`data/glass_furnace_domain_learner/thermal.json`](../../../data/glass_furnace_domain_learner/thermal.json).
-  Deployed at held-out 1560 and 1820 K, it reproduces glass units, glass cells and the first glass
-  tick exactly, and every furnace check passes. Temperature gaps and transfer residuals are owned
+  Deployed at held-out 1560 and 1820 K, it reproduced glass units, glass cells and the first glass
+  tick exactly, and every furnace check passed. Since 2026-11-20 the learner may drive only the
+  fields the replaced operator rates (no melt rate for glass). At 1820 K this exposes its
+  compounding temperature bias (+16 K; minimum fusion temperature 5.13 K off against a 5 K
+  tolerance; queued). Temperature gaps and transfer residuals are owned
   by the [inference queue](../../engine/inference/ROADMAP.md#priority-queue).
 
 ## Deep reusable JS process libraries

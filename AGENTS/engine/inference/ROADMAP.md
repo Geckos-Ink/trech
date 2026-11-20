@@ -21,7 +21,6 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R3 · Emergent grouping by default (root principle *A scenario forces nothing*). Done 2026-11-20: the furnace defaults to `grouping: "domain"`; foam, electrolysis and efflux no longer force `element_kind` in their operator calls. Remaining:
   - Furnace pair conduction routes by domain since 2026-11-20 (see the dated record). The opt-in set-network conduction (`cell_conduction_set`, `ctx.evolve`) still passes cell materials: measure routing domains for its three set models the same way, from the members' facts, and grade against declared kinds.
   - At high precision, routed pair conduction disagrees with the declared pair materials on 33 of 11.4 M pair evaluations. Most are `glass|melt` routed as `batch|glass`, where the classifier's glass rule and the melt threshold meet. The run then ends with 170 glass units against 171 and a mean temperature 2.2 K lower than with declared conduction. Narrow that boundary (more high-precision harvest, or a joint membership model).
-  - Under domain grouping, `learn_domains=deploy` at 1820 K fails `per_material_operator_selection`: the learner drives the thermal update, so no routed thermal group forms. Its shadowed thermal operators also degrade (melt shadow RMSE 0.30 vs 0.011 declared; temperature gaps are identical, 15.06 K mean). The suite pins that run to declared. Decide how the check reads deploy mode, and why learner-driven states fall outside the thermal routing domains.
   - Audit scenario `system`/ensemble declarations and process-library kind labels the same way.
 
   ([detail](#emergent-grouping-default-2026-11-20))
@@ -40,7 +39,7 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Particle-derived teachers for the online domain learner. `ctx.learnDomains` now learns dynamically changing operator responses (furnace thermal law, lamp parcels, efflux transport), but every teacher is an authored or distilled operator. Feed Geant4-derived rows (CHNO observer, atomic tables) and grade the learned domains against held-out Geant4 runs. Expose the TorchScript specialist index in engine traces and turn recurring uncovered regimes into experiment requests. ([detail](#online-response-domain-learning-2026-11-18))
 - **P2** · R3 · Closed-loop deployment of learned-domain operators beyond the furnace thermal law: chemistry (`ctx.react` hazards), the lamp parcel dynamics and efflux transport, each behind a paired observer gate. Measure compounding error over long horizons, not only per-step error. Efflux has no `deploy` mode yet, and its learner saturated the 24-domain capacity, so decide whether capacity should grow with evidence or whether merges should be stricter. ([detail](#online-response-domain-learning-2026-11-18))
 - **P2** · R4 · Calibrate the learner's `predictionStd`: the ±1.96σ interval covers 99% of rows in-run but 70–88% under transfer (furnace 1820 K, lamp 318 K), while on the efflux held-out seed it over-covers (~99.5%, bands too wide); add per-domain conformal half-widths from held-out calls and carry them into a deployed state. ([detail](#online-response-domain-learning-2026-11-18))
-- **P2** · R3 · The deployed furnace learner holds the product exactly at 1560 and 1820 K but runs 15 K cooler on mean temperature at 1820 K (operator tolerance 2 K), and its steady heating-rate error there is 23% above the pooled law. Find the remote/joint-support regions it misjudges, add training points near 1820 K, and gate the temperature observers. ([detail](#online-response-domain-learning-2026-11-18))
+- **P2** · R3 · The deployed furnace learner's temperature law compounds a bias over a long horizon. At held-out 1820 K, now that it drives only the fields the replaced operator rates (2026-11-20), the run ends 16 K warmer than the operators on mean temperature (9.8 K on max). The minimum fusion temperature misses by 5.13 K against a 5 K tolerance, so `glass_domain_learner_deploy_held_out_1820k` fails 9/10 in both groupings. Before the mask it ran 15 K cooler and passed, because it invented melt rates for glass cells, which offset the bias. Chemistry now matches the operators exactly (CO2 2878, carbonates 1442), and glass units are 677 against 648 (inside the 5 % tolerance). The per-step shadow is 0.88 K. Reduce the compounding error: a long-horizon loss, more training conditions that are not the held-out ones, or per-domain calibration. Then the 1820 K tolerances must pass again. ([detail](#deploy-mode-under-emergent-grouping-2026-11-20))
 - **P3** · R2 · Catch-all domains (wide boxes mixing materials whose laws agree in-sample) transfer poorly; split on joint-support density or a learned membership model, not only on in-sample error. The lava-lamp frame-scale response remains a weak case (velocity 13% worse than pooled inside the training range). ([detail](#online-response-domain-learning-2026-11-18))
 - **P3** · R7 · Learner cost grows with reservoir rows and domains: incremental sufficient statistics for refits and split scoring, and amortised merge checks, so 10^4-element populations stay per-frame. ([detail](#online-response-domain-learning-2026-11-18))
 - **P3** · R2 · Extend density lineage to changing element inventories and cross-platform numerical replay. Block-wise density discovery now handles 65,536 rows per parent. ([detail](#live-statistical-domain-subdivision))
@@ -55,6 +54,30 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
+
+## Deploy mode under emergent grouping (2026-11-20)
+
+- [x] Diagnosis: in `learn_domains=deploy` the frozen learner's `d_melt_fraction_dt` was applied
+  to every cell, including glass, whose operator (`thermal_glass`) rates temperature only.
+  - Under the deploy run's temperatures it pushed glass melt fractions down, as far as 0. No
+    operator reaches those states.
+  - Domain routing then sent glass cells and pairs to melt laws: 17 % of pairs misrouted, a melt
+    shadow RMSE of 0.34, and less CO2 released.
+  - Declared labels had hidden the same states.
+  - A probe was not kept: measuring every rival's gap overflow in a set-common unit routed those
+    glass cells to the batch law instead.
+- [x] Fix: a learned law that stands in for an operator drives a field only on the cells whose
+  operator rates it. `TRECH_DOMAIN_LEARNING.applyRates` takes a per-field `mask`.
+  `operatorRatesField` builds it from the shadow call's own report: the routed group path per
+  cell, or the stage bound to the cell's material, and each stage's `integratedFields`. The
+  shadow's routing is recorded like the applied call's.
+- [x] Results at 1820 K:
+  - declared and domain deploy are now identical;
+  - cell and pair routing agreement is 1.0, and every scenario check passes;
+  - CO2 and carbonates equal the operators';
+  - the melt shadow RMSE is 0.001.
+  - The case's remaining failure is the learner's temperature bias (queued above). The suite no
+    longer pins the deploy run.
 
 ## Furnace pair conduction routed by domain (2026-11-20)
 
