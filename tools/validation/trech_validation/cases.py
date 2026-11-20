@@ -5485,7 +5485,7 @@ class GlassDomainRoutingMatchesDeclared(ValidationCase):
         "band to the operator whose measured training domain covers it: the model's own input "
         "hull plus a routing_domain (melt fraction and converted-silica fraction) measured by "
         "trech-measure-routing-domain from the scenario's teacher harvest. Paired against the "
-        "default declared run (same seed, furnace, cells, sub-steps, horizon), the routed "
+        "declared-grouping run (same seed, furnace, cells, sub-steps, horizon), the routed "
         "operators must agree with the scenario's classifier applied to the state each call saw, "
         "the formed glass must stay unclaimed by any chemistry law (outside every chemistry "
         "domain), the created-product observables must stay inside the scenario's operator "

@@ -103,10 +103,11 @@ const LEARNER_STATE = domainLearnerModel
 if ((learnDomains === "deploy" || learnDomains === "evaluate") && !LEARNER_STATE) {
   throw new Error("learn_domains=" + learnDomains + " needs domain_learner_model");
 }
-// `declared` names each cell's material for the per-cell thermal and chemistry
-// operators; `domain` names none and lets the engine route by measured training
-// domain (docs/engine/scenario_hooks.md, domain routing). Conduction stays declared:
-// ctx.interact does not route.
+// `domain` (default) names no material for the per-cell thermal and chemistry operators:
+// the engine routes each cell by measured training domain (docs/engine/scenario_hooks.md,
+// domain routing). `declared` names each cell's material and is the reference the routed
+// grouping is validated against. Conduction still passes the cell materials in both modes:
+// its pair and set models carry no routing domain yet (inference roadmap).
 const grouping = TRECH_PARAMETER("grouping");
 const routeByDomain = grouping === "domain";
 // How cell-to-cell conduction is inferred. `pair` (default) runs the per-pair-

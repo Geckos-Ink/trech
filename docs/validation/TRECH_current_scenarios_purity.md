@@ -1437,7 +1437,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: default mechanics coupling (opt-in constitutive candidate has failing observer gates) and persistent bond/contact response
 - Inference sites: 3 (`cascade` 1, `evolve` 2) · law-shaped math: 3 · inference share: 50%
-- Embedded coefficients: 78 in 1520 code lines (5.1/100) · top-level literals: 52 · geometry math: 20
+- Embedded coefficients: 78 in 1519 code lines (5.1/100) · top-level literals: 52 · geometry math: 20
 - Geant4 fact reads: 10 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): 3 law-shaped sites in comparison code; functions `referenceApplyMechanicsCoupling`, `stepChemistryReference`
 - Inherited from modules: `js/trech_foam_solver.js` — 0 inference / 3 law-shaped / 41 coefficients
@@ -1523,7 +1523,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Inference sites: 2 (`evolve` 1, `react` 1) · law-shaped math: 2 · inference share: 50%
-- Embedded coefficients: 15 in 967 code lines (1.6/100) · top-level literals: 23 · geometry math: 10
+- Embedded coefficients: 15 in 965 code lines (1.6/100) · top-level literals: 23 · geometry math: 10
 - Geant4 fact reads: 0 · seeded RNG draws: 6 · hooks: yes
 - Comparison-only (excluded): 2 law-shaped sites in comparison code; functions `eventFactsWithReferenceActivation`, `referenceAdvectionVelocity`, `referenceStepCleared`, `referenceStepInside`, `referenceStepRandomVelocity`
 - Inherited from modules: `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
@@ -1552,7 +1552,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Inference sites: 1 (`react` 1) · law-shaped math: 3 · inference share: 25%
-- Embedded coefficients: 53 in 845 code lines (6.3/100) · top-level literals: 32 · geometry math: 8
+- Embedded coefficients: 53 in 844 code lines (6.3/100) · top-level literals: 32 · geometry math: 8
 - Geant4 fact reads: 0 · seeded RNG draws: 6 · hooks: yes
 - Comparison-only (excluded): functions `referenceCombustionProbability`, `referenceCombustionStep`, `referenceElectrolysisProbability`, `referenceElectrolysisStep`
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`

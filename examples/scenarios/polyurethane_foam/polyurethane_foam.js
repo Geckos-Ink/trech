@@ -551,8 +551,9 @@ function stepChemistryOperator(ctx, s, dt) {
     state: s.fieldArrays,
     aux: { reactivity: s.reactivity, exposure: foam.exposure },
     context: s.operatorContext,
-    operator_role: OPERATOR_ROLE,
-    element_kind: OPERATOR_ELEMENT_KIND
+    // The role selects the operator; no kind label is forced (root principle: a scenario
+    // forces nothing). The model's element_kind is a category label only.
+    operator_role: OPERATOR_ROLE
   });
   if (!report || !report.ran) {
     throw new Error("chemistry_source=operator requires predictive mode and a " +
@@ -607,7 +608,7 @@ function applyMechanicsOperator(ctx, s, dt) {
     context: { stress_relaxation_per_s: s.coeff.stressRelaxationPerS,
                structural_damping_per_s: s.coeff.structuralDampingPerS,
                solid_conversion: s.coeff.solidConversion },
-    operator_role: MECHANICS_ROLE, element_kind: OPERATOR_ELEMENT_KIND
+    operator_role: MECHANICS_ROLE
   });
   if (!report || !report.ran || report.inferenceCount !== s.foam.n ||
       !report.selection || report.selection.status !== "selected" ||

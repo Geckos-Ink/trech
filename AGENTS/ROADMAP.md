@@ -62,7 +62,7 @@ later step regress an earlier contract.
 - Row 2 — CNT material → device → circuit cascade (cheap deterministic scenarios with validation cases). — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
 - Row 3 — magnetic-resonance forward dynamics. — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
 - Row 6 remainder — osmosis (efflux promoted 2026-07-26). — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
-- Emergent grouping by default: scenarios force no grouping. Operators are selected by domain routing, not by declared `element_kind` labels, which stay only for validation and UI categorization (furnace default `grouping: "declared"` and four more scenarios select by kind). — [engine/inference](engine/inference/ROADMAP.md#priority-queue)
+- Emergent grouping by default: scenarios force no grouping. Operators are selected by domain routing, not by declared `element_kind` labels, which stay only for validation and UI categorization. The furnace default and three scenarios are done (2026-11-20); furnace conduction and its deploy mode remain. — [engine/inference](engine/inference/ROADMAP.md#priority-queue)
 - Engine method selection for fields (`ctx.evolveField`, declared today by validation companions): make the arbitration beat the best single method in every phase and on held-out time, on the lamp and the glass furnace. — [engine/lattice](engine/lattice/ROADMAP.md#priority-queue)
 
 **R6 Studio: observe and edit the cascade**

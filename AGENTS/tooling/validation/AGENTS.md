@@ -19,7 +19,7 @@ and the high-precision inventory check. For an isolated suite run, set `RIDGE_MO
 `REPORT_OPTICS_MD` / `REPORT_OPTICS_JSON` / `REPORT_OPTICS_TXT` alongside the main report
 paths. The optics demo consumes the exported ridge from that run.
 
-Run the glass furnace twice with `--param 'grouping="domain"'` and the lava lamp twice, adding
+Run the glass furnace twice (domain grouping is its default since 2026-11-20) and the lava lamp twice, adding
 `--param detect_domains=true` to one of each pair. Use distinct output directories. Then run:
 
 ```bash

@@ -18,7 +18,12 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R3 · Emergent grouping by default (root principle *A scenario forces nothing*). Operator selection should not depend on labels a scenario writes. Today `glass_from_sand` defaults to `grouping: "declared"`, and `water_salt_recipe`, `polyurethane_foam`, `testscenario_h2o_electrolysis_combustion` and `testscenario_efflux` select operators through declared `element_kind` labels. Make domain routing the default path. Keep declared kinds only as validation references (does the emergent grouping recover the declared one? `glass_domain_routing_matches_declared` is the pattern) and as UI categories. Close the coverage gaps that still need a label, then audit scenario `system`/ensemble declarations the same way. ([detail](AGENTS.md))
+- **P1** · R3 · Emergent grouping by default (root principle *A scenario forces nothing*). Done 2026-11-20: the furnace defaults to `grouping: "domain"`; foam, electrolysis and efflux no longer force `element_kind` in their operator calls. Remaining:
+  - Furnace conduction (the `cell_conduction_set` `ctx.evolve` and the `cell_conduction` `ctx.interact`) still passes cell materials in both modes. Its pair-kind and set models carry no `routing_domain`. Measure routing domains for them with `trech-measure-routing-domain` from the conduction harvest, then route pairs by domain (`ctx.interact` now routes) and grade against declared kinds.
+  - Under domain grouping, `learn_domains=deploy` at 1820 K fails `per_material_operator_selection`: the learner drives the thermal update, so no routed thermal group forms. Its shadowed thermal operators also degrade (melt shadow RMSE 0.30 vs 0.011 declared; temperature gaps are identical, 15.06 K mean). The suite pins that run to declared. Decide how the check reads deploy mode, and why learner-driven states fall outside the thermal routing domains.
+  - Audit scenario `system`/ensemble declarations and process-library kind labels the same way.
+
+  ([detail](#emergent-grouping-default-2026-11-20))
 - **P2** · R3 · `ctx.cascade` rival arbitration sees one context per call, so its per-context choice converges slowly: after 80 calls the late misses lie within 0.175 of the laws' crossing, and more calls do not shrink them monotonically (320 calls: RMSE 0.032 vs 0.052 at 80). Let a population cascade (one call over many contexts) feed one arbiter step, or warm-start it from an exported state. Also, a same-band consumer of a rival's output reads the last writer before the band's choice. ([detail](../../../docs/engine/scenario_hooks.md))
 - **P2** · R3 · No scenario feeds `options.reference` to `ctx.cascade` rivals. Give a family two candidate models for one property in one band, and grade them against evidence that is not one of the rivals. ([detail](AGENTS.md))
 - **P2** · R3 · No scenario routes `ctx.interact` by domain or feeds it `reference_pairs`. `glass_from_sand` declares per-element kinds. Route a pair family from an undeclared same-role pool (the lava lamp parcels or the furnace conduction cells), and grade its rivals against pair evidence that is not one of them. Evidence for neighbour pairs must name them explicitly, because only links have a stable order. ([detail](AGENTS.md))
@@ -49,6 +54,32 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
+
+## Emergent grouping default (2026-11-20)
+
+- [x] `glass_from_sand` defaults to `grouping: "domain"`: thermal and chemistry route by measured
+  domain with no material label, and declared grouping is the validation reference. The suite
+  pins `grouping="declared"` on the runs paired with that reference: the baseline, the 1820 K
+  baseline, the reference-law run, the set-conduction run and the learned-deploy run.
+- [x] `polyurethane_foam` (reaction and mechanics), `testscenario_h2o_electrolysis_combustion` and
+  `testscenario_efflux` (transport and crossing) dropped `element_kind` from their operator
+  calls. The role alone selects the same operator; the models keep their kind as a category
+  label.
+- [x] Evidence, with a pinned compute budget:
+  - **Foam (default and mechanics operator), electrolysis, efflux:** 219/219/235/425 emits are
+    identical before and after once operator-selection metadata (`selection`, `elementKind`,
+    `requestedFor`) is stripped. Scores, prediction counts and config hashes are identical, and
+    `validate_scenario.py` passes.
+  - **Furnace default:** byte-identical to an explicit `grouping=domain` run. Its observables and
+    `field_evolution` record equal the declared run's (arbitrated 28.060 K, oracle 13.791 K, 648
+    glass units), so the pinned lattice record stands.
+  - **Furnace cases:** `glass_domain_routing_matches_declared` (also at 1820 K, 14/14),
+    `glass_operator_matches_reference` (22/22), `glass_set_conduction_matches_pair` (17/17),
+    `glass_from_sand_material_creation`, `glass_domain_learning_unlabelled` and
+    `glass_charge_preserved_under_refinement` pass.
+  - **Learned deploy:** `glass_domain_learner_deploy_held_out_1820k` passes in declared mode and
+    fails in domain mode (queued above).
+- Not run: the full validation suite (only the furnace cases were graded on these runs).
 
 ## Rival arbiters across runs (2026-11-20)
 

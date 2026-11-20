@@ -400,15 +400,17 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
 
     echo "  - glass_from_sand (a material CREATED during the run: per-material operators)"
     rm -rf "${RUNS_DIR}/out_glass_from_sand"
+    # Declared grouping is the reference the default (domain) grouping is graded against.
     trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
+      --param grouping='"declared"' \
       --output "${RUNS_DIR}/out_glass_from_sand" >/dev/null 2>&1
     rm -rf "${RUNS_DIR}/out_glass_from_sand_reference"
     trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
-      --param physics_source='"reference"' \
+      --param physics_source='"reference"' --param grouping='"declared"' \
       --output "${RUNS_DIR}/out_glass_from_sand_reference" >/dev/null 2>&1
     rm -rf "${RUNS_DIR}/out_glass_from_sand_set_conduction"
     trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
-      --param conduction_source='"set_network"' \
+      --param conduction_source='"set_network"' --param grouping='"declared"' \
       --output "${RUNS_DIR}/out_glass_from_sand_set_conduction" >/dev/null 2>&1
     rm -rf "${RUNS_DIR}/out_glass_from_sand_domain"
     trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
@@ -418,7 +420,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     echo "  - glass_from_sand at 1820 K (post-thermal material classification)"
     rm -rf "${RUNS_DIR}/out_glass_from_sand_hot"
     trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
-      --param furnace_temperature_k=1820 \
+      --param furnace_temperature_k=1820 --param grouping='"declared"' \
       --output "${RUNS_DIR}/out_glass_from_sand_hot" >/dev/null 2>&1
     rm -rf "${RUNS_DIR}/out_glass_from_sand_hot_domain"
     trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
@@ -433,7 +435,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     echo "  - glass_from_sand at 1820 K driven by the frozen learned-domain thermal law"
     rm -rf "${RUNS_DIR}/out_glass_from_sand_hot_learned_deploy"
     trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
-      --param furnace_temperature_k=1820 --param learn_domains='"deploy"' \
+      --param furnace_temperature_k=1820 --param learn_domains='"deploy"' --param grouping='"declared"' \
       --param domain_learner_model='"data/glass_furnace_domain_learner/thermal.json"' \
       --output "${RUNS_DIR}/out_glass_from_sand_hot_learned_deploy" >/dev/null 2>&1
 

@@ -530,8 +530,9 @@ function evolveParticlesWithOperator(ctx, state) {
     state: fields,
     aux,
     context: transportContext(),
+    // The role selects the operator; no kind label is forced. The model's element_kind is a
+    // category label only.
     operator_role: TRANSPORT_ROLE,
-    element_kind: EFFLUX_ELEMENT_KIND,
     // Learners see the displacement law before the bath's bounds.
     report_rates: start !== null
   });
@@ -590,8 +591,7 @@ function crossBoundaryCandidatesWithOperator(ctx, state, candidates, eventFacts)
       name: "packet_identity",
       coefficients: { inside: 1, cleared: 1 }
     }],
-    operator_role: CROSSING_ROLE,
-    element_kind: EFFLUX_ELEMENT_KIND
+    operator_role: CROSSING_ROLE
   });
   if (!report || !report.ran || !report.transitionSchemaValid ||
       !report.hazardSchemaValid || !report.selection ||

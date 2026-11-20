@@ -524,8 +524,9 @@ function operatorReactionStep(ctx, state, tick, drive) {
       { name: "hydrogen_atoms", coefficients: { water: 2, hydrogen: 2 } },
       { name: "oxygen_atoms", coefficients: { water: 1, oxygen: 2 } }
     ],
-    operator_role: OPERATOR_ROLE,
-    element_kind: OPERATOR_ELEMENT_KIND
+    // The role selects the operator; no kind label is forced. The model's element_kind is a
+    // category label only.
+    operator_role: OPERATOR_ROLE
   });
   if (!report || !report.ran || !report.transitionSchemaValid ||
       !report.hazardSchemaValid) {

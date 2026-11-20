@@ -153,9 +153,10 @@ It must then label that purpose in code and records (`reference`, `validation`, 
   `<name>.view.js`. The engine must not need any of it to run and must not take it as an
   instruction; a rendering indication never changes physics, RNG or emitted physical fields. Where a scenario still forces such a choice, that is debt in
   the owning roadmap, never a pattern to copy. Today:
-  - **Grouping:** domain routing (`group_by: "domain"`, the furnace's `grouping: "domain"`) lets
-    grouping emerge, but several scenarios still select operators through declared
-    `element_kind` labels, and the furnace defaults to declared grouping. Queued in the
+  - **Grouping:** domain routing lets grouping emerge. The furnace defaults to
+    `grouping: "domain"`, and declared grouping is its validation reference. Single-population
+    scenarios select operators by role, with no kind label. Furnace conduction still passes
+    cell materials; this is queued in the
     [inference roadmap](AGENTS/engine/inference/ROADMAP.md#priority-queue).
   - **Fields:** no scenario declares a continuum field. The lamp's and the furnace's
     declarations live in their `.validation.js` companions (moved 2026-11-20), which grade the
@@ -172,8 +173,9 @@ It must then label that purpose in code and records (`reference`, `validation`, 
   labels (a declared kind that selects the operator).
 - **Right:** the lamp's validation companion declares the carrier column only to grade the
   engine's methods against the lamp's authored column. The engine runs the methods it owns and
-  records which one wins where. The scenario only hands over its observed state. In the
-  furnace's `grouping: "domain"` mode, the engine routes every cell without a material label.
+  records which one wins where. The scenario only hands over its observed state. By default
+  the furnace's engine routes every cell's thermal and chemistry operators without a material
+  label.
 - **Every multi-method path selects the same way.** Where the engine owns more than one way to
   predict a quantity (lattice methods, learned operators, surrogate networks, baselines, and any
   algorithm or model added later), the domain-free `MethodArbiter` chooses per context domain
