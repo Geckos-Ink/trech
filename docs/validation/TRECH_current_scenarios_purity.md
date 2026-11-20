@@ -772,7 +772,7 @@ Performance source: [`docs/validation/validation_report.json`](validation_report
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Ledger note: Material-creation scenario. The default physics_source=operator runs the distilled trained per-material thermal/chemistry family (measured meso hull + independent holdout); the hand-authored illustrative family it was distilled from is reachable only with physics_source=reference and is the harvest/audit teacher. Cell-to-cell conduction deliberately stays in the reference family: its law is exactly linear in the temperature difference.
 - Inference sites: 6 (`cascade` 1, `evolve` 3, `react` 1, `interact` 1) · law-shaped math: 0 · inference share: 100%
-- Embedded coefficients: 8 in 1308 code lines (0.6/100) · top-level literals: 25 · geometry math: 5
+- Embedded coefficients: 8 in 1326 code lines (0.6/100) · top-level literals: 25 · geometry math: 5
 - Geant4 fact reads: 2 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): functions `harvestTeacherRows`
 - Inherited from modules: `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients

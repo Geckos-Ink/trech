@@ -248,6 +248,7 @@ const state = {
   // ctx.learnDomains bookkeeping (learn_domains != off).
   learning: null,
   shadow: { calls: 0, elements: 0, sq: { temperature_k: 0, melt_fraction: 0 }, maxAbs: { temperature_k: 0, melt_fraction: 0 },
+            signed: {}, phases: [], byDomain: {},
             untouched: 0, extrapolated: 0 },
   minFusionTemperatureK: Infinity,
   minCalcinationTemperatureK: Infinity,
@@ -759,12 +760,25 @@ function deployThermal(ctx, cells, start, thermalSpec, dt, subStepIndex) {
   s.extrapolated += report.extrapolated;
   state.inference.evolve += applied.applied;
   state.inference.outOfDomain += report.extrapolated;
+  // Signed per-step error (learner minus operator) by material and by run third: where and
+  // when a bias accumulates (reported only).
+  const third = Math.min(2, Math.floor(3 * state.tick / TICKS));
   for (let i = 0; i < CELL_COUNT; ++i) {
+    const kind = cells.kind[i];
+    const bucket = s.signed[kind] = s.signed[kind] || { n: 0, temperature_k: 0, melt_fraction: 0 };
+    const phase = s.phases[third] = s.phases[third] || { n: 0, temperature_k: 0 };
+    bucket.n += 1; phase.n += 1;
     for (const field of ["temperature_k", "melt_fraction"]) {
       const e = cells[field][i] - shadow[field][i];
       s.sq[field] += e * e;
       s.maxAbs[field] = Math.max(s.maxAbs[field], Math.abs(e));
+      bucket[field] += e;
     }
+    phase.temperature_k += cells.temperature_k[i] - shadow.temperature_k[i];
+    const domain = String((report.predictionDomains || [])[i]);
+    const d = s.byDomain[domain] = s.byDomain[domain] || { n: 0, temperature_k: 0, kinds: {} };
+    d.n += 1; d.temperature_k += cells.temperature_k[i] - shadow.temperature_k[i];
+    d.kinds[kind] = (d.kinds[kind] || 0) + 1;
   }
   s.elements += CELL_COUNT;
   if (subStepIndex === SUB_STEPS - 1) {
@@ -791,7 +805,13 @@ function learningSummary() {
       calls: s.calls, element_steps: s.elements, untouched: s.untouched, extrapolated: s.extrapolated,
       rmse: { temperature_k: Math.sqrt(s.sq.temperature_k / Math.max(s.elements, 1)),
               melt_fraction: Math.sqrt(s.sq.melt_fraction / Math.max(s.elements, 1)) },
-      max_abs: s.maxAbs
+      max_abs: s.maxAbs,
+      mean_signed_error_by_kind: Object.fromEntries(Object.entries(s.signed).map(([k, b]) => [k, {
+        element_steps: b.n, temperature_k: b.temperature_k / Math.max(b.n, 1),
+        melt_fraction: b.melt_fraction / Math.max(b.n, 1)}])),
+      mean_signed_temperature_error_by_third: s.phases.map((p) => p ? p.temperature_k / Math.max(p.n, 1) : null),
+      mean_signed_temperature_error_by_domain: Object.fromEntries(Object.entries(s.byDomain).map(([id, d]) => [id, {
+        element_steps: d.n, temperature_k: d.temperature_k / Math.max(d.n, 1), kinds: d.kinds}]))
     } : null
   };
 }

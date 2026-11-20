@@ -39,7 +39,7 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Particle-derived teachers for the online domain learner. `ctx.learnDomains` now learns dynamically changing operator responses (furnace thermal law, lamp parcels, efflux transport), but every teacher is an authored or distilled operator. Feed Geant4-derived rows (CHNO observer, atomic tables) and grade the learned domains against held-out Geant4 runs. Expose the TorchScript specialist index in engine traces and turn recurring uncovered regimes into experiment requests. ([detail](#online-response-domain-learning-2026-11-18))
 - **P2** · R3 · Closed-loop deployment of learned-domain operators beyond the furnace thermal law: chemistry (`ctx.react` hazards), the lamp parcel dynamics and efflux transport, each behind a paired observer gate. Measure compounding error over long horizons, not only per-step error. Efflux has no `deploy` mode yet, and its learner saturated the 24-domain capacity, so decide whether capacity should grow with evidence or whether merges should be stricter. ([detail](#online-response-domain-learning-2026-11-18))
 - **P2** · R4 · Calibrate the learner's `predictionStd`: the ±1.96σ interval covers 99% of rows in-run but 70–88% under transfer (furnace 1820 K, lamp 318 K), while on the efflux held-out seed it over-covers (~99.5%, bands too wide); add per-domain conformal half-widths from held-out calls and carry them into a deployed state. ([detail](#online-response-domain-learning-2026-11-18))
-- **P2** · R3 · The deployed furnace learner's temperature law compounds a bias over a long horizon. At held-out 1820 K, now that it drives only the fields the replaced operator rates (2026-11-20), the run ends 16 K warmer than the operators on mean temperature (9.8 K on max). The minimum fusion temperature misses by 5.13 K against a 5 K tolerance, so `glass_domain_learner_deploy_held_out_1820k` fails 9/10 in both groupings. Before the mask it ran 15 K cooler and passed, because it invented melt rates for glass cells, which offset the bias. Chemistry now matches the operators exactly (CO2 2878, carbonates 1442), and glass units are 677 against 648 (inside the 5 % tolerance). The per-step shadow is 0.88 K. Reduce the compounding error: a long-horizon loss, more training conditions that are not the held-out ones, or per-domain calibration. Then the 1820 K tolerances must pass again. ([detail](#deploy-mode-under-emergent-grouping-2026-11-20))
+- **P2** · R3 · The two-pass furnace learner (2026-11-20) fixed the 1820 K deploy (+2.3 K mean, minimum fusion +1.9 K, case 10/10). At held-out 1560 K the first glass forms 6 ticks early (27 vs 33; operator tolerance 3), where the one-pass learner matched exactly, and the minimum fusion temperature sits at +4.8 K against 5 K. Grade a 1560 K deploy in the suite, and reduce the early-fusion bias without training on a held-out point. ([detail](#furnace-learner-bias-fixed-by-a-two-pass-campaign-2026-11-20))
 - **P3** · R2 · Catch-all domains (wide boxes mixing materials whose laws agree in-sample) transfer poorly; split on joint-support density or a learned membership model, not only on in-sample error. The lava-lamp frame-scale response remains a weak case (velocity 13% worse than pooled inside the training range). ([detail](#online-response-domain-learning-2026-11-18))
 - **P3** · R7 · Learner cost grows with reservoir rows and domains: incremental sufficient statistics for refits and split scoring, and amortised merge checks, so 10^4-element populations stay per-frame. ([detail](#online-response-domain-learning-2026-11-18))
 - **P3** · R2 · Extend density lineage to changing element inventories and cross-platform numerical replay. Block-wise density discovery now handles 65,536 rows per parent. ([detail](#live-statistical-domain-subdivision))
@@ -54,6 +54,21 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
+
+## Furnace learner bias fixed by a two-pass campaign (2026-11-20)
+
+- [x] Diagnosis with signed shadow errors (now in the deploy summary by material, run third and
+  learner domain): glass carried the bias, +1.08 K per step. Domain 23, a catch-all holding batch
+  and glass rows, accounted for most of it, while the glass-only domain was unbiased (+0.075).
+- [x] Probes that were not kept:
+  - keeping the inside law outside a domain's box: no change;
+  - a set-common distance unit for nearest-law routing: routed the glass cells to batch;
+  - more memory: the per-domain reservoir is bounded by refit work, not memory.
+- [x] Fix: `study_domain_learning.py --passes 2` over the same training points and pinned budget,
+  published with `publish_domain_learner.py`, which now records `passes`. At 1820 K the glass bias
+  falls to +0.43 K per step, the mean gap from +16.0 to +2.3 K, and the minimum fusion gap from
+  5.13 to 1.86 K. CO2 and carbonates are within 0.14 %, and the case passes 10/10.
+- Residual (queued above): the first glass forms 6 ticks early at 1560 K.
 
 ## Deploy mode under emergent grouping (2026-11-20)
 

@@ -122,7 +122,7 @@ law fed the same rows:
 | 1750 K | 0.00293 / 0.00762 | 0.0107 / 0.0292 | 0.90 |
 | 1880 K | 0.00423 / 0.0101 | 0.00934 / 0.0366 | 0.30 |
 
-The frozen state has 15 domains and 44 lineage entries. Capacity-sized offline residual networks
+The one-pass frozen state had 15 domains and 44 lineage entries (superseded 2026-11-20; see the two-pass rebuild below). Capacity-sized offline residual networks
 (width 64, 3,617 epochs) were refused for every domain: each law was already exact to 10⁻⁶ of its
 target variance, or too small. The state is committed as
 [`data/glass_furnace_domain_learner/thermal.json`](../../data/glass_furnace_domain_learner/thermal.json)
@@ -137,7 +137,26 @@ operators, while the declared operator runs on a copy as a shadow.
 | 1560 K | 0.00291 / 0.0217 (0.00404 / 0.0262) | 0.31 K | 324 / 324 | cells, first tick, CO₂, carbonates identical; min fusion +4.6 K | +1.1 K / +1.9 K |
 | 1820 K | 0.00633 / 0.0411 (0.00754 / 0.0400) | 0.96 K | 648 / 648 | cells, first tick identical; CO₂ 1.0%, carbonates 1.9% | −15.1 K / −7.1 K |
 
-All furnace checks pass in both deployed runs. Engine and NumPy agree on 9,600 deployed rows to
+**Two-pass rebuild (2026-11-20, the committed state).** The one-pass learner above deployed
+its melt-fraction rate on every cell, including glass, whose operator rates temperature only.
+Once deploy drove a field only where the replaced operator rates it, its 1820 K run ended 16 K
+warmer than the operators. Most of the bias, about +2 K per step on glass, came from a domain
+that mixed batch and glass rows. Its earlier 1820 K result had passed only because the bad glass
+melt rates offset it. The campaign was rerun with `--passes 2` over the same five training points
+and the same pinned budget: 20 domains and 48 lineage entries, with no specialist accepted. Its
+second-pass steady gains over the pooled law are 0.88–0.98 (melt) and 0.83–0.98 (heating).
+
+| Held-out | Evaluate RMSE melt / heating (pooled) | Deploy shadow RMSE per step | Glass units | Other created-product observables | Mean / max temperature gap |
+| --- | --- | ---: | ---: | --- | ---: |
+| 1560 K | 0.00357 / 0.0231 (0.0053 / 0.0269) | 0.30 K | 324 / 324 | cells, CO₂, carbonates identical; first glass 6 ticks early (27 vs 33); min fusion +4.8 K | +0.16 K / +0.26 K |
+| 1820 K | 0.00966 / 0.0356 (0.0111 / 0.0420) | 0.56 K | 648 / 648 | cells, first tick identical; CO₂ 0.07%, carbonates 0.14%; min fusion +1.9 K | +2.3 K / +3.7 K |
+
+At 1820 K `glass_domain_learner_deploy_held_out_1820k` passes 10/10 in both groupings. At
+1560 K the first glass now forms 6 ticks early, beyond the 3-tick operator tolerance, which no
+suite case grades (queued). Build: `build/domain_learning/furnace_campaign_p2`, published with
+`tools/torch/publish_domain_learner.py`. The record carries `passes: 2`.
+
+The one-pass results follow. All furnace checks passed in both deployed runs. Engine and NumPy agree on 9,600 deployed rows to
 2.2 × 10⁻¹⁶. The product observables meet the scenario's operator tolerances. The temperature
 tolerances (2 K mean, 1 K maximum) were set for a distilled family accurate to 10⁻⁶. At 1560 K the
 mean gap meets them and the maximum (1.9 K) does not; at 1820 K both exceed them. At 1820 K the steady heating-rate error is 23% worse than the pooled

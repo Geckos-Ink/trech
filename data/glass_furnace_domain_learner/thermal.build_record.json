@@ -1,20 +1,21 @@
 {
   "schema": "trech_domain_learner_build_v1",
   "state": "data/glass_furnace_domain_learner/thermal.json",
-  "state_sha256": "13633b34e07979971ab2e99a351b402f2373bccba27f703a47e9d224e99c55b9",
+  "state_sha256": "0cf84875787732b2c46bb7605eb2c40a1aa1924794a5e165598009b79ff540f6",
   "scenario": "furnace",
   "operating_point": "furnace_temperature_k",
   "train": [
-    1500.0,
-    1600.0,
-    1700.0,
-    1750.0,
-    1880.0
+    1500,
+    1600,
+    1700,
+    1750,
+    1880
   ],
   "test": [
-    1560.0,
-    1820.0
+    1560,
+    1820
   ],
+  "passes": 2,
   "params": {},
   "budget": {
     "budget": {
@@ -24,7 +25,7 @@
       "memory_fraction": 0.05,
       "schema": "trech_compute_budget_v1",
       "seconds_per_call": 0.05,
-      "source": "probe",
+      "source": "env",
       "torch_threads": 6
     },
     "capacity": {
@@ -40,183 +41,261 @@
     "features": 5,
     "targets": 2
   },
-  "domains": 15,
-  "calls": 3000,
-  "lineage_entries": 29,
+  "domains": 20,
+  "calls": 6000,
+  "lineage_entries": 48,
   "runs": [
     {
-      "run": "build/domain_learning/furnace_campaign/train_p0_1500",
+      "run": "build/domain_learning/furnace_campaign_p2/train_p0_1500",
       "params": {
         "learn_domains": "learn",
-        "furnace_temperature_k": 1500.0
+        "furnace_temperature_k": 1500
       },
-      "seconds": 34.1
+      "seconds": 37.5
     },
     {
-      "run": "build/domain_learning/furnace_campaign/train_p0_1600",
+      "run": "build/domain_learning/furnace_campaign_p2/train_p0_1600",
       "params": {
         "learn_domains": "learn",
-        "furnace_temperature_k": 1600.0,
-        "domain_learner_model": "build/domain_learning/furnace_campaign/state_p0_1500.json"
+        "furnace_temperature_k": 1600,
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/state_p0_1500.json"
       },
-      "seconds": 133.7
+      "seconds": 41.5
     },
     {
-      "run": "build/domain_learning/furnace_campaign/train_p0_1700",
+      "run": "build/domain_learning/furnace_campaign_p2/train_p0_1700",
       "params": {
         "learn_domains": "learn",
-        "furnace_temperature_k": 1700.0,
-        "domain_learner_model": "build/domain_learning/furnace_campaign/state_p0_1600.json"
+        "furnace_temperature_k": 1700,
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/state_p0_1600.json"
       },
-      "seconds": 159.5
+      "seconds": 45.9
     },
     {
-      "run": "build/domain_learning/furnace_campaign/train_p0_1750",
+      "run": "build/domain_learning/furnace_campaign_p2/train_p0_1750",
       "params": {
         "learn_domains": "learn",
-        "furnace_temperature_k": 1750.0,
-        "domain_learner_model": "build/domain_learning/furnace_campaign/state_p0_1700.json"
+        "furnace_temperature_k": 1750,
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/state_p0_1700.json"
       },
-      "seconds": 187.6
+      "seconds": 49.6
     },
     {
-      "run": "build/domain_learning/furnace_campaign/train_p0_1880",
+      "run": "build/domain_learning/furnace_campaign_p2/train_p0_1880",
       "params": {
         "learn_domains": "learn",
-        "furnace_temperature_k": 1880.0,
-        "domain_learner_model": "build/domain_learning/furnace_campaign/state_p0_1750.json"
+        "furnace_temperature_k": 1880,
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/state_p0_1750.json"
       },
-      "seconds": 184.0
+      "seconds": 53.6
     },
     {
-      "run": "build/domain_learning/furnace_campaign/declared_1560",
+      "run": "build/domain_learning/furnace_campaign_p2/train_p1_1500",
       "params": {
-        "furnace_temperature_k": 1560.0
+        "learn_domains": "learn",
+        "furnace_temperature_k": 1500,
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/state_p0_1880.json"
       },
-      "seconds": 5.2
+      "seconds": 36.0
     },
     {
-      "run": "build/domain_learning/furnace_campaign/evaluate_learned_1560",
+      "run": "build/domain_learning/furnace_campaign_p2/train_p1_1600",
       "params": {
-        "furnace_temperature_k": 1560.0,
+        "learn_domains": "learn",
+        "furnace_temperature_k": 1600,
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/state_p1_1500.json"
+      },
+      "seconds": 40.3
+    },
+    {
+      "run": "build/domain_learning/furnace_campaign_p2/train_p1_1700",
+      "params": {
+        "learn_domains": "learn",
+        "furnace_temperature_k": 1700,
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/state_p1_1600.json"
+      },
+      "seconds": 55.7
+    },
+    {
+      "run": "build/domain_learning/furnace_campaign_p2/train_p1_1750",
+      "params": {
+        "learn_domains": "learn",
+        "furnace_temperature_k": 1750,
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/state_p1_1700.json"
+      },
+      "seconds": 45.9
+    },
+    {
+      "run": "build/domain_learning/furnace_campaign_p2/train_p1_1880",
+      "params": {
+        "learn_domains": "learn",
+        "furnace_temperature_k": 1880,
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/state_p1_1750.json"
+      },
+      "seconds": 45.5
+    },
+    {
+      "run": "build/domain_learning/furnace_campaign_p2/declared_1560",
+      "params": {
+        "furnace_temperature_k": 1560
+      },
+      "seconds": 24.3
+    },
+    {
+      "run": "build/domain_learning/furnace_campaign_p2/evaluate_learned_1560",
+      "params": {
+        "furnace_temperature_k": 1560,
         "learn_domains": "evaluate",
-        "domain_learner_model": "build/domain_learning/furnace_campaign/learned.json"
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/learned.json"
       },
-      "seconds": 31.3
+      "seconds": 26.0
     },
     {
-      "run": "build/domain_learning/furnace_campaign/deploy_learned_1560",
+      "run": "build/domain_learning/furnace_campaign_p2/deploy_learned_1560",
       "params": {
-        "furnace_temperature_k": 1560.0,
+        "furnace_temperature_k": 1560,
         "learn_domains": "deploy",
-        "domain_learner_model": "build/domain_learning/furnace_campaign/learned.json"
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/learned.json"
       },
-      "seconds": 31.1
+      "seconds": 33.3
     },
     {
-      "run": "build/domain_learning/furnace_campaign/declared_1820",
+      "run": "build/domain_learning/furnace_campaign_p2/evaluate_specialists_1560",
       "params": {
-        "furnace_temperature_k": 1820.0
-      },
-      "seconds": 5.3
-    },
-    {
-      "run": "build/domain_learning/furnace_campaign/evaluate_learned_1820",
-      "params": {
-        "furnace_temperature_k": 1820.0,
+        "furnace_temperature_k": 1560,
         "learn_domains": "evaluate",
-        "domain_learner_model": "build/domain_learning/furnace_campaign/learned.json"
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/learned_specialists.json"
       },
-      "seconds": 30.8
+      "seconds": 26.1
     },
     {
-      "run": "build/domain_learning/furnace_campaign/deploy_learned_1820",
+      "run": "build/domain_learning/furnace_campaign_p2/deploy_specialists_1560",
       "params": {
-        "furnace_temperature_k": 1820.0,
+        "furnace_temperature_k": 1560,
         "learn_domains": "deploy",
-        "domain_learner_model": "build/domain_learning/furnace_campaign/learned.json"
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/learned_specialists.json"
       },
-      "seconds": 31.4
+      "seconds": 33.3
+    },
+    {
+      "run": "build/domain_learning/furnace_campaign_p2/declared_1820",
+      "params": {
+        "furnace_temperature_k": 1820
+      },
+      "seconds": 28.4
+    },
+    {
+      "run": "build/domain_learning/furnace_campaign_p2/evaluate_learned_1820",
+      "params": {
+        "furnace_temperature_k": 1820,
+        "learn_domains": "evaluate",
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/learned.json"
+      },
+      "seconds": 30.1
+    },
+    {
+      "run": "build/domain_learning/furnace_campaign_p2/deploy_learned_1820",
+      "params": {
+        "furnace_temperature_k": 1820,
+        "learn_domains": "deploy",
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/learned.json"
+      },
+      "seconds": 30.6
+    },
+    {
+      "run": "build/domain_learning/furnace_campaign_p2/evaluate_specialists_1820",
+      "params": {
+        "furnace_temperature_k": 1820,
+        "learn_domains": "evaluate",
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/learned_specialists.json"
+      },
+      "seconds": 30.2
+    },
+    {
+      "run": "build/domain_learning/furnace_campaign_p2/deploy_specialists_1820",
+      "params": {
+        "furnace_temperature_k": 1820,
+        "learn_domains": "deploy",
+        "domain_learner_model": "build/domain_learning/furnace_campaign_p2/learned_specialists.json"
+      },
+      "seconds": 31.2
     }
   ],
   "held_out": [
     {
-      "furnace_temperature_k": 1560.0,
+      "furnace_temperature_k": 1560,
       "evaluate": {
         "agreement": {
-          "ari": 0.5179718132847042,
+          "ari": 0.9511724683091924,
           "contingency": {
             "10": {
-              "melt": 327
+              "batch_solid": 396,
+              "melt": 964
             },
             "11": {
-              "melt": 180
-            },
-            "15": {
-              "melt": 23434
-            },
-            "16": {
-              "melt": 398
-            },
-            "17": {
-              "batch_solid": 468
-            },
-            "18": {
-              "batch_solid": 72
-            },
-            "23": {
-              "batch_solid": 50724,
-              "melt": 72
-            },
-            "25": {
-              "batch_solid": 38484
-            },
-            "27": {
+              "batch_solid": 89388,
               "melt": 36
             },
-            "28": {
-              "batch_solid": 144
+            "13": {
+              "melt": 4
             },
-            "8": {
-              "batch_solid": 396,
+            "23": {
+              "batch_solid": 468
+            },
+            "24": {
+              "batch_solid": 36
+            },
+            "26": {
               "glass": 14865
+            },
+            "30": {
+              "melt": 108
+            },
+            "41": {
+              "melt": 36
+            },
+            "42": {
+              "melt": 18144
+            },
+            "5": {
+              "melt": 5155
             }
           },
-          "inverse_purity": 0.6869058641975309,
-          "purity": 0.9963888888888889
+          "inverse_purity": 0.9444212962962963,
+          "purity": 0.9966666666666667
         },
         "calls": 600,
         "events": {},
         "gain": {
-          "d_melt_fraction_dt": 0.28055287540421125,
-          "d_temperature_k_dt": 0.1742248070272664
+          "d_melt_fraction_dt": 0.324951514184627,
+          "d_temperature_k_dt": 0.14047781399406745
         },
         "interval_coverage_1_96": {
-          "d_melt_fraction_dt": 0.8672145061728395,
-          "d_temperature_k_dt": 0.8640972222222222
+          "d_melt_fraction_dt": 0.8593904320987654,
+          "d_temperature_k_dt": 0.8598456790123457
         },
         "pooled_rmse": {
-          "d_melt_fraction_dt": 0.004039922274643489,
-          "d_temperature_k_dt": 0.026235345909161798
+          "d_melt_fraction_dt": 0.005295386196968199,
+          "d_temperature_k_dt": 0.02687332809582189
         },
         "routed_rmse": {
-          "d_melt_fraction_dt": 0.0029065104640827364,
-          "d_temperature_k_dt": 0.021664497830844502
+          "d_melt_fraction_dt": 0.003574642434071009,
+          "d_temperature_k_dt": 0.023098221710175476
         },
         "scored": 129600,
-        "seconds": 2.398117202999998,
+        "seconds": 0.8681515829999994,
         "steady": {
           "gain": {
-            "d_melt_fraction_dt": 0.27607883531462096,
-            "d_temperature_k_dt": 0.23101395307385597
+            "d_melt_fraction_dt": 0.300114512129977,
+            "d_temperature_k_dt": 0.17551028732176777
           },
           "pooled_rmse": {
-            "d_melt_fraction_dt": 0.00423101291666991,
-            "d_temperature_k_dt": 0.017822782213725463
+            "d_melt_fraction_dt": 0.005369304156219872,
+            "d_temperature_k_dt": 0.015787090536570424
           },
           "routed_rmse": {
-            "d_melt_fraction_dt": 0.003062919798434564,
-            "d_temperature_k_dt": 0.013705470839758335
+            "d_melt_fraction_dt": 0.0037578980588984876,
+            "d_temperature_k_dt": 0.013016293740522187
           },
           "scored": 116640,
           "skipped_calls": 60
@@ -225,14 +304,109 @@
       "deploy_shadow": {
         "calls": 600,
         "element_steps": 129600,
-        "extrapolated": 16158,
+        "extrapolated": 16280,
         "max_abs": {
-          "melt_fraction": 0.019618497987573535,
-          "temperature_k": 10.1611270931935
+          "melt_fraction": 0.11759104948274396,
+          "temperature_k": 12.347248485707496
         },
+        "mean_signed_error_by_kind": {
+          "batch_solid": {
+            "element_steps": 90216,
+            "melt_fraction": 0.00011360662619653624,
+            "temperature_k": 0.008536571650289872
+          },
+          "glass": {
+            "element_steps": 14857,
+            "melt_fraction": 0,
+            "temperature_k": 0.0523170906330727
+          },
+          "melt": {
+            "element_steps": 24527,
+            "melt_fraction": 2.825613535101749e-07,
+            "temperature_k": -0.07934428117093932
+          }
+        },
+        "mean_signed_temperature_error_by_domain": {
+          "10": {
+            "element_steps": 1221,
+            "kinds": {
+              "batch_solid": 396,
+              "melt": 825
+            },
+            "temperature_k": -1.5443397748061505
+          },
+          "11": {
+            "element_steps": 89316,
+            "kinds": {
+              "batch_solid": 89316
+            },
+            "temperature_k": 0.0029539579754670232
+          },
+          "13": {
+            "element_steps": 22,
+            "kinds": {
+              "melt": 22
+            },
+            "temperature_k": -2.745894084105947
+          },
+          "23": {
+            "element_steps": 468,
+            "kinds": {
+              "batch_solid": 468
+            },
+            "temperature_k": 0.13204946501331102
+          },
+          "24": {
+            "element_steps": 36,
+            "kinds": {
+              "batch_solid": 36
+            },
+            "temperature_k": 12.347248485707496
+          },
+          "26": {
+            "element_steps": 14857,
+            "kinds": {
+              "glass": 14857
+            },
+            "temperature_k": 0.0523170906330727
+          },
+          "30": {
+            "element_steps": 108,
+            "kinds": {
+              "melt": 108
+            },
+            "temperature_k": 0.0001264732273819357
+          },
+          "41": {
+            "element_steps": 36,
+            "kinds": {
+              "melt": 36
+            },
+            "temperature_k": -0.0016182106644653989
+          },
+          "42": {
+            "element_steps": 18180,
+            "kinds": {
+              "melt": 18180
+            },
+            "temperature_k": 9.60502013160246e-07
+          },
+          "5": {
+            "element_steps": 5356,
+            "kinds": {
+              "melt": 5356
+            },
+            "temperature_k": -3.6827635963751166e-07
+          }
+        },
+        "mean_signed_temperature_error_by_third": [
+          -0.014647755655585655,
+          -0.003407451754526385,
+          0.008826808781836075
+        ],
         "rmse": {
-          "melt_fraction": 0.000693619337926201,
-          "temperature_k": 0.30989649111343837
+          "melt_fraction": 0.0025541258988721525,
+          "temperature_k": 0.29817329227949924
         },
         "untouched": 0
       },
@@ -259,23 +433,23 @@
         },
         "first_glass_tick": {
           "declared": 33,
-          "learned": 33,
-          "relative_difference": 0.0
+          "learned": 27,
+          "relative_difference": 0.18181818181818182
         },
         "mean_temperature_k": {
           "declared": 1020.2798678091302,
-          "learned": 1021.4262809756694,
-          "relative_difference": 0.0011236261762186265
+          "learned": 1020.4345368410039,
+          "relative_difference": 0.000151594711170606
         },
         "max_temperature_k": {
           "declared": 1490.9686017599456,
-          "learned": 1492.8645020391193,
-          "relative_difference": 0.0012715896746153966
+          "learned": 1491.2252360922967,
+          "relative_difference": 0.00017212591334794623
         },
         "min_temperature_k": {
           "declared": 394.75771550311504,
-          "learned": 394.9083459403596,
-          "relative_difference": 0.0003815769301749588
+          "learned": 394.7778957972026,
+          "relative_difference": 5.112070846245168e-05
         },
         "final_kinds": {
           "declared": {
@@ -293,89 +467,100 @@
       "numpy_parity": {
         "rows": 9600,
         "domain_mismatches": 0,
-        "max_relative_difference": 2.2012906048203423e-16
+        "max_relative_difference": 2.1984306809564866e-16
       }
     },
     {
-      "furnace_temperature_k": 1820.0,
+      "furnace_temperature_k": 1820,
       "evaluate": {
         "agreement": {
-          "ari": 0.45131219122741145,
+          "ari": 0.8654647573955577,
           "contingency": {
             "10": {
-              "melt": 242
-            },
-            "15": {
-              "melt": 22373
-            },
-            "16": {
-              "glass": 18613,
-              "melt": 245
-            },
-            "17": {
               "batch_solid": 396
             },
-            "18": {
+            "11": {
+              "batch_solid": 69012,
+              "melt": 15
+            },
+            "23": {
+              "batch_solid": 396
+            },
+            "24": {
               "batch_solid": 36,
               "melt": 36
             },
-            "19": {
+            "26": {
+              "glass": 887,
+              "melt": 129
+            },
+            "30": {
+              "melt": 88
+            },
+            "31": {
+              "melt": 3649
+            },
+            "35": {
+              "melt": 138
+            },
+            "36": {
+              "glass": 16582
+            },
+            "37": {
               "melt": 36
             },
-            "23": {
-              "batch_solid": 28944,
-              "glass": 15317,
-              "melt": 1106
+            "41": {
+              "glass": 1144,
+              "melt": 56
             },
-            "25": {
-              "batch_solid": 39882
+            "42": {
+              "melt": 18705
             },
-            "27": {
-              "melt": 1689
+            "43": {
+              "melt": 657
             },
-            "28": {
-              "batch_solid": 186,
-              "melt": 103
+            "47": {
+              "glass": 15317
             },
-            "8": {
-              "batch_solid": 396
+            "5": {
+              "melt": 2321
             }
           },
-          "inverse_purity": 0.6239814814814815,
-          "purity": 0.8703163580246913
+          "inverse_purity": 0.8047762345679013,
+          "purity": 0.998179012345679
         },
         "calls": 600,
         "events": {},
         "gain": {
-          "d_melt_fraction_dt": 0.16066547412565013,
-          "d_temperature_k_dt": -0.028443593341491047
+          "d_melt_fraction_dt": 0.13209193537090747,
+          "d_temperature_k_dt": 0.1528801801084847
         },
         "interval_coverage_1_96": {
-          "d_melt_fraction_dt": 0.7035108024691358,
-          "d_temperature_k_dt": 0.7045370370370371
+          "d_melt_fraction_dt": 0.8166512345679012,
+          "d_temperature_k_dt": 0.816658950617284
         },
         "pooled_rmse": {
-          "d_melt_fraction_dt": 0.007542718230607737,
-          "d_temperature_k_dt": 0.03999650237410865
+          "d_melt_fraction_dt": 0.011126799403423608,
+          "d_temperature_k_dt": 0.0420183633695975
         },
         "routed_rmse": {
-          "d_melt_fraction_dt": 0.006330863829890961,
-          "d_temperature_k_dt": 0.041134146622719775
+          "d_melt_fraction_dt": 0.009657038935741526,
+          "d_temperature_k_dt": 0.03559458840978968
         },
         "scored": 129600,
-        "seconds": 2.4251462909999986,
+        "seconds": 0.8065908419999999,
         "steady": {
           "gain": {
-            "d_melt_fraction_dt": 0.13847649983362575,
-            "d_temperature_k_dt": -0.23325797729672315
+            "d_melt_fraction_dt": 0.11641830894780814,
+            "d_temperature_k_dt": 0.17508981772724685
           },
           "pooled_rmse": {
-            "d_melt_fraction_dt": 0.007629244557662811,
-            "d_temperature_k_dt": 0.02660848233251465
+            "d_melt_fraction_dt": 0.01142351616521991,
+            "d_temperature_k_dt": 0.0317404604790154
           },
           "routed_rmse": {
-            "d_melt_fraction_dt": 0.006572773474942927,
-            "d_temperature_k_dt": 0.03281512310033261
+            "d_melt_fraction_dt": 0.010093609731027058,
+            "d_temperature_k_dt": 0.026183029039165712
           },
           "scored": 116640,
           "skipped_calls": 60
@@ -384,14 +569,153 @@
       "deploy_shadow": {
         "calls": 600,
         "element_steps": 129600,
-        "extrapolated": 36929,
+        "extrapolated": 20223,
         "max_abs": {
-          "melt_fraction": 0.8106582194582423,
-          "temperature_k": 18.809740980800598
+          "melt_fraction": 0.23191367826940518,
+          "temperature_k": 16.062849342527898
         },
+        "mean_signed_error_by_kind": {
+          "batch_solid": {
+            "element_steps": 69801,
+            "melt_fraction": 0.0002638821926506716,
+            "temperature_k": 0.012895948940449499
+          },
+          "glass": {
+            "element_steps": 33985,
+            "melt_fraction": 0,
+            "temperature_k": 0.43042036054435157
+          },
+          "melt": {
+            "element_steps": 25814,
+            "melt_fraction": -0.0003693360918003641,
+            "temperature_k": -0.09024808999697946
+          }
+        },
+        "mean_signed_temperature_error_by_domain": {
+          "10": {
+            "element_steps": 396,
+            "kinds": {
+              "batch_solid": 396
+            },
+            "temperature_k": -8.428234640301856e-07
+          },
+          "11": {
+            "element_steps": 69020,
+            "kinds": {
+              "batch_solid": 69009,
+              "melt": 11
+            },
+            "temperature_k": 0.0007262656799501058
+          },
+          "23": {
+            "element_steps": 360,
+            "kinds": {
+              "batch_solid": 360
+            },
+            "temperature_k": 0.9528329109909464
+          },
+          "24": {
+            "element_steps": 36,
+            "kinds": {
+              "batch_solid": 36
+            },
+            "temperature_k": 14.354160630818114
+          },
+          "26": {
+            "element_steps": 788,
+            "kinds": {
+              "glass": 637,
+              "melt": 151
+            },
+            "temperature_k": -0.2429819254004985
+          },
+          "30": {
+            "element_steps": 74,
+            "kinds": {
+              "melt": 74
+            },
+            "temperature_k": -0.0008923889445797515
+          },
+          "31": {
+            "element_steps": 3549,
+            "kinds": {
+              "melt": 3549
+            },
+            "temperature_k": 0.005817421965365906
+          },
+          "35": {
+            "element_steps": 197,
+            "kinds": {
+              "melt": 197
+            },
+            "temperature_k": 0.04579576549500753
+          },
+          "36": {
+            "element_steps": 16749,
+            "kinds": {
+              "glass": 16749
+            },
+            "temperature_k": 0.7833658826542303
+          },
+          "37": {
+            "element_steps": 36,
+            "kinds": {
+              "melt": 36
+            },
+            "temperature_k": -11.150090854125892
+          },
+          "40": {
+            "element_steps": 36,
+            "kinds": {
+              "melt": 36
+            },
+            "temperature_k": -16.062849342527898
+          },
+          "41": {
+            "element_steps": 1247,
+            "kinds": {
+              "glass": 1167,
+              "melt": 80
+            },
+            "temperature_k": 0.6470458106412306
+          },
+          "42": {
+            "element_steps": 18540,
+            "kinds": {
+              "melt": 18540
+            },
+            "temperature_k": -0.02922061053592354
+          },
+          "43": {
+            "element_steps": 704,
+            "kinds": {
+              "melt": 704
+            },
+            "temperature_k": 0.19004456852734594
+          },
+          "47": {
+            "element_steps": 15432,
+            "kinds": {
+              "glass": 15432
+            },
+            "temperature_k": -0.005802434483383889
+          },
+          "5": {
+            "element_steps": 2436,
+            "kinds": {
+              "melt": 2436
+            },
+            "temperature_k": 8.131624305124639e-08
+          }
+        },
+        "mean_signed_temperature_error_by_third": [
+          0.04606894797127341,
+          0.1297293647082689,
+          0.12971839773504362
+        ],
         "rmse": {
-          "melt_fraction": 0.01099532311166113,
-          "temperature_k": 0.9630958787192604
+          "melt_fraction": 0.005762515403667412,
+          "temperature_k": 0.556837474714556
         },
         "untouched": 0
       },
@@ -408,13 +732,13 @@
         },
         "remaining_carbonates": {
           "declared": 1442,
-          "learned": 1470,
-          "relative_difference": 0.019417475728155338
+          "learned": 1440,
+          "relative_difference": 0.0013869625520110957
         },
         "released_co2": {
           "declared": 2878,
-          "learned": 2850,
-          "relative_difference": 0.009728978457261988
+          "learned": 2880,
+          "relative_difference": 0.0006949270326615705
         },
         "first_glass_tick": {
           "declared": 10,
@@ -423,18 +747,18 @@
         },
         "mean_temperature_k": {
           "declared": 1182.8566266409161,
-          "learned": 1167.7929111002236,
-          "relative_difference": 0.012735030773315776
+          "learned": 1185.1742510283289,
+          "relative_difference": 0.0019593451439624695
         },
         "max_temperature_k": {
           "declared": 1725.6798169282183,
-          "learned": 1718.5566314590442,
-          "relative_difference": 0.004127756145316515
+          "learned": 1729.4233829120446,
+          "relative_difference": 0.0021693282537719144
         },
         "min_temperature_k": {
           "declared": 429.472210798561,
-          "learned": 426.6353266364283,
-          "relative_difference": 0.006605512745184974
+          "learned": 429.8120551655614,
+          "relative_difference": 0.0007913070006753243
         },
         "final_kinds": {
           "declared": {
@@ -452,10 +776,10 @@
       "numpy_parity": {
         "rows": 9600,
         "domain_mismatches": 0,
-        "max_relative_difference": 2.1097487740010695e-16
+        "max_relative_difference": 2.1962242951736098e-16
       }
     }
   ],
-  "command": "tools/torch/study_domain_learning.py --scenario furnace --train 1500.0 1600.0 1700.0 1750.0 1880.0 --test 1560.0 1820.0",
+  "command": "tools/torch/study_domain_learning.py --scenario furnace --train 1500 1600 1700 1750 1880 --test 1560 1820 --passes 2",
   "note": "Learned online by ctx.learnDomains from the scenario operator's own pre-bound rates; measured:false. Capacity depends on the recorded budget."
 }

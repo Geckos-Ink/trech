@@ -1001,7 +1001,13 @@ The scenario summary (`glass_furnace_summary`, `lava_lamp_summary`, `efflux_summ
 `interval_coverage_1_96`, event
 counts, learner seconds, run-level `agreement`). The furnace `deploy` mode adds `shadow`: per
 element-step RMSE and maximum absolute difference of temperature and melt fraction between the
-learned update and the declared operator applied to a copy, untouched and extrapolated counts.
+learned update and the operator applied to a copy, untouched and extrapolated counts, and the
+mean signed temperature error (learned minus operator) by cell material
+(`mean_signed_error_by_kind`, also melt fraction), by third of the run
+(`mean_signed_temperature_error_by_third`) and by the learner domain that predicted the cell
+(`mean_signed_temperature_error_by_domain`, with element-steps and the materials it held). The
+learned update drives a field only on cells whose operator rates that field (the glass operator
+rates temperature only).
 
 ## Engine field-evolution emits
 

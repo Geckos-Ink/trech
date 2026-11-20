@@ -60,8 +60,8 @@ They feed two cases in `cases.py`:
   drives a field only on cells whose operator rates that field, so it adds no melt rate to glass.
   The products must stay within the declared tolerances. The shadow temperature RMSE must be
   ≤ 1.5 K, every element-step must be predicted, and the scenario's own checks must pass. The
-  mean and maximum temperature gaps are reported but not gated. Since 2026-11-20 it fails 9/10:
-  the minimum fusion temperature misses by 5.13 K against 5 K (learner bias, inference queue).
+  mean and maximum temperature gaps are reported but not gated. It passes 10/10 with the two-pass
+  learner (2026-11-20; mean +2.3 K, minimum fusion +1.86 K).
 
 The full campaign (training, freezing, specialists, held-out evaluate/deploy, NumPy parity) is
 `tools/torch/study_domain_learning.py --scenario furnace|lamp|efflux`. A published learner carries

@@ -44,6 +44,7 @@ def main(argv=None) -> int:
         "operating_point": report.get("operating_point"),
         "train": report.get("train"),
         "test": report.get("test"),
+        "passes": report.get("passes", 1),
         "params": report.get("params"),
         "budget": report.get("budget"),
         "domains": len(state["leaves"]),
@@ -51,9 +52,9 @@ def main(argv=None) -> int:
         "lineage_entries": len(state["lineage"]),
         "runs": report.get("runs"),
         "held_out": held_out,
-        "command": ("tools/torch/study_domain_learning.py --scenario {s} --train {tr} --test {te}"
+        "command": ("tools/torch/study_domain_learning.py --scenario {s} --train {tr} --test {te} --passes {p}"
                     .format(s=report.get("scenario"), tr=" ".join(map(str, report.get("train", []))),
-                            te=" ".join(map(str, report.get("test", []))))),
+                            te=" ".join(map(str, report.get("test", []))), p=report.get("passes", 1))),
         "note": ("Learned online by ctx.learnDomains from the scenario operator's own pre-bound rates; "
                  "measured:false. Capacity depends on the recorded budget."),
     }
