@@ -80,6 +80,8 @@ struct FieldEvolution::Impl {
   std::vector<double> state, previousState;
   double previousTime = kNaN;
   long calls = 0;
+  nlohmann::json pending;  // a restored state, applied when the system is built
+  bool frozen = false;
 
   std::vector<double> context(const FieldEvolutionInput& in, double interval) const {
     const std::size_t C = sys.cells(), F = kContext.size();
@@ -126,7 +128,35 @@ struct FieldEvolution::Impl {
     o.minElements = sys.options.minElements;
     o.seed = sys.options.seed;
     arbiter = std::make_unique<MethodArbiter>(o);
+    if (!pending.is_null()) {
+      try {
+        applyRestore();
+      } catch (...) {
+        candidates.clear(); excluded = nlohmann::json::object(); features.clear(); arbiter.reset();
+        throw;
+      }
+    }
     built = true;
+  }
+
+  void applyRestore() {
+    const auto& st = pending;
+    if (st.at("cells").get<std::size_t>() != sys.cells())
+      throw std::invalid_argument("restored field state: it was learned on " + st.at("cells").dump() +
+                                  " cells, this system declares " + std::to_string(sys.cells()));
+    std::vector<std::string> names;
+    for (const auto& c : candidates) names.push_back(c.name);
+    if (st.at("methods").get<std::vector<std::string>>() != names)
+      throw std::invalid_argument("restored field state: its candidate methods " + st.at("methods").dump() +
+                                  " differ from this system's " + nlohmann::json(names).dump());
+    if (st.at("context_features").get<std::vector<std::string>>() != features)
+      throw std::invalid_argument("restored field state: its context features differ from this system's");
+    auto restored = std::make_unique<MethodArbiter>(MethodArbiter::fromState(st.at("arbiter"), frozen));
+    const auto& methodStates = st.at("method_states");
+    for (auto& c : candidates)
+      if (methodStates.contains(c.name) && !methodStates.at(c.name).is_null())
+        c.method->restoreState(methodStates.at(c.name), frozen);
+    arbiter = std::move(restored);
   }
 };
 
@@ -235,6 +265,31 @@ nlohmann::json FieldEvolution::step(const FieldEvolutionInput& in) {
   return out;
 }
 
+nlohmann::json FieldEvolution::exportState(bool includeRows) const {
+  const auto& s = *impl_;
+  if (!s.built) throw std::logic_error("field evolution state is available after the first step");
+  std::vector<std::string> names;
+  nlohmann::json methodStates = nlohmann::json::object();
+  for (const auto& c : s.candidates) {
+    names.push_back(c.name);
+    methodStates[c.name] = c.method->exportState(includeRows);
+  }
+  return {{"format", "trech_field_evolution_v1"}, {"cells", s.sys.cells()}, {"methods", names},
+          {"context_features", s.features}, {"arbiter", s.arbiter->exportState(includeRows)},
+          {"method_states", methodStates}};
+}
+
+void FieldEvolution::restore(nlohmann::json state, bool frozen) {
+  auto& s = *impl_;
+  if (s.built) throw std::logic_error("a field evolution state can be restored only before the first step");
+  if (!state.is_object() || state.value("format", "") != "trech_field_evolution_v1")
+    throw std::invalid_argument("field evolution state: expected format trech_field_evolution_v1");
+  for (const char* key : {"cells", "methods", "context_features", "arbiter", "method_states"})
+    if (!state.contains(key)) throw std::invalid_argument(std::string("field evolution state: missing ") + key);
+  s.pending = std::move(state);
+  s.frozen = frozen;
+}
+
 nlohmann::json FieldEvolution::summary() const {
   const auto& s = *impl_;
   if (!s.built) return {{"calls", s.calls}};
@@ -249,6 +304,8 @@ nlohmann::json FieldEvolution::summary() const {
   for (const auto& [name, why] : s.excluded.items())
     out["methods"][name] = {{"available", false}, {"family", why.at("family")}, {"reason", why.at("reason")}};
   out["registered_methods"] = methodNames();
+  if (s.frozen) out["restored"] = "frozen";
+  else if (!s.pending.is_null()) out["restored"] = "continued";
   // Learner capacities derive from it; a run is reproducible only under the same budget.
   out["compute_budget"] = hostComputeBudget().toJson();
   out["graded_cells"] = out["graded_elements"];

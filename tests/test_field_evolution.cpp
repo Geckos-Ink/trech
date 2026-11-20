@@ -6,7 +6,10 @@
 //  3. a method registered later joins the arbitration with no other change and emerges where
 //     it is best;
 //  4. a method that cannot represent the declared system is excluded with its reason and the
-//     arbitration still runs among the others.
+//     arbitration still runs among the others;
+//  5. an exported arbiter (with the learned operator's state) restored in a later run: frozen
+//     on its own regime it works from the first window and learns nothing; on a held-out
+//     exchange regime its transfer is measured and printed.
 #include "trech/ml/FieldEvolution.hpp"
 #include "trech/ml/MethodArbiter.hpp"
 
@@ -138,6 +141,38 @@ void arbiterDomains() {
 }
 }  // namespace
 
+// 5. A learned field arbiter across runs: run the same declared system on an exchange regime,
+// optionally restoring an exported state first. Returns the summary; `exported` receives the
+// final state (through text, as a later run reads it).
+nlohmann::json runRegime(double rate, double target, const nlohmann::json* warm, bool frozen,
+                         nlohmann::json* exported, nlohmann::json* restoredBefore = nullptr) {
+  const int cells = 8;
+  const double heightMm = 120, slab = heightMm / cells, kappa = 1e-5;
+  std::vector<std::array<double, 3>> lo, hi;
+  for (int c = 0; c < cells; ++c) { lo.push_back({0, 0, c * slab}); hi.push_back({30, 30, (c + 1) * slab}); }
+  trech::ml::FieldRegion region;
+  region.shape = "box"; region.sizeMm = {30, 30, heightMm};
+  trech::ml::FieldProperties props;
+  props.kinematicViscosityM2S = 1e-5; props.diffusivityM2S = kappa;
+  trech::ml::FieldEvolutionOptions opt;
+  opt.cellMm = 5; opt.minElements = 16; opt.seed = 7;
+  FieldEvolution evolution(region, lo, hi, props, std::vector<double>(cells, 0.0), opt);
+  if (warm) evolution.restore(*warm, frozen);
+  Column column{std::vector<double>(cells, 0.0), slab * 1e-3, kappa};
+  for (int frame = 0; frame <= 60; ++frame) {
+    if (frame > 0) column.advance(2.0, rate, target);
+    trech::ml::FieldEvolutionInput in;
+    in.timeS = 2.0 * frame;
+    in.rate.assign(cells, 0.0); in.rate[0] = rate;
+    in.target.assign(cells, 0.0); in.target[0] = target;
+    in.reference = column.t;
+    evolution.step(in);
+    if (frame == 0 && restoredBefore) *restoredBefore = nlohmann::json::parse(evolution.exportState(true).dump());
+  }
+  if (exported) *exported = nlohmann::json::parse(evolution.exportState(true).dump());
+  return evolution.summary();
+}
+
 int main() {
   try {
     arbiterDomains();
@@ -185,6 +220,50 @@ int main() {
     check(still.at("phases").at(2).at("arbitrated_rmse").get<double>() <
               0.5 * still.at("phases").at(2).at("methods").at("persistence").at("rmse").get<double>(),
           "arbitration without the convective lattice did not beat persistence");
+
+    // 5. Across runs: learn on one exchange regime and export. Deployed frozen on the SAME
+    // regime, the carried choice works from the first window (the mechanism). Deployed frozen
+    // on a held-out regime (another target and rate), it is the held-out test of the choice:
+    // its result is measured and reported, not assumed (see the inference roadmap).
+    {
+      nlohmann::json trained, afterSame, atSame, afterHeld, atHeld, continued;
+      const auto learning = runRegime(0.2, 10.0, nullptr, false, &trained);
+      const auto same = runRegime(0.2, 10.0, &trained, true, &afterSame, &atSame);
+      const auto fresh = runRegime(0.5, 4.0, nullptr, false, nullptr);
+      const auto held = runRegime(0.5, 4.0, &trained, true, &afterHeld, &atHeld);
+      const auto more = runRegime(0.5, 4.0, &trained, false, &continued);
+      auto window = [](const nlohmann::json& s, int w) { return s.at("phases").at(w).at("arbitrated_rmse").get<double>(); };
+      std::printf("across runs, first/last window arbitrated rmse: learning %.4f/%.4f; same regime frozen %.4f/%.4f; "
+                  "held-out regime untrained %.4f/%.4f, frozen %.4f/%.4f (oracle %.4f), continued %.4f/%.4f\n",
+                  window(learning, 0), window(learning, 2), window(same, 0), window(same, 2), window(fresh, 0),
+                  window(fresh, 2), window(held, 0), window(held, 2),
+                  held.at("phases").at(0).at("oracle_rmse").get<double>(), window(more, 0), window(more, 2));
+      print("same regime, restored frozen", same);
+      print("held-out regime, restored frozen", held);
+      check(same.at("restored") == "frozen" && same.value("frozen", false),
+            "a frozen restore was not reported in the summary");
+      check(window(same, 0) < window(learning, 0) &&
+                same.at("arbitrated_rmse").get<double>() < learning.at("arbitrated_rmse").get<double>(),
+            "a restored frozen arbiter did not beat learning from scratch on its own regime");
+      check(afterSame.at("arbiter") == atSame.at("arbiter") && afterSame.at("method_states") == atSame.at("method_states") &&
+                afterHeld.at("arbiter") == atHeld.at("arbiter") && afterHeld.at("method_states") == atHeld.at("method_states"),
+            "a frozen field arbiter or learned method changed while deployed");
+      check(atSame.at("arbiter").at("policy_score") == trained.at("arbiter").at("policy_score") &&
+                atSame.at("arbiter").at("ew_log") == trained.at("arbiter").at("ew_log"),
+            "the restored state was not applied at build");
+      check(more.at("restored") == "continued" && !more.contains("frozen") && continued.at("arbiter") != trained.at("arbiter"),
+            "a continued restore did not keep learning");
+
+      // A state that does not fit the declared system fails the first step and builds nothing.
+      nlohmann::json wrong = trained;
+      wrong["cells"] = 9;
+      bool threw = false;
+      try { runRegime(0.5, 4.0, &wrong, true, nullptr); } catch (const std::invalid_argument&) { threw = true; }
+      check(threw, "a field state for another system was accepted");
+      bool badFormat = false;
+      try { runRegime(0.5, 4.0, &trained.at("arbiter"), true, nullptr); } catch (const std::invalid_argument&) { badFormat = true; }
+      check(badFormat, "a field state of another format was accepted");
+    }
 
     // 3. A method registered later joins with no other change (here one that sees the answer).
     trech::ml::registerFieldMethod({"test_foresight", "test", "test only: predicts the coming reference",

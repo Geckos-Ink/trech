@@ -195,6 +195,31 @@ Earlier development findings (the free-running confrontation, 4/6 mm spatial con
 staggered-mode defect and the superseded 2026-11-18 record) are in the
 [roadmap history](ROADMAP.md#2026-11-18--lattice-module-native-kernel-and-lava-lamp-companion).
 
+## Cross-run state (2026-11-20)
+
+`FieldEvolution::exportState`/`restore` (`trech_field_evolution_v1`) carry the `MethodArbiter`
+state and each candidate's `FieldMethod::exportState`. Only `learned_operator` overrides it (its
+`DomainLearner`). Lattice physical state and the twin's diagnostic learner are not carried. A
+pending restore is applied when the system is built on the first step. A mismatch in cells,
+candidates or context features throws and resets the build, and the JS host then drops the
+just-created field. Frozen: the arbiter and the learned operator select, predict and grade, but
+learn nothing (`observe` returns early); lattices still synchronise to references.
+
+Recorded in `trech_field_evolution` case 5 (8-cell slab, 61 frames, first/last window arbitrated
+RMSE):
+
+| Run | First window | Last window |
+| --- | --- | --- |
+| Learning from scratch | 0.194 | 0.012 |
+| Same regime, frozen restore | 0.159 | 0.008 |
+| Held-out regime (0.5 s⁻¹ / target 4), untrained | 0.141 | 0.000 |
+| Held-out regime, frozen restore | 0.320 (oracle 0.130) | 0.002 |
+| Held-out regime, continued restore | 0.321 | 0.001 |
+
+The carried choice helps on its own regime. It does not transfer to another exchange regime,
+and the operator's support has shrunk to the late phase. Both gaps are in the
+[roadmap](ROADMAP.md#priority-queue).
+
 ## Common mistakes
 
 - **Wiring a method in a scenario.** The first lattice companion (commit `916a60d`) imported the

@@ -39,6 +39,15 @@ class FieldEvolution {
 
   nlohmann::json step(const FieldEvolutionInput& input);
   nlohmann::json summary() const;
+  // Learned state (`trech_field_evolution_v1`): the arbiter and every candidate method's learned
+  // state, with the candidate list and context features they belong to. Available after the
+  // first step (the system is built then). Learner rows only on request.
+  nlohmann::json exportState(bool includeRows = false) const;
+  // Restore an export before the first step; it is applied when the system is built. The
+  // declared system must produce the same cells, candidates and context features, else that
+  // step throws and nothing is built (a retry fails the same way). Frozen: the arbiter and the
+  // learned methods select and grade but learn nothing, the held-out test of the choice.
+  void restore(nlohmann::json state, bool frozen);
   // Names of the registered methods, in registry order (candidates are the applicable ones).
   static std::vector<std::string> methodNames();
   // Method-independent context of each field cell and call.

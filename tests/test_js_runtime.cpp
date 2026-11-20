@@ -2148,6 +2148,56 @@ int main() {
   fs::remove(carryTrain);
   fs::remove(carryDeploy);
 
+  // ctx.evolveField across runs: export_state returns the field arbiter and its methods'
+  // learned state; options.warm_start restores it (frozen: deploy, learn nothing). A warm
+  // start that does not fit the declared system throws and leaves no evolution behind.
+  fs::path fieldExp = fixture.path() / ("trech_js_field_carry_" + stamp + ".js");
+  try {
+    {
+      std::ofstream out(fieldExp);
+      out << "globalThis.TRECH_CONFIG={run:{nEvents:1,seed:3},determinism:{mode:\"predictive\"}};\n";
+      out << "const cells=(n)=>{const lo=[],hi=[];for(let c=0;c<n;c++){lo.push([0,0,c*20]);hi.push([20,20,(c+1)*20]);}return {min_mm:lo,max_mm:hi};};\n";
+      out << "const decl=(name,n,extra)=>Object.assign({name,region:{shape:\"box\",size_mm:[20,20,20*n]},cells:cells(n),\n";
+      out << " values:new Array(n).fill(0),properties:{diffusivity_m2_s:1e-5},options:{cell_mm:5,min_elements:8}},extra);\n";
+      out << "const ex=(n)=>({rate_per_s:[0.3].concat(new Array(n-1).fill(0)),target:[5].concat(new Array(n-1).fill(0))});\n";
+      out << "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n";
+      out << " let ref=[0,0,0,0], last=null;\n";
+      out << " for(let k=0;k<=20;k++){ if(k>0){ref=ref.map((v,c)=>c===0?v+0.3*(5-v)*0.5:v+0.2*(ref[c-1]-v));}\n";
+      out << "  last=ctx.evolveField(decl(\"train\",4,{time_s:2*k,exchanges:ex(4),reference:ref,export_state:k===20}));}\n";
+      out << " const st=last.state;\n";
+      out << " const opts={cell_mm:5,min_elements:8,warm_start:st,frozen:true};\n";
+      out << " const dep=ctx.evolveField(decl(\"deploy\",4,{options:opts,time_s:0,exchanges:ex(4),reference:[0,0,0,0],report:\"summary\",export_state:true}));\n";
+      out << " let bad=null; try{ctx.evolveField(decl(\"wrong\",3,{options:{cell_mm:5,min_elements:8,warm_start:st,frozen:true},time_s:0,exchanges:ex(3)}));}catch(e){bad=String(e.message);}\n";
+      out << " const after=ctx.evolveField(decl(\"wrong\",3,{time_s:0,exchanges:ex(3)}));\n";
+      out << " ctx.emit(\"field_carry\",{format:st.format,methods:st.methods,restored:dep.summary.restored,frozen:dep.summary.frozen===true,\n";
+      out << "  unchanged:JSON.stringify(dep.state.arbiter.ew_log)===JSON.stringify(st.arbiter.ew_log),bad,afterName:after.name});\n";
+      out << "}};\n";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(fieldExp.string());
+    trech::HookRuntimeContext fCtx{};
+    fCtx.determinismMode = "predictive";
+    fCtx.seed = 3;
+    (void)js.dispatchHook("onEventEnd", fCtx, nullptr, false);
+    const auto emits = js.takeEmittedRecords();
+    failures += expect(emits.size() == 1, "Expected one evolveField carry emit.");
+    if (!emits.empty()) {
+      const auto j = nlohmann::json::parse(emits[0].payloadJson);
+      std::cout << "ctx.evolveField across runs: " << j.dump() << "\n";
+      failures += expect(j.at("format") == "trech_field_evolution_v1" && j.at("methods").size() >= 2 &&
+                             j.at("restored") == "frozen" && j.at("frozen").get<bool>() && j.at("unchanged").get<bool>(),
+                         "Expected an exported field state to restore frozen and stay unchanged.");
+      failures += expect(j.at("bad").is_string() &&
+                             j.at("bad").get<std::string>().find("restored field state") != std::string::npos &&
+                             j.at("afterName") == "wrong",
+                         "Expected a mismatched field warm start to throw and leave no evolution behind.");
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ctx.evolveField export/restore error: " << ex.what() << "\n";
+    failures += 1;
+  }
+  fs::remove(fieldExp);
+
   // ctx.evolve with PER-ELEMENT material kinds: one call, several materials,
   // each advanced by the operator its own context selected. This is the
   // "inference level is not fixed for the run" contract -- a scenario holding

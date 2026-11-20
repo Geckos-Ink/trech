@@ -2327,6 +2327,7 @@ static JSValue jsHookEvolveField(JSContext* ctx, JSValueConst, int argc, JSValue
       return out;
     };
     auto& evolution = state->fieldEvolutions[name];
+    const bool createdNow = !evolution;
     if (!evolution) {
       trech::ml::FieldRegion region;
       const auto& r = spec.at("region");
@@ -2367,7 +2368,12 @@ static JSValue jsHookEvolveField(JSContext* ctx, JSValueConst, int argc, JSValue
         o.twinRatio = opt.value("twin_ratio", o.twinRatio);
         o.minElements = opt.value("min_elements", o.minElements);
       }
-      evolution = std::make_unique<trech::ml::FieldEvolution>(region, lo, hi, props, numbers(spec.at("values"), "values"), o);
+      auto created = std::make_unique<trech::ml::FieldEvolution>(region, lo, hi, props, numbers(spec.at("values"), "values"), o);
+      // A learned state from an earlier run (ctx.evolveField export_state): continue learning,
+      // or with frozen: true deploy it unchanged (the held-out test of the choice).
+      if (spec.contains("options") && spec.at("options").is_object() && spec.at("options").contains("warm_start"))
+        created->restore(spec.at("options").at("warm_start"), spec.at("options").value("frozen", false));
+      evolution = std::move(created);
     }
     trech::ml::FieldEvolutionInput in;
     in.timeS = spec.at("time_s").get<double>();
@@ -2378,9 +2384,18 @@ static JSValue jsHookEvolveField(JSContext* ctx, JSValueConst, int argc, JSValue
       in.loadPerS = numbers(e.value("load_per_s", nlohmann::json()), "exchanges.load_per_s");
     }
     in.reference = numbers(spec.value("reference", nlohmann::json()), "reference");
-    auto out = evolution->step(in);
+    nlohmann::json out;
+    try {
+      out = evolution->step(in);
+    } catch (...) {
+      // A first step that could not build (for example a warm start that does not fit the
+      // declared system) leaves no half-made evolution behind.
+      if (createdNow) state->fieldEvolutions.erase(name);
+      throw;
+    }
     out["name"] = name;
     if (spec.value("report", std::string()) == "summary") out["summary"] = evolution->summary();
+    if (spec.value("export_state", false)) out["state"] = evolution->exportState(spec.value("export_rows", false));
     const std::string text = out.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
     return JS_ParseJSON(ctx, text.c_str(), text.size(), "<evolveField>");
   } catch (const std::exception& e) {

@@ -60,14 +60,23 @@ choice is statistical); strict mode returns `null`. The arbiter persists across 
 - `properties`: `kinematic_viscosity_m2_s`, `diffusivity_m2_s`, `expansion_per_unit`,
   `body_acceleration_m_s2`;
 - optional `options`: `cell_mm`, `mach_target`, `twin_ratio` and `min_elements`. These are
-  method numerics, not a choice of method.
+  method numerics, not a choice of method. `options.warm_start` restores the learned state an
+  earlier run exported (`export_state`), and `options.frozen: true` deploys it unchanged: the
+  arbiter and the learned operator select and grade, but learn nothing. That is the held-out
+  test of the choice. Both are read only on the call that creates the named field. The
+  declared system must give the same cells, candidate methods and context features; otherwise
+  that call throws and leaves no field behind. Physical method state (the lattices) and the
+  engine's current field are not carried: they restart from the declared values.
 
 Every call carries `time_s` and may carry:
 
 - `exchanges`: `rate_per_s`, `target` and `load_per_s`, per cell;
 - `reference`: per cell, the field at `time_s` to grade against (a validation teacher or a
   measurement);
-- `report: "summary"`.
+- `report: "summary"`;
+- `export_state: true` (plus `export_rows: true` for the learners' buffered rows), to return the
+  learned state as `state` (`trech_field_evolution_v1`: the arbiter, each candidate's learned
+  state — today the `learned_operator`'s learner — the candidate list and the context features).
 
 On the first call the engine builds every method of its field-method registry
 (`trech::ml::fieldMethodRegistry`, [`FieldMethods.hpp`](../../include/trech/ml/FieldMethods.hpp))
@@ -119,7 +128,8 @@ The result holds:
   domains (`predicted_error_at_mean` and `context_envelope`);
 - `self_consistency`.
 
-With `report: "summary"` it also holds the run `summary`. Nothing is written back into the
+With `report: "summary"` it also holds the run `summary`. A restored field's summary carries
+`restored: "frozen"` or `"continued"`, and a frozen arbiter's summary also carries `frozen: true`. Nothing is written back into the
 scenario: a scenario that uses `field` takes that decision itself, and must document it.
 
 ## Portable model output links
@@ -775,7 +785,8 @@ tracking action only when one of them is registered.
   - **Moving the state.** A scenario emits the export, and a later run reads it with
     `TRECH_READ_JSON`.
   - **Strict mode** returns `null`.
-  - **Not covered:** the field arbiters of `ctx.evolveField` are not exported yet.
+  - **Field arbiters:** `ctx.evolveField` carries its field arbiters through `export_state` and
+    `options.warm_start` instead.
 - `ctx.lift(spec)`: **recursive group lifting** of a population (elements → groups → … →
   observer). Each level partitions the current elements (`cell_size` lattice, explicit `groups`
   ids, or `all`) and evaluates a trained v3 set model carrying `group_lift` on every group's

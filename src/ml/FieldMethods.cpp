@@ -409,7 +409,22 @@ class LearnedOperatorMethod final : public FieldMethod {
 
   std::vector<double> prediction() const override { return field_; }
 
+  nlohmann::json exportState(bool includeRows) const override {
+    return {{"format", "trech_learned_operator_v1"}, {"learner", learner_->exportState(includeRows)}};
+  }
+
+  void restoreState(const nlohmann::json& state, bool frozen) override {
+    if (!state.is_object() || state.value("format", "") != "trech_learned_operator_v1")
+      throw std::invalid_argument("learned_operator state: expected format trech_learned_operator_v1");
+    auto learner = std::make_unique<DomainLearner>(DomainLearner::fromState(state.at("learner"), frozen));
+    if (learner->options().features != sys_->contextNames)
+      throw std::invalid_argument("learned_operator state: its context features differ from this system's");
+    learner_ = std::move(learner);
+    frozen_ = frozen;
+  }
+
   void observe(const FieldCall&, const std::vector<double>& reference) override {
+    if (frozen_) return;  // deployed: predicts from what it learned, learns nothing
     DomainLearnerBatch batch;
     batch.time = time_;
     const std::size_t C = sys_->cells(), F = sys_->contextNames.size();
@@ -434,9 +449,11 @@ class LearnedOperatorMethod final : public FieldMethod {
   }
   nlohmann::json summary() const override {
     const double cellCalls = static_cast<double>(sys_->cells()) * static_cast<double>(calls_);
-    return {{"family", "learned"}, {"learner_calls", learner_->calls()}, {"domains", domains_},
+    nlohmann::json out = {{"family", "learned"}, {"learner_calls", learner_->calls()}, {"domains", domains_},
             {"abstained_share", cellCalls > 0 ? static_cast<double>(abstainedTotal_) / cellCalls : 0.0},
             {"features", sys_->contextNames}, {"target", "increment over the call interval / field span"}};
+    if (frozen_) out["frozen"] = true;
+    return out;
   }
 
  private:
@@ -445,6 +462,7 @@ class LearnedOperatorMethod final : public FieldMethod {
   std::vector<double> start_, context_, field_, remoteness_;
   double time_ = 0.0, lastRmse_ = kNaN;
   std::size_t lawCells_ = 0, domains_ = 0, abstained_ = 0, abstainedTotal_ = 0, calls_ = 0;
+  bool frozen_ = false;
 };
 
 std::vector<FieldMethodEntry>& registry() {

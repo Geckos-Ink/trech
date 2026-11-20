@@ -91,6 +91,12 @@ class FieldMethod {
   // Optional extra context the method contributes to arbitration (cells x names); fixed names.
   virtual std::vector<std::string> descriptorNames() const { return {}; }
   virtual std::vector<double> descriptors() const { return {}; }
+  // Learned state a later run may restore (null = the method learns nothing that must persist;
+  // physical state is re-synchronised from references and diagnostics are not carried).
+  virtual nlohmann::json exportState(bool /*includeRows*/) const { return nullptr; }
+  // Called after build and before the first advance. Throws when the state does not fit the
+  // declared system. A frozen method predicts from what it learned and learns nothing more.
+  virtual void restoreState(const nlohmann::json& /*state*/, bool /*frozen*/) {}
   // Per-call and run reports (diagnostics; never fed back).
   virtual nlohmann::json report() const { return nlohmann::json::object(); }
   virtual nlohmann::json summary() const { return nlohmann::json::object(); }

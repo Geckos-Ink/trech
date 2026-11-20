@@ -308,7 +308,7 @@ nlohmann::json MethodArbiter::exportState(bool includeRows) const {
                        {"fallback", s.o.methods[s.fallback]}, {"min_elements", s.o.minElements},
                        {"forgetting", s.o.forgetting}, {"policy_forgetting", s.o.policyForgetting},
                        {"seed", s.o.seed}}},
-          {"floor", finiteOrNull(s.floor)}, {"informative", s.informative},
+          {"informative", s.informative},
           {"policy_score", finiteOrNull(s.policyScore)},
           {"policy_total", {finiteOrNull(s.policyTotal[0]), finiteOrNull(s.policyTotal[1])}},
           {"ew_sq", writeSeries(s.ewSq)}, {"ew_n", writeSeries(s.ewN)},
@@ -337,7 +337,6 @@ MethodArbiter MethodArbiter::fromState(const nlohmann::json& state, bool frozen)
     throw std::invalid_argument("method arbiter state: one learner per method expected");
   for (std::size_t m = 0; m < s.M; ++m)
     s.learners[m] = std::make_unique<DomainLearner>(DomainLearner::fromState(learners[m], frozen));
-  s.floor = numberOr(state.at("floor"), kErrorFloor);
   s.informative = state.at("informative").get<bool>();
   s.policyScore = numberOr(state.at("policy_score"), 0.0);
   const auto& total = state.at("policy_total");
