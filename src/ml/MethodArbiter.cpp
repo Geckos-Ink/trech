@@ -54,6 +54,8 @@ struct MethodArbiter::Impl {
   std::array<double, 2> policyTotal{0.0, 0.0};
   bool informative = false;
   bool frozen = false;  // restored for deployment: select and grade, never learn
+  double unseenSelections = 0.0;  // run total: elements far from every error law (median prior)
+  bool restored = false;  // laws come from an earlier run (fromState)
 
   // Variance (log units) of a method's error learner; unknown until it has been graded.
   double uncertainty(std::size_t m) const { return learnerW[m] > 0 ? learnerSq[m] / learnerW[m] : std::numeric_limits<double>::infinity(); }
@@ -133,12 +135,21 @@ MethodArbiterResult MethodArbiter::step(const MethodArbiterBatch& b) {
   }
   MethodArbiterResult r;
   r.graded = !b.reference.empty();
-  r.selection.assign(n, -1); r.learned.assign(n, 0); r.value.assign(n * K, kNaN);
+  r.selection.assign(n, -1); r.learned.assign(n, 0); r.value.assign(n * K, kNaN); r.unseen.assign(n, 0);
   // Predicted errors before anything of this call is learned (no side effects).
   r.predictedError.assign(n * M, kNaN);
+  // Per element: how many methods have an error law there, and how many of those laws are
+  // remote (the context lies beyond the support they were learned on, remoteness > 1).
+  std::vector<std::size_t> laws(n, 0), remoteLaws(n, 0);
+  std::vector<double> remoteness;
   for (std::size_t m = 0; m < M; ++m) {
-    const auto p = s.learners[m]->predict(b.features, n, b.time);
-    for (std::size_t e = 0; e < n; ++e) r.predictedError[e * M + m] = s.fromLog(p[e]);
+    const auto p = s.learners[m]->predict(b.features, n, b.time, s.restored ? &remoteness : nullptr);
+    for (std::size_t e = 0; e < n; ++e) {
+      r.predictedError[e * M + m] = s.fromLog(p[e]);
+      if (!std::isfinite(p[e]) || !s.predicts(b, e, m)) continue;
+      ++laws[e];
+      if (s.restored && remoteness[e] > 1.0) ++remoteLaws[e];
+    }
   }
   const auto order = s.leaderOrder();
   const bool useLearned = s.informative && s.policyScore > 0.0 && s.policyTotal[1] <= s.policyTotal[0];
@@ -151,7 +162,12 @@ MethodArbiterResult MethodArbiter::step(const MethodArbiterBatch& b) {
       const double pe = r.predictedError[e * M + m];
       if (std::isfinite(pe) && s.predicts(b, e, m) && pe < bestError) { bestError = pe; learnedSel[e] = static_cast<int>(m); }
     }
-    if (!s.informative) {
+    // A restored arbiter far from every error law (each method's law, learned in an earlier run,
+    // is remote here) meets a regime its evidence says nothing about: the same position as
+    // before any evidence, so the same prior. Within the run that learned them, remote laws
+    // still extrapolate this system's own evidence and are kept (unchanged behaviour).
+    const bool unseen = s.restored && laws[e] > 0 && remoteLaws[e] == laws[e];
+    if (!s.informative || unseen) {
       // No evidence distinguishes the methods yet: the lower median of the candidates' distinct
       // predictions (first output), a prior that privileges no method.
       std::vector<std::pair<double, int>> values;
@@ -164,7 +180,8 @@ MethodArbiterResult MethodArbiter::step(const MethodArbiterBatch& b) {
     } else {
       for (std::size_t m : order) if (s.predicts(b, e, m)) { leaderSel[e] = static_cast<int>(m); break; }
     }
-    if (learnedSel[e] < 0) learnedSel[e] = leaderSel[e];  // no law here yet
+    if (learnedSel[e] < 0 || unseen) learnedSel[e] = leaderSel[e];  // no (trusted) law here
+    if (unseen) { r.unseen[e] = 1; s.unseenSelections += 1.0; }
     // Hysteresis from evidence: leave the leader only when the predicted advantage exceeds the
     // error learners' own prequential uncertainty (log units, both methods combined).
     if (learnedSel[e] != leaderSel[e] && leaderSel[e] >= 0) {
@@ -176,7 +193,7 @@ MethodArbiterResult MethodArbiter::step(const MethodArbiterBatch& b) {
       }
     }
     const int best = useLearned ? learnedSel[e] : leaderSel[e];
-    r.learned[e] = useLearned && std::isfinite(bestError) ? 1 : 0;
+    r.learned[e] = useLearned && std::isfinite(bestError) && !unseen ? 1 : 0;
     r.selection[e] = best;
     if (best >= 0) {
       for (std::size_t k = 0; k < K; ++k) r.value[e * K + k] = b.predictions[(e * M + static_cast<std::size_t>(best)) * K + k];
@@ -349,6 +366,7 @@ MethodArbiter MethodArbiter::fromState(const nlohmann::json& state, bool frozen)
   s.learnerSq = readSeries(state.at("learner_sq"), s.M, "learner_sq");
   s.learnerW = readSeries(state.at("learner_w"), s.M, "learner_w");
   s.frozen = frozen;
+  s.restored = true;
   return arbiter;
 }
 
@@ -370,6 +388,8 @@ nlohmann::json MethodArbiter::summary() const {
           {"arbitrated_rmse_learned", rmseOf(s.learnedSq, s.learnedGraded)},
           {"final_domains", s.lastDomains}, {"phases", phases(3)}};
   if (s.frozen) out["frozen"] = true;  // only restored deployments carry the flag
+  if (s.unseenSelections > 0)  // only runs that met unseen contexts carry the share
+    out["unseen_context_share"] = s.totalSelections > 0 ? s.unseenSelections / s.totalSelections : kNaN;
   return out;
 }
 

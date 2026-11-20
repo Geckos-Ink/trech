@@ -205,6 +205,12 @@ candidates or context features throws and resets the build, and the JS host then
 just-created field. Frozen: the arbiter and the learned operator select, predict and grade, but
 learn nothing (`observe` returns early); lattices still synchronise to references.
 
+Restored arbiters treat unseen contexts as unseen. Where every candidate's error law is remote
+(remoteness > 1 from the support learned in the earlier run), the element takes the median
+prior, the same choice as before any evidence. Within the run that learns them, remote laws keep
+extrapolating the system's own evidence, so non-restored arbitration is unchanged and the pinned
+lamp and furnace records stand. The summary reports `unseen_context_share` when it happened.
+
 Recorded in `trech_field_evolution` case 5 (8-cell slab, 61 frames, first/last window arbitrated
 RMSE):
 
@@ -213,12 +219,25 @@ RMSE):
 | Learning from scratch | 0.194 | 0.012 |
 | Same regime, frozen restore | 0.159 | 0.008 |
 | Held-out regime (0.5 s⁻¹ / target 4), untrained | 0.141 | 0.000 |
-| Held-out regime, frozen restore | 0.320 (oracle 0.130) | 0.002 |
-| Held-out regime, continued restore | 0.321 | 0.001 |
+| Held-out regime, frozen restore | 0.142 (oracle 0.130) | 0.002 |
+| Held-out regime, continued restore | 0.140 | 0.001 |
 
-The carried choice helps on its own regime. It does not transfer to another exchange regime,
-and the operator's support has shrunk to the late phase. Both gaps are in the
-[roadmap](ROADMAP.md#priority-queue).
+Reading:
+
+- On its own regime, the carried choice beats learning from scratch (0.092 vs 0.111 over the
+  run).
+- Held out, it now ties an untrained arbiter (0.082 vs 0.081 over the run). The fallback was
+  needed on 1.2% of cell selections (`unseen_context_share`), at the opening step of the stronger
+  exchange.
+- Before the fallback, that single step cost 1.42 RMSE and drove the window to 0.320, while calls
+  3–13 were already better than untrained (for example call 4: 0.021 vs 0.089).
+- Falling back to the recent leader instead does not help (the leader order also lands on
+  persistence there). Applying either fallback within a learning run worsens existing in-run
+  cases, which is why it is limited to restored arbiters.
+- A frozen operator cannot follow the new regime late (0.002 vs 0.000); a continued restore
+  does (0.001).
+- The frozen operator's exported support covers only the late phase (see the
+  [roadmap](ROADMAP.md#priority-queue)).
 
 ## Common mistakes
 

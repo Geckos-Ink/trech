@@ -407,6 +407,11 @@ methods that must predict before a call's reference exists. Paths using it:
 - `ctx.predict` names one model and has no rivals. Every multi-method engine path now selects
   through `MethodArbiter`.
 
+A restored `MethodArbiter` (any path) whose error laws are all remote at an element (remoteness
+> 1 from the support learned in the earlier run) uses the median prior there and counts it in
+`unseen_context_share`. Learning-run behaviour is unchanged; see the
+[lattice handbook](../lattice/AGENTS.md#cross-run-state-2026-11-20) for the held-out record.
+
 Rival arbiters persist across runs. `MethodArbiter::exportState`/`fromState` save and restore the
 options, the per-candidate `DomainLearner`s, and the leader and policy scores (run totals are not
 saved). `RivalArbitration::exportState`/`restore` do the same for a pool of keyed entries.

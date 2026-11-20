@@ -32,7 +32,12 @@ namespace trech::ml {
 // with the lowest decayed mean log call error, else the declared fallback), and applies the learned
 // one only while it has been better on both scores. Within the learned policy an element leaves the leader
 // only when the predicted log-error advantage exceeds the two error learners' own prequential
-// log-RMSE (hysteresis set by evidence, not a constant). Before any evidence distinguishes the methods, the lower
+// log-RMSE (hysteresis set by evidence, not a constant). In a RESTORED arbiter (fromState),
+// where every method's error law is remote (the context lies beyond the support each was
+// learned on in the earlier run: remoteness > 1, the learner's own boundary), that evidence says
+// nothing about the context, so the element takes the same prior as before any evidence. Within
+// the run that learns them, remote laws still extrapolate the system's own evidence and are used
+// as before. Before any evidence distinguishes the methods, the lower
 // median of the candidates' distinct predictions is used (a prior that privileges no method). Errors are learned as log(error + 1e-6 x scale). A method
 // with a non-finite prediction for an element is not a candidate for that element.
 struct MethodArbiterOptions {
@@ -58,6 +63,10 @@ struct MethodArbiterBatch {
 struct MethodArbiterResult {
   std::vector<int> selection;           // per element: method index, -1 when no method predicts it
   std::vector<std::uint8_t> learned;    // 1 when chosen from learned (predicted) errors
+  // Restored arbiters only: 1 when every method's error law is remote at the element
+  // (remoteness > 1, beyond the support learned in the earlier run): the element then takes the
+  // median prior, as before evidence.
+  std::vector<std::uint8_t> unseen;
   std::vector<double> value;            // [element][output] of the selected method
   std::vector<double> predictedError;   // [element][method], NaN when no law yet
   std::string policy;                   // "learned_domains", "recent_leader" or "candidate_median"

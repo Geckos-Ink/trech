@@ -8,8 +8,9 @@
 //  4. a method that cannot represent the declared system is excluded with its reason and the
 //     arbitration still runs among the others;
 //  5. an exported arbiter (with the learned operator's state) restored in a later run: frozen
-//     on its own regime it works from the first window and learns nothing; on a held-out
-//     exchange regime its transfer is measured and printed.
+//     on its own regime it beats learning from scratch and learns nothing; on a held-out
+//     exchange regime it falls back to the prior where its evidence never reached and stays
+//     near the oracle.
 #include "trech/ml/FieldEvolution.hpp"
 #include "trech/ml/MethodArbiter.hpp"
 
@@ -222,9 +223,8 @@ int main() {
           "arbitration without the convective lattice did not beat persistence");
 
     // 5. Across runs: learn on one exchange regime and export. Deployed frozen on the SAME
-    // regime, the carried choice works from the first window (the mechanism). Deployed frozen
-    // on a held-out regime (another target and rate), it is the held-out test of the choice:
-    // its result is measured and reported, not assumed (see the inference roadmap).
+    // regime, the carried choice beats learning from scratch. Deployed frozen on a held-out
+    // regime (another target and rate), it is the held-out test of the choice.
     {
       nlohmann::json trained, afterSame, atSame, afterHeld, atHeld, continued;
       const auto learning = runRegime(0.2, 10.0, nullptr, false, &trained);
@@ -238,6 +238,9 @@ int main() {
                   window(learning, 0), window(learning, 2), window(same, 0), window(same, 2), window(fresh, 0),
                   window(fresh, 2), window(held, 0), window(held, 2),
                   held.at("phases").at(0).at("oracle_rmse").get<double>(), window(more, 0), window(more, 2));
+      std::printf("unseen-context share: same regime frozen %.4f, held-out frozen %.4f, continued %.4f\n",
+                  same.value("unseen_context_share", 0.0), held.value("unseen_context_share", 0.0),
+                  more.value("unseen_context_share", 0.0));
       print("same regime, restored frozen", same);
       print("held-out regime, restored frozen", held);
       check(same.at("restored") == "frozen" && same.value("frozen", false),
@@ -245,6 +248,13 @@ int main() {
       check(window(same, 0) < window(learning, 0) &&
                 same.at("arbitrated_rmse").get<double>() < learning.at("arbitrated_rmse").get<double>(),
             "a restored frozen arbiter did not beat learning from scratch on its own regime");
+      // Held out: where the restored error laws are all remote (the opening step of a stronger
+      // exchange), the median prior is used, so the frozen arbiter stays near the oracle.
+      const double heldOracle = held.at("phases").at(0).at("oracle_rmse").get<double>();
+      check(window(held, 0) < 1.15 * heldOracle && held.value("unseen_context_share", 0.0) > 0.0,
+            "a restored frozen arbiter did not fall back to the prior in contexts its evidence never covered");
+      check(held.at("arbitrated_rmse").get<double>() < 0.5 * held.at("methods").at("persistence").at("rmse").get<double>(),
+            "a restored frozen arbiter did not beat persistence on a held-out regime");
       check(afterSame.at("arbiter") == atSame.at("arbiter") && afterSame.at("method_states") == atSame.at("method_states") &&
                 afterHeld.at("arbiter") == atHeld.at("arbiter") && afterHeld.at("method_states") == atHeld.at("method_states"),
             "a frozen field arbiter or learned method changed while deployed");

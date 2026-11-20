@@ -66,7 +66,10 @@ choice is statistical); strict mode returns `null`. The arbiter persists across 
   test of the choice. Both are read only on the call that creates the named field. The
   declared system must give the same cells, candidate methods and context features; otherwise
   that call throws and leaves no field behind. Physical method state (the lattices) and the
-  engine's current field are not carried: they restart from the declared values.
+  engine's current field are not carried: they restart from the declared values. Where every
+  candidate's restored error law is remote from the context (a regime the earlier run never
+  reached), the restored arbiter uses the median prior there, as before any evidence, and the
+  summary reports `unseen_context_share`.
 
 Every call carries `time_s` and may carry:
 
