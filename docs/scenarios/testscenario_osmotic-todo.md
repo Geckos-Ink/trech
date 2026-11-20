@@ -2,6 +2,11 @@ This experiment and its scenario should be implemented and used for validation t
 
 ### The Experiment: Osmotic Dehydration via Dimensional Exclusion
 
+<img src="../../studio/previews/testscenario_osmotic.gif" width="360" alt="Studio replay of water crossing a membrane as the simulated cell shrinks">
+
+Studio replays the current three-dimensional hook-layer comparison. The implementation
+notes below describe its evolution from the original two-dimensional model.
+
 The objective is to validate TRECH physics/chemistry engine by placing a simplified "cell" in a hypertonic environment. The engine must naturally simulate the spontaneous efflux of water driven entirely by microscopic kinetic collisions and dimensional exclusion, without relying on hardcoded macroscopic forces.
 
 Implementation note (2026-06-28): `examples/scenarios/testscenario_osmotic/testscenario_osmotic.js` implements this as a deterministic hook-layer 2D coarse-grained bath, one Geant4 event per MD tick. Brownian motion is a Langevin velocity refresh, so the temperature proxy stays bounded instead of heating without limit.
@@ -12,7 +17,8 @@ Cell-biology upgrade (2026-06-28): the scenario now reads as an evident biologic
 
 3D upgrade (2026-09-29): the bath, pores and membrane are now three-dimensional. Particles move in a cubic bath (half-size 40, keeping the historical outside/inside volume ratio ~4.6); 24 water-channel caps cover the same ~38% of the membrane as the old 12 arcs; the membrane is a 642-vertex icosphere with radial DOF moved overdamped by the MEASURED collision-pressure difference, near-conserved lipid area and bending. The scripted `cos(8θ)` lobe target and the decoupled-overlay membrane are gone: particles collide with, cross and are swept by the deformed membrane, and crenation emerges from volume loss at held area. `pressure_response_observed` now grades the external-over-internal bias during the windows in which the cell actually shrank (at osmotic balance the two sides converge).
 
-The committed validation case (`osmotic_shift_observed`, category `fluid`) now checks **9/9** expected behaviours: dimensional AND polarity exclusion, net osmotic water shift, early pore crossings, macroscopic flux growth, bounded kinetic energy, late external/internal pressure bias, observed membrane crenation, and membrane stability. Latest run: `net_water_flux_out=71`, first crossing tick 3, max mean KE 0.963 vs 0.81 target, late external/internal pressure 1.18, cell mean radius 28 → 21.3 (area −41%, crenated), 3016 wrong-polarized molecules expelled. The video `tools/viz/demos/osmotic_dehydration.mp4` (renderer `tools/viz/demos/classic trech-viz (render_readme_3d.py)`) is a replay of these emitted states — a top-down cell with a crenating lipid membrane, cytoplasm/nucleus/organelles, channel pores expelling water, the hypertonic glucose bath, and flash markers where wrong-polarized molecules are rejected — not a closed-form osmotic-law drawing.
+The committed validation case (`osmotic_shift_observed`, category `fluid`) now checks **9/9** expected behaviours: dimensional AND polarity exclusion, net osmotic water shift, early pore crossings, macroscopic flux growth, bounded kinetic energy, late external/internal pressure bias, observed membrane crenation, and membrane stability. Latest run: `net_water_flux_out=71`, first crossing tick 3, max mean KE 0.963 vs 0.81 target, late external/internal pressure 1.18, cell mean radius 28 → 21.3 (area −41%, crenated), 3016 wrong-polarized molecules expelled. The [classic replay with flux and pressure charts](../../tools/viz/demos/osmotic_dehydration.gif)
+uses the bath and membrane states emitted by that comparison.
 
 **1. Test Substance (The Dynamic Variable)**
 

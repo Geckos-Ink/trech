@@ -9,7 +9,7 @@ Read the root principles and the parent handbook first; then open only the subca
   `build/geant4-build`/`-install`). Keep vendored deps current (see the standing dep-refresh note
   in the [dependency roadmap](ROADMAP.md); rebuilds are heavy — confirm before a bump).
 - **Current dependency checkout:** Geant4 `f3d5293d38` (`v11.5.0.beta`), json
-  `8617d9c94` (upstream develop), QuickJS `19d6bd8`, Evolvo `ed3f7aa`.
+  `8617d9c94` (upstream develop), QuickJS `19d6bd8`. The Evolvo pin is recorded in the TRECH git tree.
   These upstream revisions have not yet been rebuilt or validated together; existing build
   outputs and validation reports do not establish compatibility with this checkout.
 - **Evolvo workflow:** `thirds/evolvo` ([Geckos-Ink/evolvo](https://github.com/Geckos-Ink/evolvo)) is
@@ -70,8 +70,9 @@ Helpers: [`cmake/TrechOptions.cmake`](../../../cmake/TrechOptions.cmake) (the `T
 ## Build, run, test, debug, and release
 
 Prerequisites: CMake ≥ 3.21, Ninja, a C++ compiler, Python 3. Geant4 is a required submodule for
-simulation (`thirds/geant4`; build/install and set `Geant4_DIR` or `CMAKE_PREFIX_PATH`); LibTorch
-is optional. Commands (from repo root):
+simulation (`thirds/geant4`; build/install and set `Geant4_DIR` or `CMAKE_PREFIX_PATH`).
+LibTorch and the Torch/NumPy Python environment are required by CMake. See the
+[user build guide](../../../docs/build.md) for setup. Commands (from repo root):
 
 ```bash
 # Geant4 from the submodule (once): configure thirds/geant4 into build/geant4-build with

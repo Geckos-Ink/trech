@@ -42,6 +42,6 @@ Read the root principles and the parent handbook first; then open only the subca
   per-frame observer (`TRECH_CHECKS[name].observeFrame`) with its observed state, and nothing
   returned feeds back. `lava_lamp` and `glass_from_sand` follow this pattern.
 
-Each family's micro-base → observer-target and honest scope is in [`README.md`](../../README.md)
-and the per-scenario notes. The linked category handbooks carry family status and reusable lessons;
+Each family's physical basis and observable are mapped in the
+[scenario catalog](../../docs/scenarios/catalog.md) and per-scenario notes. The linked category handbooks carry family status and reusable lessons;
 [scenario bundles](bundles/AGENTS.md) list canonical scenarios and their regression guards.

@@ -15,5 +15,6 @@ Experimental research tools and their scientific scope. Read each document’s m
 
 | Document or asset | Purpose |
 | --- | --- |
+| [Scientific and mathematical foundations](foundations.md) | Transport, uncertainty, coarse-graining, lattice methods and evidence. |
 | [Atomic stability research tool](atomic_stability.md) | Node/V8 research workflow, commands and scientific limits. |
 | [Spectrum prediction](spectrum_prediction.md) | Experimental learned spectra, data and independent checks. |

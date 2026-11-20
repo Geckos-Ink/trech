@@ -1,20 +1,15 @@
-# TRECH previews: media not shown anywhere else
+# Scenario preview gallery
 
-[Documentation index](README.md) · [Media capture guides](media/README.md)
+[Documentation home](README.md) · [Runnable scenario catalog](scenarios/catalog.md) · [Evidence guide](validation/README.md) · [Media capture guides](media/README.md)
 
-This page shows the committed GIFs and images that no other Markdown page displays. The
-[README](../README.md), [Studio README](../studio/README.md) and screenshot guides already show their
-own images, so they are not repeated here. The PNG next to a GIF is only that GIF's poster frame,
-so this page shows the GIF instead.
+Use the topic links to explore recorded experiments. Studio replays and classic-viewer
+captures share the same output contracts. See the companion indexes for each viewer's
+full media inventory.
 
-**How to read these.** Every frame is a viewer replay of engine output: recorded Geant4
-trajectories, or the `material_frame` state a scenario emitted, on its own clock. These replays
-are not new validation. Labels such as *comparison*, *hook layer*, *QM reference* and
-*learned/predicted* mean what the [project principles](../AGENTS.md#essential-project-principles)
-say. Only Geant4 transport is ground truth. Classical formulas and hook-layer solvers are
-comparisons, and predictive-mode output is inference, not a Geant4 tally. The camera turntable,
-the colours and any accelerated playback clock are rendering choices. The caption under each
-frame is the capture's own annotation.
+A replay can show Geant4 trajectories or `material_frame` state from a hook, model or
+comparison solver. The caption identifies the source. Camera movement, color mapping and
+accelerated playback are representation choices. Use the
+[validation reports](validation/README.md) to check the numerical evidence behind a result.
 
 Most items come from `scripts/update_experiment_media.sh`. The Studio previews come with JSON
 sidecars that record the run, seed, mode and frame sampling:
@@ -39,12 +34,13 @@ index: [`tools/viz/demos/`](../tools/viz/demos/media_index.md).
 
 ## Optics and photon transport
 
-Optical photons are transported by Geant4. Each medium's refractive index, absorption and
-scattering are derived by TRECH from Geant4's own cross sections, not taken from a handbook.
+Geant4 transports optical photons using the configured optical properties. These examples
+exercise properties derived by TRECH from Geant4 data.
+[Optical boundaries and the inverse check](research/foundations.md#optical-boundaries)
 
 **`viz_refraction_demo`.** A monochromatic optical beam enters a glass slab that holds a water
-cube, then exits back into air. Every bend you see comes from the derived n of each medium. The
-README shows only this scenario's poster PNG.
+cube, then exits back into air. Every bend you see comes from the derived n of each medium.
+[Still frame](../studio/previews/viz_refraction_demo.png)
 
 <img src="../studio/previews/viz_refraction_demo.gif" width="360" alt="Studio replay of photons refracting through a glass slab and a water cube">
 
@@ -62,8 +58,7 @@ repeated primary.
 <img src="../studio/previews/glass_of_water_varied.gif" width="360" alt="A varied green photon source refracting through glass and water">
 
 **`glass_of_water_spectral`.** A white blackbody source from 380 to 750 nm. Each photon refracts
-at the angle set by its own wavelength through the derived n(λ) tables, so the dispersion you see
-is not hard-coded. The README hero GIF shows the same scenario in the classic viewer.
+using the refractive index at its own wavelength in the derived n(λ) tables. [Classic-viewer replay](../tools/viz/demos/glass_of_water_beam.gif)
 
 <img src="../studio/previews/glass_of_water_spectral.gif" width="360" alt="White-light photons dispersing through a glass of water">
 
@@ -106,8 +101,10 @@ continuous-slowing-down (CSDA) range integrated from Geant4's stopping power.
 
 ## Water: molecules to fluids
 
+[Run the water cases](scenarios/catalog.md#water-and-fluids)
+
 The molecular-dynamics replays below come from hook-layer solvers that run *for comparison*.
-Geant4 does not form or evolve chemical bonds. Its role here is to supply the material base.
+Geant4 supplies the material setup and event cadence. The authored force fields determine the molecular dynamics.
 
 **`h2o_molecule_stability`.** A single flexible H₂O integrated with velocity-Verlet at constant
 energy (NVE). The bonds oscillate around the equilibrium geometry without breaking apart.
@@ -131,9 +128,21 @@ trend rather than a single state point.
 
 <img src="../studio/previews/h2o_diffusion_temperature.gif" width="360" alt="Bulk water measuring self-diffusion at several temperatures">
 
+<details>
+<summary>Freeze and melt replay</summary>
+
+**`h2o_bulk_freeze_boil`.** Coarse-grained mW water freezes on an ice template and
+then melts as the system heats. Colors show the local structural classifications from
+CHILL+, and the captions retain the physical clock.
+
+<img src="../tools/viz/demos/h2o_bulk_freeze_boil.gif" width="640" alt="Water freezing upward from an ice template and melting again as the system heats">
+
+</details>
+
 **`glass_of_water_shaken`.** The canonical demo of the project's main thesis. Fluid parameters
 are inferred by the cascade from the nano-scale base, and a particle fluid solver (PBF, position
-based fluids) then sloshes the water. The README shows this scenario in the classic viewer.
+based fluids) then sloshes the water. The density lift uses nano MD facts. The
+cohesion and viscosity maps are illustrative. [Classic replay](../tools/viz/demos/glass_of_water_shaken.gif)
 
 <img src="../studio/previews/glass_of_water_shaken.gif" width="360" alt="Studio particle replay of a shaken glass of water">
 
@@ -149,8 +158,9 @@ composition and density, and the cascade infers observer-scale behaviour on an e
 which may be an accelerated clock that keeps the physical time.
 
 **`lava_lamp`.** A parameterized wax/carrier thermofluid run in which heater and geometry
-context drive buoyant rise and fall. The README shows only this capture's poster frame, and the
-Studio README shows the gated 10-minute reference. This is the standard suite capture.
+context drive buoyant rise and fall. [Still frame](../studio/previews/lava_lamp.png) ·
+[Classic replay](../tools/viz/demos/lava_lamp_trech_viz.gif) ·
+[Separate field comparison](engine/field_evolution.md)
 
 <img src="../studio/previews/lava_lamp.gif" width="360" alt="Lava-lamp wax parcels rising on an accelerated clock">
 
@@ -209,9 +219,8 @@ trained on Geant4. See [docs/scenarios/molecular_series.md](scenarios/molecular_
 
 <img src="../studio/previews/molecular_series.gif" width="360" alt="Ethanol torsion scan from the combined molecular series">
 
-The classic PyVista viewer renders the same runs at 1280×720 with a chart panel. The README
-already shows butane, ethanol, formamide and the dimethyl-ether particle response. The other
-classic captures are below. The `molecular_*` captures show the torsion stream with the quantum
+The classic PyVista viewer adds a chart panel. Browse the
+[classic-viewer index](../tools/viz/demos/media_index.md) for all molecular variants. The `molecular_*` captures show the torsion stream with the quantum
 reference chart. The `molecular_particle_*` captures show learned atomic photoelectric halos and
 molecular cross sections across 24 held-out photon energies, compared against Geant4. The photon
 energy sweep has no physical time.
@@ -227,6 +236,9 @@ energy sweep has no physical time.
 <img src="../tools/viz/demos/molecular_particle_acetamide.gif" width="640" alt="Classic viewer: acetamide learned particle response across photon energies">
 
 ## Chemistry workspace references
+
+[All native Chemistry screenshots and capture notes](media/images/studio-chemistry/README.md) ·
+[Quantum reference and probability views](studio/chemistry_probability.md)
 
 **`chemistry_mode`.** The initial Chemistry workspace: an authored molecular graph next to the
 live, isotope-resolved Geant4 material response. This is structure inspection, not molecular
@@ -279,8 +291,8 @@ Fermi–Dirac drain current under a gate-voltage sweep, then assembled into logi
 ## Magnetic resonance
 
 **`testscenario_magnetic_resonance` (stage 1).** A 5 cm³ water cube in a static B0 field
-with a swept RF pulse. The Larmor line is *discovered* from the Geant4-derived proton density,
-and the replay shows the spins dephasing in the free-induction decay.
+with a swept RF pulse. The replay shows hook-layer Bloch dynamics through the free-induction decay. Geant4-derived
+proton density scales the signal. The simulated readout estimates the resonance frequency.
 
 <img src="../studio/previews/testscenario_magnetic_resonance.gif" width="360" alt="Spins dephasing in a free-induction decay inside an RF coil">
 
@@ -294,8 +306,10 @@ The per-tissue contrast is a tally rather than motion.
 
 <img src="../studio/previews/testscenario_magnetic_resonance_tissues.png" width="360" alt="Static virtual-tissue phantom geometry">
 
-Stage 4 (`testscenario_magnetic_resonance_brain`) is a 2D image that the README shows in the
-classic viewer. Its Studio still is in the [table below](#scenarios-with-nothing-spatial-to-draw).
+**Stage 4.** The brain phantom replay sweeps axial slices of the volumetric reconstruction.
+Click the slice to play the replay.
+
+<a href="../tools/viz/demos/magnetic_resonance_brain.gif"><img src="../tools/viz/demos/magnetic_resonance_brain.png" width="360" alt="Axial slice through the simulated proton-density reconstruction of a digital brain phantom"></a>
 
 ## Inference and the multi-scale cascade
 
@@ -306,7 +320,7 @@ Geant4.
 
 <img src="../studio/previews/particle_observer_cascade.gif" width="360" alt="Learned observer prediction for acetone before a Geant4 check">
 
-**`optics_surrogate_demo`.** A ridge surrogate (no LibTorch needed) corrects NaI's refractive
+**`optics_surrogate_demo`.** A portable ridge surrogate corrects NaI's refractive
 index, which the f-sum extractor cannot reach for high-Z materials. The viewport shows one
 probe photon in the NaI box; the result is the corrected optical constants.
 
@@ -348,7 +362,7 @@ spring-walled vessel. While the piston holds, the same push reaches every wall.
 
 **`aerodynamics_reference`.** An independent 3D Euler gas solver around a fixed blunt body, with
 captions showing temperature and the CFL-step clock. This is a comparison, not a Geant4-trained
-aerodynamics prediction. The README shows the gated reference GIF of this scenario.
+aerodynamics prediction. See the [numerical verification](scenarios/process_references.md).
 
 <img src="../studio/previews/aerodynamics_reference.gif" width="360" alt="3D Euler comparison: air temperature around a blunt body">
 
@@ -378,7 +392,6 @@ still is an empty stage, so it is linked here rather than embedded.
 | `cascade_multiscale_demo` | `ctx.cascade` chaining scale-tagged models to one observer-scale number | [png](../studio/previews/cascade_multiscale_demo.png) |
 | `surrogate_generic_demo` | A learned model called deterministically from a hook (`ctx.predict`) | [png](../studio/previews/surrogate_generic_demo.png) |
 | `spectrum_prediction` | Learned atomic line strengths and molecular UV/Vis envelopes from NIST/PubChem data | [png](../studio/previews/spectrum_prediction.png) |
-| `testscenario_magnetic_resonance_brain` | Geant4 proton densities for a 2D brain phantom image (shown in the README via the classic viewer) | [png](../studio/previews/testscenario_magnetic_resonance_brain.png) |
 | `h2o_single_molecule` | A micrometre-scale container, too small to see at this zoom | [png](../studio/previews/h2o_single_molecule.png) |
 | `hello_world` | 10 electrons in a water world: the smallest runnable config | [png](../studio/previews/hello_world.png) |
 | `config_hook_dispatch` | Hook dispatch with `ctx.emit` and `onInit` config overrides | [png](../studio/previews/config_hook_dispatch.png) |
@@ -399,8 +412,10 @@ still is an empty stage, so it is linked here rather than embedded.
 
 <img src="../tools/viz/demos/nacl_dehydration.gif" width="640" alt="Retired NaCl dehydration inventory animation in the classic viewer">
 
-The native window capture and the offscreen render of the same retired NaCl run, plus the
-offscreen render of the **historical 2D** airflow comparison. The current airflow solver is 3D
+The native window capture and offscreen render of the retired NaCl run appear alongside
+the **historical 2D** airflow comparison. The
+[native airflow workspace](media/images/studio-processes/aerodynamics-workspace.png)
+and [reference replay](../studio/tests/reference/aerodynamics.gif) show that earlier run. The current airflow solver is 3D
 (see [above](#airflow-comparison)).
 
 <img src="media/images/studio-processes/nacl-workspace.png" width="640" alt="Historical native Studio window: NaCl inventory workspace">

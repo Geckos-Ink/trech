@@ -58,8 +58,8 @@ Do not regenerate these JPEGs during ordinary test or capture runs.
 
 The orbital/nuclear screenshots were refreshed on **2026-10-28** after the state/particle
 inspection improvements. The original structure/density/sample images retain their 2026-10-27
-source run. The original sample image remains here as a documented comparison; the root gallery now uses
-the quantitative gradient, phase and occupied-level profiles. The manifest
+source run. The original sample image remains here as a documented comparison; the capture collection also includes
+quantitative gradient, phase and occupied-level profiles. The manifest
 associates each artifact with its own capture session, fixture/config hash and source state.
 
 

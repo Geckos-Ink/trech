@@ -1,5 +1,7 @@
 # Chemistry mode — initial molecular workbench
 
+<img src="../../studio/previews/chemistry_mode.gif" width="360" alt="Studio rendering of the authored molecular scaffold emitted by the Chemistry scenario">
+
 For multiple entities, joint electron-density fields and Geant4 proton/neutron ensemble views,
 see [`Multi-molecule scenarios and probability views`](chemistry_probability.md). The single
 structure workflow below remains available; Scene JSON and its view selector extend it with

@@ -1,5 +1,7 @@
 # Learned particle-to-observer transport
 
+[Inference index](README.md) · [Multi-scale walkthrough](multiscale.md) · [Model training and execution](libtorch.md)
+
 `particle_observer_cascade` extends the existing Geant4-trained CHNO atomic/nano response to
 observable photon transmission and deposited-energy fractions. It predicts before the current
 run's Monte Carlo events, then runs Geant4 independently for comparison. **Experimental:** the
@@ -17,6 +19,8 @@ Controls include `material`, `energy_kev`, `half_length_mm`, `events` and `mode`
 `--param 'mode="strict"'` disables every learned stage and emits null predictions and zero inferences.
 
 ## Physical scope and execution
+
+<img src="../../studio/previews/particle_observer_cascade.gif" width="360" alt="Studio diagram of the atomic, nano and meso prediction stages for the acetone proxy">
 
 The domain is a homogeneous **unit-density composition proxy**, a central gamma source directed
 along +z, a cube with half length 0.25–9 mm, 10–30 keV and `QBBC_LIV`. The density is an authored

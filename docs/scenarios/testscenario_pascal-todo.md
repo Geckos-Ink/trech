@@ -1,5 +1,10 @@
 # TRECH Engine Test Scenario: Pascal's Principle & Material Deformation
 
+<img src="../../studio/previews/testscenario_pascal.gif" width="360" alt="Studio replay comparing piston-driven water baths in rigid and deformable vessels">
+
+The [implemented comparison](../../examples/scenarios/testscenario_pascal/testscenario_pascal.js)
+uses a hook-layer fluid and wall model. The original proposal follows.
+
 **Objective:**
 To validate the TRECH engine's calculation of fluid mechanics, specifically testing if macroscopic hydrostatic pressure correctly emerges from microscopic statistical collisions (kinetic theory). The test will verify Pascal's Principle in an ideal rigid vessel and observe pressure dampening in a deformable vessel.
 

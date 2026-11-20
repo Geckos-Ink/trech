@@ -47,11 +47,11 @@ values enter these two fits. Rebuilding needs NumPy and the Geant4 binary.
 
 ## New molecules and visual meaning
 
-| Molecule | Scenario | Torsion GIF | Particle-response GIF | PubChem |
+| Molecule | Scenario | Torsion GIF | Particle-response preview | PubChem |
 | --- | --- | --- | --- | --- |
-| Butane | [`molecular_04_butane.js`](../../examples/scenarios/molecular_04_butane/molecular_04_butane.js) | [C–C conformations](../../tools/viz/demos/molecular_butane.gif) | [photon scan](../../tools/viz/demos/molecular_particle_butane.gif) | [CID 7843](https://pubchem.ncbi.nlm.nih.gov/compound/7843) |
-| Dimethyl ether | [`molecular_05_dimethyl_ether.js`](../../examples/scenarios/molecular_05_dimethyl_ether/molecular_05_dimethyl_ether.js) | [C–O torsion](../../tools/viz/demos/molecular_dimethyl_ether.gif) | [photon scan](../../tools/viz/demos/molecular_particle_dimethyl_ether.gif) | [CID 8254](https://pubchem.ncbi.nlm.nih.gov/compound/8254) |
-| Acetamide | [`molecular_06_acetamide.js`](../../examples/scenarios/molecular_06_acetamide/molecular_06_acetamide.js) | [amide torsion](../../tools/viz/demos/molecular_acetamide.gif) | [photon scan](../../tools/viz/demos/molecular_particle_acetamide.gif) | [CID 178](https://pubchem.ncbi.nlm.nih.gov/compound/178) |
+| Butane | [`molecular_04_butane.js`](../../examples/scenarios/molecular_04_butane/molecular_04_butane.js) | [C–C conformations](../../tools/viz/demos/molecular_butane.gif) | <a href="../../tools/viz/demos/molecular_particle_butane.gif"><img src="../../tools/viz/demos/molecular_particle_butane.png" width="200" alt="Photon-energy sweep for butane showing learned cross sections and the Geant4 reference"></a> | [CID 7843](https://pubchem.ncbi.nlm.nih.gov/compound/7843) |
+| Dimethyl ether | [`molecular_05_dimethyl_ether.js`](../../examples/scenarios/molecular_05_dimethyl_ether/molecular_05_dimethyl_ether.js) | [C–O torsion](../../tools/viz/demos/molecular_dimethyl_ether.gif) | <a href="../../tools/viz/demos/molecular_particle_dimethyl_ether.gif"><img src="../../tools/viz/demos/molecular_particle_dimethyl_ether.png" width="200" alt="Photon-energy sweep for dimethyl ether showing learned cross sections and the Geant4 reference"></a> | [CID 8254](https://pubchem.ncbi.nlm.nih.gov/compound/8254) |
+| Acetamide | [`molecular_06_acetamide.js`](../../examples/scenarios/molecular_06_acetamide/molecular_06_acetamide.js) | [amide torsion](../../tools/viz/demos/molecular_acetamide.gif) | <a href="../../tools/viz/demos/molecular_particle_acetamide.gif"><img src="../../tools/viz/demos/molecular_particle_acetamide.png" width="200" alt="Photon-energy sweep for acetamide showing learned cross sections and the Geant4 reference"></a> | [CID 178](https://pubchem.ncbi.nlm.nih.gov/compound/178) |
 
 Each new scenario emits two independent 24-frame streams. `torsion` holds queried particle
 energy at 3 keV while scanning the bond. `particle_response` holds scaffold and quantum

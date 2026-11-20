@@ -27,6 +27,21 @@ dated record below, and queue its residuals in the same change.
 - **P3** · R5 · Nuclear cycles: event-level transmutation/decay tallies with Geant4 process attribution. ([detail](#shared-implementation-priorities))
 - **gated** · Research sponsorship: scope a pilot observable/domain with named owners, validate credit allocations and staffing/compute estimates, establish partner interest (owner decisions, not agent work). ([detail](#research-sponsorship-and-pilot-scoping))
 
+## Reader walkthrough and reference navigation (2026-11-20)
+
+- [x] Shortened the root introduction and moved example discovery, build and CLI usage,
+  evidence interpretation and media navigation into their owning documentation pages.
+- [x] Added linked explanations of systems and fields, Geant4 and LibTorch handoffs,
+  runtime scale and domain selection, and mathematical foundations. Added direct
+  API anchors and worked examples that can be followed with an existing build.
+- [x] Expanded the root introduction with five distinct recorded experiments. Captions identify
+  the transport, model or comparison evidence behind each preview and link to scenario details.
+- [x] Added bulk water, the shaken glass and polyurethane foam to the README alongside
+  butane, plus native Studio screenshots. Added current committed previews to the catalog
+  and the corresponding scenario walkthroughs.
+- [x] Featured the simulated 3D brain phantom in the README’s magnetic-resonance section
+  with links to the scenario and reconstruction driver.
+
 ## Documentation navigation (2026-11-19)
 
 - [x] Moved the root gallery to [`docs/previews.md`](../../docs/previews.md) and categorized

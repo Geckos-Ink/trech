@@ -1,3 +1,7 @@
+# Original repository skeleton
+
+[Architecture index](README.md) · [Current runtime walkthrough](runtime.md)
+
 Below is a **baseline, “boring-but-stable” TRECH C++ skeleton**: repo tree, CMake structure, the embedded JS choice (**QuickJS**), and the **essential Geant4 wiring** (RunManager → DetectorConstruction/PhysicsList/ActionInitialization) that your roadmap already points to.
 
 Note: in this repository, third-party dependencies live under `thirds/` rather than `third_party/` as shown in the example tree below.

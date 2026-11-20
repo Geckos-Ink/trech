@@ -8,6 +8,8 @@ JavaScript bundles, reusable processes, molecular examples and scenario validati
 
 | Document or asset | Purpose |
 | --- | --- |
+| [Scenario catalog](catalog.md) | Choose an experiment by question, subject and evidence. |
+| [Author a scenario](authoring.md) | Build up from a physical system to a runnable configuration and hooks. |
 | [Molecular series](molecular_series.md) | Scenarios, sources, validation and media regeneration. |
 | [Independent process references](process_references.md) | NaCl interface and airflow comparisons and their limits. |
 | [Scenario bundles](scenario_bundles.md) | Physics roots and presentation/validation companions. |

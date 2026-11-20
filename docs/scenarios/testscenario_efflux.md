@@ -84,12 +84,14 @@ form, in the same family as the analytic Beer-Lambert check.
 
 ## Validation & rendering
 
+<img src="../../studio/previews/testscenario_efflux.gif" width="360" alt="Studio replay of passive membrane efflux in a spherical cell">
+
 - Guarded by `efflux_first_order_kinetics` (category `fluid`) in the validation
   suite; wired into `scripts/run_validation_suite.sh` (`N_EVENTS_EFFLUX`).
 - The cell is a sphere and the transport operator is 3D (`x/y/z`, `rvx/rvy/rvz`,
   `noise_x/y/z`); the permeability is back-derived with the spherical Fick relation k = 3P/R.
-- Rendered in 3D from the scenario's `material_frame` emits by classic `trech-viz`
-  (`tools/viz/demos/render_readme_3d.py` → `efflux_clearance.gif`, the README headline).
+- The [classic replay with a clearance chart](../../tools/viz/demos/efflux_clearance.gif)
+  also uses the scenario's recorded material frames.
 
 ## Possible next steps
 

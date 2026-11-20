@@ -8,6 +8,8 @@ Configuration, hook APIs, runtime backends, precision and the Geant4 base of tru
 
 | Document or asset | Purpose |
 | --- | --- |
+| [CLI and live lab](cli.md) | Command-line usage, modes and JSON Lines sessions. |
+| [Fields and field evolution](field_evolution.md) | Scalar fields, candidate methods and how the engine grades them. |
 | [Geant4 features and limits](GEANT4_features_and_limits.md) | Pinned-version capabilities and responsibilities above the particle base. |
 | [Adaptive precision](adaptive_precision.md) | Commands, budgets, refinement and limits. |
 | [Output schema](output_schema.md) | JSON/JSONL contracts consumed by Studio and analysis tools. |

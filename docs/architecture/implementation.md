@@ -1,5 +1,7 @@
 # TRECH implementation notes (initial skeleton)
 
+[Architecture index](README.md) · [Current runtime walkthrough](runtime.md) · [Current build instructions](../build.md)
+
 ## Scope
 
 This is the M1 scaffold: JS config -> JSON -> C++ -> Geant4, with a minimal provenance JSONL log.

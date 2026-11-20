@@ -6,6 +6,8 @@ starting points, with continuous refinement and explicit work bounds alongside t
 
 ## Scenario precision
 
+<img src="../../studio/previews/lava_lamp.gif" width="360" alt="Studio replay of the lava-lamp scenario used to demonstrate refinement factors">
+
 For scenarios using `TRECH_HELPERS.precision.resolve`, pass any finite positive factor relative
 to the balanced reference:
 

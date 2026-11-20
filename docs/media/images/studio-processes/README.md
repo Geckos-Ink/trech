@@ -3,7 +3,7 @@
 [Parent index](../README.md) · [Documentation index](../../../README.md)
 
 These are historical 2D-airflow/inventory captures. The salt trays are retired from active
-playback and the README gallery; no validated measured interface time sequence is bundled.
+playback and the [preview gallery](../../../previews.md#retired-and-historical-captures); no validated measured interface time sequence is bundled.
 Current airflow source evolves 3D independent Euler state. New source cannot reproduce the old
 images byte-for-byte; retain their manifests rather than relabel them as new 3D/microscopy output.
 

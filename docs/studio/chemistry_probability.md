@@ -109,6 +109,8 @@ which reports dropped emits. Large-scene streaming/chunking remains roadmap work
 
 ## Included independent quantum comparison
 
+<img src="../../studio/previews/chemistry_probability_reference.gif" width="360" alt="Studio replay of the independent water and deuterium electron-density reference scan">
+
 Water + D2 are placed at declared 4/3/2 Å separations. PySCF solves a **joint neutral
 RHF/6-31g** state at each placement. This permits a field spanning both molecules; it is not a
 sum of fixed authored atom halos. The scaffold/approach is imposed, not a collision simulation,
@@ -277,6 +279,8 @@ regeneration remains explicitly gated.
 
 
 ## Nonuniform occupied-level distributions through an atom
+
+<img src="../../studio/previews/chemistry_atomic_levels_reference.gif" width="360" alt="Studio rendering of occupied-level electron-density contributions in the neon quantum reference">
 
 Open **Chemistry → Atomic core/valence reference (Ne)**, or run
 `examples/scenarios/chemistry_atomic_levels_reference/chemistry_atomic_levels_reference.js`. This independent, clamped Ne-20

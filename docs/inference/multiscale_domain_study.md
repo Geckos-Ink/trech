@@ -1,5 +1,7 @@
 # Statistical domains and multi-scale prediction
 
+[Inference index](README.md) · [Runtime routing overview](multiscale.md#follow-changing-domains-within-a-level) · [Model execution and fitting](libtorch.md)
+
 TRECH analyzes the feature distribution of a population, measures candidate subdivisions, and
 can fit separate response models to recurring populations. The live detector is an opt-in
 diagnostic. The specialist trainer freezes membership and support at fit time, chooses experts
@@ -29,7 +31,7 @@ authored check. The separate spatial count uses a fixed connection radius, so ag
 measures consistency between two definitions of connectedness.
 
 Enable the graph with `--param detect_domains=true --param 'domain_method="density"'`.
-The [hook contract](../engine/scenario_hooks.md#context-object-draft) describes its limits, and
+The [hook contract](../engine/scenario_hooks.md#ctxdetectdomains) describes its limits, and
 [the emit schema](../engine/output_schema.md#statistical-domain-discovery-emits) describes lineage.
 
 ## Online response-domain learning
@@ -96,6 +98,8 @@ to 6.7 × 10⁻¹⁶ (`trech_domain_learner_numpy`).
   the type only.
 
 ### Glass furnace, cold start
+
+<img src="../../studio/previews/glass_from_sand.gif" width="360" alt="Recorded furnace batch, melt and glass surfaces">
 
 One default run at 1750 K (`learn_domains=learn`, 600 learner calls over 216 cells). The host
 budget gave a quadratic basis, up to 24 domains of 3,755 reservoir rows and 32-wide residual
@@ -167,6 +171,8 @@ gate what holds and report the temperature gaps.
 
 ### Lava lamp campaign
 
+<img src="../../studio/previews/lava_lamp.gif" width="360" alt="Recorded wax parcel motion in the lava lamp">
+
 Frame-scale (meso) response of the wax parcels: heating rate and mean vertical velocity over one
 5 s output interval. The heater temperature enters as run context. The three training heaters
 were 325, 333.15 and 345 K, each a 600 s run. The step laws are authored and parcels interact,
@@ -184,6 +190,8 @@ there. Inside the range, heating improves by 21% while vertical velocity worsens
 The lamp is a weak case for frozen domain laws.
 
 ### Membrane efflux campaign
+
+<img src="../../studio/previews/testscenario_efflux.gif" width="360" alt="Membrane efflux comparison showing particles inside and outside a spherical cell">
 
 This learner covers the particle transport operator, the micro-scale step of `testscenario_efflux`
 with `physics_source="operator"`. It has 13 features: position, radius, velocity, mass, the
@@ -292,6 +300,8 @@ build/render-venv/bin/python tools/torch/study_atomic_domains.py \
 ```
 
 ## Particle-to-observer experiment
+
+<img src="../../studio/previews/particle_observer_cascade.gif" width="360" alt="Recorded inference diagram for the particle-to-observer benchmark">
 
 The photon study uses two learned chains on a bounded Geant4 reference. The existing
 atomic and nano composition model supplies the dense observer. A separate `ctx.lift` branch

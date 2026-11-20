@@ -2,6 +2,8 @@
 
 ## Goal
 
+<img src="../../studio/previews/viz_refraction_demo.gif" width="360" alt="Studio replay of optical photons bending as they cross glass and water">
+
 Show, in a 3D view, a light beam crossing **air → glass slab → water bulk → air**, with the refraction emerging from TRECH's engine rather than from classical Snell's-law plumbing. The viz layer must be accessible (no commercial ray-tracer dependency) and faithful to the JS → JSON → C++ boundary.
 
 ## Non-negotiables

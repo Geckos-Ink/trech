@@ -1,5 +1,7 @@
 # Output Schema
 
+[Documentation home](../README.md) · [Engine index](README.md) · [Read your first run](../first_run.md) · [Runtime data flow](../architecture/runtime.md)
+
 TRECH writes JSONL (one JSON object per line). The current schema is small and stable,
 so this file documents the exact fields emitted by the runtime.
 
@@ -973,7 +975,7 @@ records `method` and `shared_distance_scale`. Its `lineage[]` aligns with the re
 Each entry carries a persistent `id` and sorted `predecessors[]` with prior IDs and overlap
 `elements`. An ID continues when the overlap is a strict majority of both groups and both
 belong to the same parent. Density residuals carry a null ID. Lineage refers to the fixed parcel
-population of one run. See the [hook contract](scenario_hooks.md#context-object-draft).
+population of one run. See the [hook contract](scenario_hooks.md#ctxdetectdomains).
 
 ## Response-domain learning emits
 

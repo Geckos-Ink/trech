@@ -19,7 +19,7 @@ independent references. Geant4 material probes do not calibrate their response l
 ## NaCl: retire inventory geometry; consume measured interfaces
 
 The old separated trays and connected parcel cluster are retired from active playback and the
-README gallery. Inventory diagnostics still test Na/Cl/solvent bookkeeping, but emit no spatial
+[preview gallery](../previews.md#retired-and-historical-captures). Inventory diagnostics still test Na/Cl/solvent bookkeeping, but emit no spatial
 material frame. `microscope_interface_status.available:false` explains missing data. Media drivers
 skip animation rather than capture those inventories or substitute Geant4 probe geometry.
 Historical binary captures remain historical; they are no longer promoted as growth.
@@ -49,6 +49,8 @@ experimental accuracy. Source/reconstruction review remains necessary. No calibr
 interface sequence is bundled yet. Synthetic test triangles are never published as microscopy.
 
 ## Three-dimensional compressible airflow comparison
+
+<img src="../../studio/previews/aerodynamics_reference.gif" width="360" alt="Studio replay of the 3D Euler gas temperature around a fixed obstacle">
 
 `trech_euler3d_reference.js` evolves five conservative cell variables (density, x/y/z momentum,
 total energy), using first-order Rusanov flux on **all three** Cartesian face directions and a

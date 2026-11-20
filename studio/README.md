@@ -97,7 +97,7 @@ Choose a destination folder; each export receives a fresh name and a JSON proven
 missing video output is reported as incomplete even when the still image succeeded.
 The export does not yet copy a manually orbited camera or every probability/field-display setting.
 
-The [historical workspaces and GIFs](../README.md#studio-experiment-previews) retain their capture
+The [historical workspaces and GIFs](../docs/previews.md#retired-and-historical-captures) retain their capture
 identities. The current airflow example evolves an independent 3D Euler comparison; Options
 authors its perspective/orthographic camera, scalar volume/slice/surface, linear gradient,
 opacity and threshold. Engine CFL and physical-duration options support common-time refinement.

@@ -1,5 +1,7 @@
 # ML model definitions, structure searches and the checkpoint store
 
+[Inference index](README.md) · [Model training and LibTorch](libtorch.md) · [Multi-scale walkthrough](multiscale.md)
+
 TRECH exposes learned-model *definitions* to JavaScript. A definition file states what a model is:
 named inputs/outputs, dimension band, network structure and the Geant4 runs it learns from. A search
 file states how to choose a structure. The offline `trech-ml` CLI trains both through the existing

@@ -57,7 +57,13 @@ Read the root principles and the parent handbook first; then open only the subca
 
 ### Docs — [`docs/`](../../docs)
 
-Start at the [documentation index](../../docs/README.md). Topics are `architecture/`,
+The [root README](../../README.md) introduces TRECH with core concepts, a curated set
+of recorded experiment previews and one runnable quick start. The
+[documentation index](../../docs/README.md) leads from that first experiment through
+concepts, runtime, scale, fields and science, with paths to authoring and technical
+reference. Keep examples in the [scenario catalog](../../docs/scenarios/catalog.md)
+or their owning topic. When presenting a scenario, include its latest relevant committed
+rendering when available, with a caption that identifies what it shows. Topics are `architecture/`,
 `engine/`, `inference/`, `scenarios/`, `studio/`, `validation/`, `research/`, `project/`,
 `media/` and `reference/`; every directory, including asset leaves, has a navigation README
 linking its files, child folders and parent. Keep indexes current when adding or moving files.

@@ -8,6 +8,8 @@ Learned particle-to-observer responses, recursive lifting, domain learning and m
 
 | Document or asset | Purpose |
 | --- | --- |
+| [How TRECH moves between scales](multiscale.md) | Runtime ordering, population hierarchy and context-dependent routing. |
+| [From training data to a running model](libtorch.md) | Offline training, LibTorch, model formats and runtime trust. |
 | [Evolved architectures](evolvo_architectures.md) | Architecture-search tooling and evidence. |
 | [Recursive group hierarchies](group_hierarchy.md) | Learned set models from elements through groups to an observer. |
 | [Model tooling and validation](ml_models.md) | Model definitions, checkpoint store, training and validation gates. |

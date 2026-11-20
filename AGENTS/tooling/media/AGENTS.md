@@ -39,8 +39,8 @@ captures and are not automatically regenerated or composited.
   from real runs — **no scripted 2D renderer remains; do not add one** (a figure that cannot come
   from emitted state is a gap in the scenario's emits, not a job for a drawing script).
 
-**[`docs/previews.md`](../../../docs/previews.md)** is the hand-written gallery for committed media
-that no other Markdown page embeds, each with a short explanation. GIF poster PNGs are left out.
+**[`docs/previews.md`](../../../docs/previews.md)** is the hand-written topic gallery, with a
+caption for each example. It links to the viewer inventories and capture guides for variants.
 Stills of an empty stage are linked from a table rather than embedded, and the retired NaCl and
 historical 2D-airflow captures are shown under a "not current output" label. When a refresh adds
 a preview that no page embeds, add it to `docs/previews.md` with an honest caption.

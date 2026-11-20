@@ -1,5 +1,7 @@
 # Recursive group lifting (`ctx.lift`, `GroupHierarchy`)
 
+[Inference index](README.md) · [How TRECH moves between scales](multiscale.md#follow-a-population-through-a-hierarchy) · [Set-model mathematics](../research/foundations.md#coarse-graining-and-set-models)
+
 `ctx.cascade` lifts one context vector from band to band. Many questions are about a
 **population** instead: atoms make molecules, molecules make clusters, clusters make parcels,
 parcels make the glass of water. `ctx.lift` lifts a population scale by scale, with one trained

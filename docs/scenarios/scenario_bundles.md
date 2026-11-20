@@ -1,5 +1,7 @@
 # JavaScript scenario bundles
 
+[Documentation home](../README.md) · [Author a scenario](authoring.md) · [Scenario catalog](catalog.md) · [Hook API](../engine/scenario_hooks.md)
+
 Every shipped scenario has its own folder under `examples/scenarios/<name>/`:
 
 | File | Responsibility |
@@ -20,7 +22,9 @@ validation results. After adding or changing a bundle, regenerate it with
 `PYTHONPATH=tools/validation python3 -m trech_validation.purity`. CTest
 `trech_scenario_purity_report` fails while it is stale.
 
-Run or inspect the physics entry point:
+<img src="../../studio/previews/h2o_fluid.gif" width="360" alt="Recorded particle tracks in the brine scenario used in this bundle example">
+
+Use the brine scenario’s physics entry point to inspect, run and validate it.
 
 ```sh
 build/dev/trech inspect examples/scenarios/h2o_fluid/h2o_fluid.js

@@ -1,8 +1,21 @@
-# Scenario Hook API (proposal)
+# Scenario hook API
 
-This document proposes a deterministic JS hook surface that lets scenarios react to runtime
-context without breaking the JSON config boundary. Hooks are optional; the canonical input
-remains `TRECH_CONFIG`.
+[Documentation home](../README.md) · [Engine index](README.md) · [How a run works](../architecture/runtime.md) · [Author a scenario](../scenarios/authoring.md)
+
+Hooks read a serialized runtime context at lifecycle boundaries. The canonical
+configuration comes from `TRECH_CONFIG`. For examples and the records written by
+`ctx.emit`, see the [scenario catalog](../scenarios/catalog.md) and
+[output schema](output_schema.md#trech_hook_emitsjsonl).
+
+| Task | API |
+| --- | --- |
+| Set typed inputs and attach callbacks | [Typed values](#typed-authoring-values) · [Registration](#registration) |
+| Read Geant4 facts or keep scenario state | [Context object](#context-object) |
+| Predict a named quantity or chain across bands | [`ctx.predict`](#ctxpredict) · [`ctx.cascade`](#ctxcascade) |
+| Advance state, inventories or interactions | [`ctx.evolve`](#ctxevolve) · [`ctx.react`](#ctxreact) · [`ctx.interact`](#ctxinteract) |
+| Lift a population or discover response laws | [`ctx.lift`](#ctxlift) · [`ctx.detectDomains`](#ctxdetectdomains) · [`ctx.learnDomains`](#ctxlearndomains) |
+| Grade field methods or inspect operators | [`ctx.evolveField`](#engine-field-evolution) · [`ctx.operatorCatalog`](#read-only-operator-catalog) |
+| Interpret coverage or carry selection evidence across runs | [Trust profile](#per-stage-trust-profile-low-confidence-flags-carried-with-the-model) · [Arbitration state](#arbitration-state) |
 
 ## Typed authoring values
 
@@ -46,6 +59,8 @@ These numerical errors do not certify physical accuracy or make independent refe
 Geant4 training labels. The exact 3D Euler verification fixture uses this API.
 
 ## Engine field evolution
+
+[Field walkthrough and method selection](field_evolution.md) · [Emit schema](output_schema.md#engine-field-evolution-emits)
 
 `ctx.evolveField(spec)` hands a continuum field to the engine. **Validation companions only:** a
 scenario forces nothing about how the engine organises its system (root principle *A scenario
@@ -216,7 +231,9 @@ All hooks are optional. `onTrackStart` / `onTrackEnd` (since 2026-11-14) fire on
 track, before its first step and after its last, with `ctx.track`; the engine installs its
 tracking action only when one of them is registered.
 
-## Context object (draft)
+<a name="context-object-draft"></a>
+
+## Context object
 
 - `ctx.config`: immutable config object (parsed from `TRECH_CONFIG`).
 - `ctx.runtime`: `{ seed, nEvents, mode, runId }`. `runId` is the Geant4 run ID of the
@@ -259,7 +276,7 @@ tracking action only when one of them is registered.
   hook/event/step identity determine replay on the same platform/runtime; cross-platform
   transcendental rounding has not been validated. RNG remains available in strict mode and
   does not count as model inference.
-- `ctx.emit(tag, payload)`: attach a tagged record to provenance.
+- `ctx.emit(tag, payload)`: write a tagged hook-emit record.
 - `ctx.materials`: when `materialProbe.enable` is active, named Geant4 material probes plus
   `.list` (density, electron density, element number densities, mean excitation energy,
   radiation length). This is serialized engine data, not a Geant4 object binding.
@@ -267,6 +284,9 @@ tracking action only when one of them is registered.
   `trech_viz_scene.json`, keyed by both Geant4 material name and config material key plus `.list`.
   Entries include the derived spectrum, mean refractive/absorption/scatter values,
   neutral-preserving `display_rgb`, availability/note and validation deltas.
+
+### `ctx.predict`
+
 - `ctx.predict(modelName, features?)`: run one declared named-IO surrogate in predictive mode.
   Ambient Geant4 event/material/optics facts seed the inputs; numeric features override keys.
   Missing required inputs or strict mode return `null`, without counting an inference.
@@ -275,6 +295,9 @@ tracking action only when one of them is registered.
   outOfDomainInputs}` — the honest "am I extrapolating?" signal for that prediction (see below) —
   and, when the model carries held-out metrics, a reserved `__accuracy{<output>:{r2?,mae?,rmse?,interval_half_width?,interval_coverage?}}`
   with that model's **measured** per-output error (`rmse` = held-out root mean square residual).
+
+### `ctx.cascade`
+
 - `ctx.cascade(seed?, modelNames?, options?)`: run declared scale-tagged models in ascending scale order.
   Within a band, dependency-ready models run first, with registration order breaking ties. There
   is no fixed stage-depth limit. Optional `maxStages` (0 = all) and `targetOutputs` bound work
@@ -318,6 +341,8 @@ tracking action only when one of them is registered.
   `stage_output` links the quantity to the stage whose `outputs` list names it, so that stage's
   engine trust badges appear beside the gap. The reference only grades a result; it never feeds
   the cascade. `glass_of_water_shaken.js` emits rest density, cohesion and viscosity this way.
+
+### `ctx.evolve`
 
 - `ctx.evolve(spec)`: the per-element **operator** — where `ctx.cascade` infers *properties*,
   `ctx.evolve` infers how a declared per-element *state* changes over `dt`, so a scenario does not
@@ -501,6 +526,8 @@ tracking action only when one of them is registered.
   `scripts/validate_foam_mechanics.sh` grades its separate promotion suite. Bond/contact and
   thermal laws remain comparison physics.
 
+### `ctx.react`
+
 - `ctx.react(spec)`: the discrete counterpart to `ctx.evolve`. It evaluates the same contextual
   operator model family over N independent integer-state elements, then keeps the stochastic and
   conservation-sensitive part inside the engine:
@@ -571,6 +598,8 @@ tracking action only when one of them is registered.
   mutates nothing, and each stage reports `elementKind` + `elementsMatched`. That is what a run in
   which a cell *becomes* another material needs — see `glass_from_sand.js`, where a formed glass
   cell has no declared chemistry left and is reported unclaimed rather than kept reacting.
+
+### `ctx.interact`
 
 - `ctx.interact(spec)`: the **pair/neighbour** operator. `ctx.evolve` answers "how does THIS
   element change?"; `ctx.interact` answers "what does one element do TO ANOTHER" — the shape of
@@ -669,9 +698,13 @@ tracking action only when one of them is registered.
   (distinct from a malformed block; `ran` stays false); each `trace[i]` names
   `ratedElementFields`, `incrementedElementFields`, `ratedPairFields`, `assignedPairFields`,
   `intermediateOutputs`, `unappliedFieldOutputs` and the per-pair-aggregated trust profile
-  (`pairsOutOfDomain`, `pairsStarved`, `maxExtrapolation`, …). **Status: mechanism shipped and
-  tested; no scenario has been migrated onto it yet** (foam bonds / MD / PBF are ledger rows in
-  `ROADMAP.md`), so there is no committed pair model to point at yet.
+  (`pairsOutOfDomain`, `pairsStarved`, `maxExtrapolation`, …). The
+  [glass furnace](../../examples/scenarios/glass_from_sand/glass_from_sand.js)
+  uses pair operators for conduction, with domain routing as the default.
+  The [inference roadmap](../../AGENTS/engine/inference/ROADMAP.md#furnace-pair-conduction-routed-by-domain-2026-11-20)
+  records evidence for those pair laws.
+
+### `ctx.detectDomains`
 
 - `ctx.detectDomains({features, parent_groups?, min_elements?, max_depth?, method?, shared_distance_scale?})` measures candidate
   subdomains in the current batch. Each field of `features` is an equal-length numeric array or
@@ -705,6 +738,9 @@ tracking action only when one of them is registered.
   Predictive mode returns diagnostics without changing state, model choice or inference counts.
   Strict mode returns `null`. For recorded examples, enable `detect_domains=true` in the glass
   furnace or lava lamp scenarios. See [output schema](output_schema.md#statistical-domain-discovery-emits).
+
+### `ctx.learnDomains`
+
 - `ctx.learnDomains({name, features, targets?, time?, options?, report?, export_rows?, tendencies?})` grows
   **response domains** of a live population online (`trech::ml::DomainLearner`). `features` and
   `targets` are objects of equal-length numeric arrays (sorted by name). `targets` is the response
@@ -773,6 +809,9 @@ tracking action only when one of them is registered.
   (the furnace's `learn_domains=deploy`) does so itself and must label the result as learned.
   Strict mode returns `null`. Set `TRECH_DEBUG_LEARNER=1` to print per-call errors and split and
   merge statistics to stderr. See [output schema](output_schema.md#response-domain-learning-emits).
+
+### Arbitration state
+
 - `ctx.arbitrationState({rows?})` and `ctx.restoreArbitration(state, {frozen?})` carry the learned
   rival arbiters of `ctx.evolve`, `ctx.react`, `ctx.cascade` and `ctx.interact` across runs.
   - **Export.** `ctx.arbitrationState` returns
@@ -797,6 +836,9 @@ tracking action only when one of them is registered.
   - **Strict mode** returns `null`.
   - **Field arbiters:** `ctx.evolveField` carries its field arbiters through `export_state` and
     `options.warm_start` instead.
+
+### `ctx.lift`
+
 - `ctx.lift(spec)`: **recursive group lifting** of a population (elements → groups → … →
   observer). Each level partitions the current elements (`cell_size` lattice, explicit `groups`
   ids, or `all`) and evaluates a trained v3 set model carrying `group_lift` on every group's
@@ -958,23 +1000,22 @@ return {
 };
 ```
 
-## Provenance requirements
+<a name="provenance-requirements"></a>
 
-- Record hook source hash (experiment file hash + hook object hash).
-- Record hook enablement and all patches applied, per run.
-- Record all `ctx.emit` events with timestamps in run order.
-- When ML inference is used, record model path + hash and inference outputs.
+## Provenance
 
-## Determinism modes (proposal)
+The run records its effective config, hook registrations, dispatch and inference
+counts, guardrails and model artifact identities when present. Tagged payloads
+written with `ctx.emit` appear in `trech_hook_emits.jsonl`. Read the
+[output schema](output_schema.md) for the exact records and their fields.
 
-- `strict`: no ML inference; hooks are deterministic and fully logged.
-- `predictive`: ML inference allowed; outputs are logged with model hash and confidence.
+<a name="determinism-modes-proposal"></a>
 
-## Notes
+## Determinism modes
 
-- Hooks do not expose Geant4 objects or pointers.
-- Hooks may only influence the runtime through whitelisted overrides.
-- Unit conversions and multi-entity assembly are still done in JS before emitting config.
+- `strict` disables model inference. Use a single worker for order-sensitive hook state.
+- `predictive` enables configured model paths. Hook reports and artifact provenance
+  identify the executed model and any coverage or accuracy metadata it carries.
 
-Scenario physics and hooks live in `examples/scenarios/<name>/<name>.js`. Rendering, acceptance
-checks and typed UI inputs use automatically loaded companions; see [scenario bundles](../scenarios/scenario_bundles.md).
+See [run controls and modes](cli.md#strict-and-predictive-runs) and
+[scenario bundles](../scenarios/scenario_bundles.md) for typed inputs and companions.

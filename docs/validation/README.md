@@ -4,6 +4,24 @@
 
 Committed regression reports, machine-readable sidecars, model audits and benchmark snapshots. Reports apply to the checkout and data they record; moving them does not revalidate their results.
 
+## What does a passing check establish?
+
+| Evidence | What a pass supports |
+| --- | --- |
+| Reproducibility or accounting check | The recorded inputs replay or an invariant such as energy or inventory accounting closes. |
+| Analytic consistency check | Sampled transport agrees with an equation evaluated under the same assumptions, often using Geant4's own tables. |
+| Teacher fidelity | A learned law agrees with its comparison solver or operator teacher on the graded cases. |
+| Independent Geant4 holdout | A learned estimate agrees with separately sampled Geant4 outcomes under the tested conditions. |
+| Independent physical or quantum reference | Agreement with the stated measurements or calculation, in the range and units reported by the check. |
+
+Identify the observable and its producer before quoting an error. Check the reference,
+run conditions, model coverage and acceptance rule. One-step agreement and a test
+that lets the predictor drive a full run grade different things. A plot can show any
+of these results. Its camera, clock or color mapping can come from the viewer.
+[Mathematical foundations](../research/foundations.md#learning-error-and-trust) ·
+[Run provenance and artifact identities](../engine/output_schema.md#trech_provenancejsonl) ·
+[Run a check](running_checks.md)
+
 ## Folders
 
 | Folder | Contents |
@@ -14,6 +32,7 @@ Committed regression reports, machine-readable sidecars, model audits and benchm
 
 | Document or asset | Purpose |
 | --- | --- |
+| [Run and reproduce checks](running_checks.md) | CTest, validators and regenerable reports. |
 | [TRECH_current_scenarios_purity.json](TRECH_current_scenarios_purity.json) | Machine-readable sidecar for the corresponding Markdown report. |
 | [Scenario purity report](TRECH_current_scenarios_purity.md) | Generated inference/authored-law evidence and recorded validation. |
 | [ml_model_audit.json](ml_model_audit.json) | Machine-readable sidecar for the corresponding Markdown report. |
