@@ -71,10 +71,10 @@ comparison solver. The run accumulates an oxygen–oxygen radial distribution to
 how the liquid is structured and estimates self-diffusion from molecular motion.
 Geant4 events pace the hook-layer updates.
 
-![Studio replay of molecular motion in a periodic box of bulk water](studio/previews/h2o_bulk_water.gif)
+![Bulk water molecular dynamics replay with a chart of the oxygen–oxygen radial distribution](tools/viz/demos/h2o_bulk_water.gif)
 
 [`h2o_bulk_water`](examples/scenarios/h2o_bulk_water/h2o_bulk_water.js) ·
-[Replay with radial-distribution chart](tools/viz/demos/h2o_bulk_water.gif) ·
+[Studio replay](studio/previews/h2o_bulk_water.gif) ·
 [Water structure and diffusion](docs/research/foundations.md#molecular-dynamics-and-water)
 
 ### Shaken glass of water · From molecular data to sloshing
@@ -82,12 +82,13 @@ Geant4 events pace the hook-layer updates.
 The scenario pours water and prescribes how the glass moves. A particle-fluid solver
 produces waves and splashes using parameters supplied by the cascade. Molecular-dynamics
 data ground the density estimate, while the cohesion and viscosity maps are illustrative.
-Studio reconstructs the water surface from the recorded particle positions.
+The viewer reconstructs the water surface from recorded particle positions. The
+charts show the prescribed glass motion and the solver’s splash height.
 
-![Studio replay of a water surface responding to the motion of a shaken glass](studio/previews/glass_of_water_shaken.gif)
+![Shaken-glass fluid replay with charts of glass motion, surface roughness and splash height](tools/viz/demos/glass_of_water_shaken.gif)
 
 [`glass_of_water_shaken`](examples/scenarios/glass_of_water_shaken/glass_of_water_shaken.js) ·
-[Replay with glass motion and splash-height charts](tools/viz/demos/glass_of_water_shaken.gif)
+[Studio replay](studio/previews/glass_of_water_shaken.gif)
 
 ### Molecular behaviour · Butane torsion
 
@@ -122,12 +123,13 @@ of the reconstructed phantom.
 A furnace model heats a batch of sand, soda ash and limestone. Learned operators
 advance heating and reactions, and neighbouring cells exchange heat. The
 validation checks atom conservation and compares the learned operators with the
-reference model they were trained to reproduce. Studio draws surfaces around the
+reference model they were trained to reproduce. The viewer draws surfaces around the
 recorded batch, melt and glass cells.
 
-![Studio replay of a furnace batch progressing from solid ingredients through melt to soda-lime glass](studio/previews/glass_from_sand.gif)
+![Glass furnace replay with charts of material classes, temperature and remaining carbonates](tools/viz/demos/glass_from_sand.gif)
 
 [Furnace scenario](examples/scenarios/glass_from_sand/glass_from_sand.js) ·
+[Studio replay](studio/previews/glass_from_sand.gif) ·
 [Furnace model validation and held-out deployment](docs/inference/multiscale_domain_study.md#glass-furnace-campaign-learn-freeze-deploy-at-held-out-temperatures)
 
 ### Polyurethane foam · Expansion and curing
@@ -138,10 +140,10 @@ The bonded-parcel mechanics model accounts for leaning, cracking and shedding un
 gravity. The validation compares the learned reaction response with its model teacher
 and checks how the foam behaves with gravity removed.
 
-![Studio replay of polyurethane foam expanding, curing and shedding pieces](studio/previews/polyurethane_foam.gif)
+![Polyurethane foam replay with charts of foam expansion, curing and deformation](tools/viz/demos/polyurethane_foam.gif)
 
 [`polyurethane_foam`](examples/scenarios/polyurethane_foam/polyurethane_foam.js) ·
-[Replay with growth and mechanics charts](tools/viz/demos/polyurethane_foam.gif) ·
+[Studio replay](studio/previews/polyurethane_foam.gif) ·
 [Scenario and validation context](docs/scenarios/catalog.md#chemistry-and-materials)
 
 ## TRECH Studio

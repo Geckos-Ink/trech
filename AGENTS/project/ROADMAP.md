@@ -41,6 +41,8 @@ dated record below, and queue its residuals in the same change.
   and the corresponding scenario walkthroughs.
 - [x] Featured the simulated 3D brain phantom in the README’s magnetic-resonance section
   with links to the scenario and reconstruction driver.
+- [x] Embedded the existing 1280×720 charted replays for bulk water, the shaken glass,
+  the glass furnace and polyurethane foam, with links to their Studio versions.
 
 ## Documentation navigation (2026-11-19)
 
