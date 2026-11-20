@@ -43,6 +43,8 @@ dated record below, and queue its residuals in the same change.
   with links to the scenario and reconstruction driver.
 - [x] Embedded the existing 1280×720 charted replays for bulk water, the shaken glass,
   the glass furnace and polyurethane foam, with links to their Studio versions.
+- [x] Made human-facing documentation part of every code or project change. The root
+  instructions and project workflow require an explanation in the owning docs topic.
 
 ## Documentation navigation (2026-11-19)
 

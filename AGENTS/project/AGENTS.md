@@ -57,6 +57,13 @@ Read the root principles and the parent handbook first; then open only the subca
 
 ### Docs — [`docs/`](../../docs)
 
+Every code or project change includes an update to the relevant human-facing documentation.
+Follow the [documentation index](../../docs/README.md) to find the owning topic and update its
+existing guide or reference. Link new or moved pages from the topic’s README and update
+cross-references. Give readers enough context to understand what changed and why it matters.
+When usage changes, show the revised steps and the result readers should expect. For internal
+changes, explain the relevant design or maintenance implications in the appropriate technical page.
+
 The [root README](../../README.md) introduces TRECH with core concepts, a curated set
 of recorded experiment previews and one runnable quick start. The
 [documentation index](../../docs/README.md) leads from that first experiment through
@@ -166,6 +173,8 @@ claims with current code before relying on them; note which sections the task wi
 
 **Handoff:** update changed durable facts in the owning handbook (owners, symbols, contracts,
 feature status) and add any residual/scaffold/TODO to its paired roadmap in the same change.
+Check that the relevant user or contributor documentation explains the change and that readers
+can find it through the topic index.
 Update the root files when shared principles, objectives or routing change; keep
 [`README.md`](../../README.md)/[`CHARTS.md`](../../CHARTS.md)/[`docs/engine/output_schema.md`](../../docs/engine/output_schema.md)
 consistent; run `ctest --preset dev` for engine changes (and the relevant validation/smoke script if

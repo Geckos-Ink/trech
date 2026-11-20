@@ -20,6 +20,11 @@ Cross-component tasks follow each affected branch. [The full tree index](AGENTS/
 ## Maintenance and task workflow
 
 - Check `git status`, preserve unrelated changes, and find the owning source and focused tests before editing. Verify handbook claims against current code.
+- **Update human-facing documentation in the same change as every code or project change.**
+  Start at the [documentation index](docs/README.md), update the guide or reference in its
+  owning topic, and keep the topic index and related links current. Explain what changed,
+  why it matters, and what readers need to do or understand. Define unfamiliar terms and
+  use a concrete example when it helps readers apply or verify the change.
 - Update durable facts in the owning `AGENTS/…/AGENTS.md` and unfinished work in its paired `ROADMAP.md` in the same change. Parent/root files hold shared principles and navigation; update them when those change. Keep README/schema/dataflow docs aligned when their facts change.
 - The [project workflow](AGENTS/project/AGENTS.md) owns detailed maintenance and handoff rules; references there to the shared handbook/roadmap mean this categorized collection. Do not grow the root files with component status or delivery history.
 - Documentation alone does not implement a capability. Change the owning C++ or Studio source, retain honest maturity labels, and record every residual/scaffold/missing validation in the owning roadmap's **Priority queue** with a priority key ([keys and implementation route](AGENTS/ROADMAP.md#priority-keys)).
