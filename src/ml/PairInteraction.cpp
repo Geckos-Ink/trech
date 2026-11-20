@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
+#include <map>
 #include <set>
 #include <unordered_map>
 
@@ -487,7 +489,141 @@ PairInteractionResult PairInteraction::interact(
                          !request.elementKindNames.empty() &&
                          !request.pairKindNames.empty();
 
-  for (const PairEntry& pair : pairs) {
+  // ---- domain routing over canonical pairs --------------------------------
+  DomainRouter router;
+  if (request.routeByDomain) {
+    std::vector<DomainRouterStage> routed;
+    routed.reserve(planned.size());
+    for (const PlannedStage& plan : planned) {
+      DomainRouterStage stage;
+      stage.name = plan.stage->name;
+      stage.model = plan.stage->model;
+      stage.scale = plan.stage->scale;
+      stage.outputs = plan.stage->model->outputNames();
+      stage.routable = plan.stage->pairKindIndex == kAnyElementKind;
+      routed.push_back(std::move(stage));
+    }
+    router.plan(routed, pairs.size());
+  }
+  const bool routing = router.active();
+  auto fillInputs = [&](std::size_t q, std::vector<double>& out) {
+    const PlannedStage& plan = planned[q];
+    out.resize(plan.inputs.size());
+    for (std::size_t i = 0; i < plan.inputs.size(); ++i) {
+      const InputSource& src = plan.inputs[i];
+      if (!src.available || (!src.constant && !available[src.slot])) return false;
+      out[i] = src.constant ? src.value : working[src.slot];
+    }
+    return true;
+  };
+  // A per-pair fact by name (member facts, geometry, pair state, an
+  // intermediate already produced, or shared context): routing features read it.
+  auto factOf = [&](const std::string& name, double& out) {
+    const auto slot = slotOf.find(name);
+    if (slot != slotOf.end()) {
+      if (!available[slot->second]) return false;
+      out = working[slot->second];
+      return true;
+    }
+    const auto fact = request.shared.find(name);
+    if (fact == request.shared.end()) return false;
+    out = fact->second;
+    return true;
+  };
+
+  // ---- rival arbitration bookkeeping (routing only) -----------------------
+  // Per set: its planned members, the accumulating outputs >= 2 members
+  // produce, and the union of the members' inputs (the arbiter's context).
+  const bool arbitrating = routing && static_cast<bool>(request.arbitrateRivals);
+  struct ArbitratedOutput {
+    std::string name;
+    OutputKind kind = OutputKind::kElementRate;
+    std::size_t index = 0;
+    std::vector<std::pair<std::size_t, std::size_t>> producers;  // (planned, output) over all stages
+  };
+  std::vector<std::string> rivalNames;
+  std::vector<ArbitratedOutput> arbitrated;           // aligned with rivalNames
+  std::vector<std::vector<std::size_t>> setMembers;   // planned indices
+  std::vector<std::vector<std::size_t>> setOutputs;   // indices into arbitrated
+  std::vector<std::vector<std::string>> setFeatures;
+  std::vector<RivalCandidates> rivals;
+  std::vector<unsigned char> stageRan(planned.size(), 0);
+  std::vector<double> stageExtrapolation(planned.size(), 0.0);
+  std::vector<std::vector<double>> stageY(planned.size());
+  if (arbitrating) {
+    for (std::size_t p = 0; p < planned.size(); ++p) {
+      const std::size_t set = router.setOf(p);
+      if (set == DomainRouter::kNoSet) continue;
+      if (set >= setMembers.size()) setMembers.resize(set + 1);
+      setMembers[set].push_back(p);
+    }
+    std::map<std::string, std::size_t> perSetCount;
+    std::vector<std::set<std::string>> shared(setMembers.size());
+    for (std::size_t sIdx = 0; sIdx < setMembers.size(); ++sIdx) {
+      std::map<std::string, std::size_t> count;
+      for (std::size_t p : setMembers[sIdx]) {
+        const auto& names = planned[p].stage->model->outputNames();
+        for (std::size_t o = 0; o < names.size(); ++o) {
+          const OutputKind k = planned[p].outputs[o].kind;
+          if (k == OutputKind::kElementRate || k == OutputKind::kElementIncrement || k == OutputKind::kPairRate)
+            ++count[names[o]];
+        }
+      }
+      for (const auto& [name, n] : count) if (n >= 2) shared[sIdx].insert(name);
+    }
+    std::set<std::string> all;
+    for (const auto& set : shared) all.insert(set.begin(), set.end());
+    rivalNames.assign(all.begin(), all.end());
+    arbitrated.resize(rivalNames.size());
+    for (std::size_t k = 0; k < rivalNames.size(); ++k) {
+      arbitrated[k].name = rivalNames[k];
+      for (std::size_t p = 0; p < planned.size(); ++p) {
+        const auto& names = planned[p].stage->model->outputNames();
+        for (std::size_t o = 0; o < names.size(); ++o) {
+          if (names[o] != rivalNames[k]) continue;
+          arbitrated[k].kind = planned[p].outputs[o].kind;
+          arbitrated[k].index = planned[p].outputs[o].index;
+          arbitrated[k].producers.emplace_back(p, o);
+        }
+      }
+    }
+    rivals.resize(setMembers.size());
+    setOutputs.resize(setMembers.size());
+    setFeatures.resize(setMembers.size());
+    for (std::size_t sIdx = 0; sIdx < setMembers.size(); ++sIdx) {
+      RivalCandidates& rc = rivals[sIdx];
+      rc.set = sIdx;
+      std::set<std::string> inputs;
+      for (std::size_t p : setMembers[sIdx]) {
+        rc.members.push_back(planned[p].stage->name);
+        const auto& in = planned[p].stage->model->inputNames();
+        inputs.insert(in.begin(), in.end());
+      }
+      for (const std::string& name : shared[sIdx]) {
+        const std::size_t k = static_cast<std::size_t>(
+            std::lower_bound(rivalNames.begin(), rivalNames.end(), name) - rivalNames.begin());
+        setOutputs[sIdx].push_back(k);
+        rc.fields.push_back(k);
+      }
+      setFeatures[sIdx].assign(inputs.begin(), inputs.end());
+      rc.featureNames = setFeatures[sIdx];
+    }
+  }
+  // A per-pair fact for the arbiter's context (0 when the pair has none).
+  auto contextValue = [&](const std::string& name) {
+    double v = 0.0;
+    if (factOf(name, v)) return v;
+    return name == kStepInputName ? request.dt : 0.0;
+  };
+
+  // Pair state integrates after arbitration (a chosen rival may change a
+  // pair rate); the arithmetic is unchanged.
+  std::vector<double> linkBase(request.links.size() * pairFieldCount, 0.0);
+  std::vector<double> linkRates(request.links.size() * pairFieldCount, 0.0);
+  std::vector<unsigned char> linkTouched(request.links.size(), 0);
+
+  for (std::size_t pairIndex = 0; pairIndex < pairs.size(); ++pairIndex) {
+    const PairEntry& pair = pairs[pairIndex];
     std::size_t pairKind = kAnyElementKind;
     if (haveKinds) {
       const std::size_t ka = pair.a < request.elementKindIndex.size()
@@ -549,12 +685,17 @@ PairInteractionResult PairInteraction::interact(
       working[memberAuxBase + auxCount + a] = request.aux[pair.b * auxCount + a];
     }
 
+    if (routing) router.beginElement();
+    if (arbitrating) std::fill(stageRan.begin(), stageRan.end(), 0);
     bool touched = false;
     for (std::size_t pi = 0; pi < planned.size(); ++pi) {
       const PlannedStage& plan = planned[pi];
       if (plan.stage->pairKindIndex != kAnyElementKind &&
           plan.stage->pairKindIndex != pairKind) {
         continue;  // another material combination's interaction
+      }
+      if (routing && !router.admits(pi, fillInputs, factOf, workspace)) {
+        continue;  // a rival law whose trained domain does not cover this pair
       }
       auto& trace = result.stages[plan.traceIndex];
       bool ready = true;
@@ -642,6 +783,11 @@ PairInteractionResult PairInteraction::interact(
             break;
         }
       }
+      if (arbitrating) {
+        stageRan[pi] = 1;
+        stageExtrapolation[pi] = cov.extrapolation;
+        stageY[pi] = y;
+      }
       if (!trace.ran) {
         trace.ran = true;
         ++result.stagesRun;
@@ -651,18 +797,107 @@ PairInteractionResult PairInteraction::interact(
       ++trace.pairsMatched;
       ++result.inferenceCount;
     }
+    if (routing) router.endElement(pairIndex);
 
-    // Integrate the pair's own state once, at the bounded step the caller
-    // chose, then apply its declared bounds.  Only a declared link persists.
+    // The pair's own state integrates once, after arbitration (below).
     if (touched && pair.link != kNoLink && pairFieldCount > 0) {
       const std::size_t base = pair.link * pairFieldCount;
       for (std::size_t p = 0; p < pairFieldCount; ++p) {
-        double value = working[p] + pairRates[p] * request.dt;
-        const PairStateField& field = request.pairFields[p];
-        if (value < field.minValue) value = field.minValue;
-        if (value > field.maxValue) value = field.maxValue;
-        result.pairState[base + p] = value;
+        linkBase[base + p] = working[p];
+        linkRates[base + p] = pairRates[p];
       }
+      linkTouched[pair.link] = 1;
+    }
+
+    // Sets where two or more rivals ran on this pair: the pair's total on each
+    // arbitrated output with every rival alone, then the cooperating sum.
+    for (std::size_t sIdx = 0; arbitrating && sIdx < rivals.size(); ++sIdx) {
+      std::size_t ran = 0;
+      for (std::size_t p : setMembers[sIdx]) ran += stageRan[p];
+      if (ran < 2 || setOutputs[sIdx].empty()) continue;
+      RivalCandidates& rc = rivals[sIdx];
+      const std::size_t M = rc.members.size();
+      rc.elements.push_back(pairIndex);
+      std::vector<double> total(setOutputs[sIdx].size(), 0.0), setSum(setOutputs[sIdx].size(), 0.0);
+      for (std::size_t j = 0; j < setOutputs[sIdx].size(); ++j) {
+        for (const auto& [p, o] : arbitrated[setOutputs[sIdx][j]].producers) {
+          if (!stageRan[p]) continue;
+          total[j] += stageY[p][o];
+          if (std::find(setMembers[sIdx].begin(), setMembers[sIdx].end(), p) != setMembers[sIdx].end())
+            setSum[j] += stageY[p][o];
+        }
+      }
+      for (std::size_t m = 0; m < M; ++m) {
+        const std::size_t p = setMembers[sIdx][m];
+        for (std::size_t j = 0; j < setOutputs[sIdx].size(); ++j) {
+          if (!stageRan[p]) { rc.totals.push_back(std::numeric_limits<double>::quiet_NaN()); continue; }
+          double own = 0.0;
+          for (const auto& [q, o] : arbitrated[setOutputs[sIdx][j]].producers)
+            if (q == p) own += stageY[p][o];
+          rc.totals.push_back(total[j] - setSum[j] + own);
+        }
+        rc.extrapolation.push_back(stageRan[p] ? stageExtrapolation[p]
+                                               : std::numeric_limits<double>::quiet_NaN());
+      }
+      rc.totals.insert(rc.totals.end(), total.begin(), total.end());
+      for (const std::string& name : setFeatures[sIdx]) rc.features.push_back(contextValue(name));
+    }
+  }
+
+  // ---- arbitration: a chosen candidate replaces the pair's set total --------
+  if (arbitrating) {
+    std::vector<RivalCandidates> pending;
+    std::vector<std::size_t> pendingSet;
+    for (std::size_t sIdx = 0; sIdx < rivals.size(); ++sIdx) {
+      if (rivals[sIdx].elements.empty()) continue;
+      rivals[sIdx].choice.assign(rivals[sIdx].elements.size(), -1);
+      pending.push_back(std::move(rivals[sIdx]));
+      pendingSet.push_back(sIdx);
+    }
+    if (!pending.empty()) {
+      std::vector<PairLink> canonical;
+      canonical.reserve(pairs.size());
+      for (const PairEntry& pair : pairs) canonical.push_back({pair.a, pair.b});
+      request.arbitrateRivals(canonical, rivalNames, pending);
+      for (std::size_t i = 0; i < pending.size(); ++i) {
+        const RivalCandidates& rc = pending[i];
+        const std::vector<std::size_t>& outs = setOutputs[pendingSet[i]];
+        const std::size_t C = rc.candidates(), K = outs.size(), M = rc.members.size();
+        for (std::size_t j = 0; j < rc.elements.size(); ++j) {
+          const int c = j < rc.choice.size() ? rc.choice[j] : -1;
+          if (c < 0 || static_cast<std::size_t>(c) >= C) continue;
+          const PairEntry& pair = pairs[rc.elements[j]];
+          for (std::size_t k = 0; k < K; ++k) {
+            const double chosen = rc.totals[(j * C + static_cast<std::size_t>(c)) * K + k];
+            const double delta = chosen - rc.totals[(j * C + M) * K + k];
+            if (!std::isfinite(delta) || delta == 0.0) continue;
+            const ArbitratedOutput& out = arbitrated[outs[k]];
+            if (out.kind == OutputKind::kPairRate) {
+              if (pair.link != kNoLink) linkRates[pair.link * pairFieldCount + out.index] += delta;
+              continue;
+            }
+            std::vector<double>& sink = out.kind == OutputKind::kElementRate ? elementRates : elementIncrements;
+            const double other = request.fields[out.index].symmetry == PairSymmetry::kSymmetric ? delta : -delta;
+            sink[pair.a * fieldCount + out.index] += delta;
+            sink[pair.b * fieldCount + out.index] += other;
+          }
+        }
+      }
+      result.rivals = std::move(pending);
+    }
+  }
+
+  // Integrate each touched link's own state once, at the bounded step the
+  // caller chose, then apply its declared bounds. Only a declared link persists.
+  for (std::size_t l = 0; l < request.links.size(); ++l) {
+    if (!linkTouched[l]) continue;
+    const std::size_t base = l * pairFieldCount;
+    for (std::size_t p = 0; p < pairFieldCount; ++p) {
+      double value = linkBase[base + p] + linkRates[base + p] * request.dt;
+      const PairStateField& field = request.pairFields[p];
+      if (value < field.minValue) value = field.minValue;
+      if (value > field.maxValue) value = field.maxValue;
+      result.pairState[base + p] = value;
     }
   }
 
@@ -707,6 +942,11 @@ PairInteractionResult PairInteraction::interact(
     std::sort(trace.missingInputs.begin(), trace.missingInputs.end());
   }
 
+  if (routing) {
+    result.routing = router.finish();
+    result.pairs.reserve(pairs.size());
+    for (const PairEntry& pair : pairs) result.pairs.push_back({pair.a, pair.b});
+  }
   result.ran = result.inferenceCount > 0;
   return result;
 }

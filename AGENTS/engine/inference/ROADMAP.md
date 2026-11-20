@@ -18,19 +18,19 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R3 · Route `ctx.interact` pair operators through the domain-free `MethodArbiter`. They do not route by domain yet, so rival pair laws for one output cannot form a set; add routing first, then arbitration with pair-level evidence. `ctx.evolveField`, the `ctx.evolve`, `ctx.react` and `ctx.cascade` rivals are done, and `ctx.predict` names one model. ([detail](AGENTS.md)) Each path needs a method registry or rival set, so a model or algorithm added later joins without scenario changes. Strict mode stays inference-free. ([detail](AGENTS.md))
 - **P2** · R3 · `ctx.cascade` rival arbitration sees one context per call, so its per-context choice converges slowly: after 80 calls the late misses lie within 0.175 of the laws' crossing, and more calls do not shrink them monotonically (320 calls: RMSE 0.032 vs 0.052 at 80). Let a population cascade (one call over many contexts) feed one arbiter step, or warm-start it from an exported state. Also, a same-band consumer of a rival's output reads the last writer before the band's choice. ([detail](../../../docs/engine/scenario_hooks.md))
 - **P2** · R3 · No scenario feeds `options.reference` to `ctx.cascade` rivals. Give a family two candidate models for one property in one band, and grade them against evidence that is not one of the rivals. ([detail](AGENTS.md))
+- **P2** · R3 · No scenario routes `ctx.interact` by domain or feeds it `reference_pairs`. `glass_from_sand` declares per-element kinds. Route a pair family from an undeclared same-role pool (the lava lamp parcels or the furnace conduction cells), and grade its rivals against pair evidence that is not one of them. Evidence for neighbour pairs must name them explicitly, because only links have a stable order. ([detail](AGENTS.md))
 - **P2** · R3 · No scenario feeds `reference_hazards` to `ctx.react`: hazard-rival arbitration is exercised only by `trech_discrete_transition` and `trech_js_runtime`. Give a chemistry family two candidate hazard laws for one channel and grade them against an evidence source that is not one of the rivals (held-out Geant4-derived or measured transition rates). ([detail](AGENTS.md))
 - **P2** · R3 · No scenario has overlapping `ctx.evolve` rivals today: the glass furnace's trained laws split its population cleanly, so rival arbitration is exercised only by `trech_state_evolution`. Exercise it on a family with two candidate operator families for one quantity and an evidence source that is not one of the rivals (a held-out Geant4-derived or measured rate). The scenario-chosen `physics_source` families of the furnace are the obvious place to retire into emergent selection. ([detail](AGENTS.md))
-- **P2** · R3 · Rival arbitration covers rate outputs (`ctx.evolve`) and hazard/weight outputs (`ctx.react`) only. Intermediates and `set_` assignments of every covering rival still apply, so a chosen rival's higher-band consumers may read a rejected rival's intermediate. In `ctx.react`, a hazard output that a non-rival stage also writes is recomposed as if only the set's members wrote it. Arbitrate the whole rival output, and re-run the higher bands from the chosen rival's intermediates. ([detail](../../../docs/engine/scenario_hooks.md))
+- **P2** · R3 · Rival arbitration covers rate outputs (`ctx.evolve`), hazard/weight outputs (`ctx.react`), shared outputs (`ctx.cascade`) and accumulating pair outputs (`ctx.interact`) only. Intermediates and `set_` assignments of every covering rival still apply, so a chosen rival's higher-band consumers may read a rejected rival's intermediate. In `ctx.react`, a hazard output that a non-rival stage also writes is recomposed as if only the set's members wrote it. Arbitrate the whole rival output, and re-run the higher bands from the chosen rival's intermediates. ([detail](../../../docs/engine/scenario_hooks.md))
 - **P2** · R4 · Rival and field arbiters live for one run only. Export and restore their learned state (as `ctx.learnDomains` does) so a later run can deploy them frozen, which is also the held-out test of the choice. ([detail](AGENTS.md))
 - **P1** · R2 · Close residual CHNO observer coverage holes and validate transfer across composition, geometry and source context. The larger campaign reduced error and measured sparse coverage, and 29 of 48 new conditions still show per-feature starvation with 10 jointly starved. ([study](../../../docs/inference/multiscale_domain_study.md#final-runs-and-validation))
 - **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Improve recursive hierarchy transfer and calibration. The experimental CHNO scenario runs Geant4-trained atom → nano group → meso observer chains with both atomic backends. Their error and interval coverage lag the dense observer on unseen compositions. ([study](../../../docs/inference/multiscale_domain_study.md#final-runs-and-validation))
 - **P2** · R2 · Domain routing beyond glass from sand: route a second family (lava lamp wax/carrier, membrane efflux) and measure routing domains from particle-derived rows rather than from the scenario's own labelled harvest; let elements outside every envelope queue a Geant4 experiment plan and a `trech arch` job for the uncovered regime. ([detail](#domain-routing-2026-11-18))
-- **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit; route `ctx.interact` pairs from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
+- **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element or per-pair group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit. `ctx.interact` now routes pairs by their own context; also let it compose pair kinds from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Particle-derived teachers for the online domain learner. `ctx.learnDomains` now learns dynamically changing operator responses (furnace thermal law, lamp parcels, efflux transport), but every teacher is an authored or distilled operator. Feed Geant4-derived rows (CHNO observer, atomic tables) and grade the learned domains against held-out Geant4 runs. Expose the TorchScript specialist index in engine traces and turn recurring uncovered regimes into experiment requests. ([detail](#online-response-domain-learning-2026-11-18))
 - **P2** · R3 · Closed-loop deployment of learned-domain operators beyond the furnace thermal law: chemistry (`ctx.react` hazards), the lamp parcel dynamics and efflux transport, each behind a paired observer gate. Measure compounding error over long horizons, not only per-step error. Efflux has no `deploy` mode yet, and its learner saturated the 24-domain capacity, so decide whether capacity should grow with evidence or whether merges should be stricter. ([detail](#online-response-domain-learning-2026-11-18))
 - **P2** · R4 · Calibrate the learner's `predictionStd`: the ±1.96σ interval covers 99% of rows in-run but 70–88% under transfer (furnace 1820 K, lamp 318 K), while on the efflux held-out seed it over-covers (~99.5%, bands too wide); add per-domain conformal half-widths from held-out calls and carry them into a deployed state. ([detail](#online-response-domain-learning-2026-11-18))
@@ -49,6 +49,30 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
+
+## Pair routing and rival arbitration for ctx.interact (2026-11-20)
+
+- [x] `PairInteraction` routes with `DomainRouter` over canonical pairs (`routeByDomain`). It
+  reports `routing` (one group per pair) and the canonical `pairs`. `ctx.interact` routes an
+  undeclared same-role pool, and `group_by: "declared"` keeps `ambiguous`.
+- [x] Arbitration covers the accumulating outputs (`d_f_dt`, `add_f`, `d_p_dt`) that two or more
+  members of a set produce. Each candidate's value is the pair's total contribution (other stages
+  plus the candidate). A choice is applied as a correction with the declared symmetry, and link
+  state integrates after arbitration. Without a choice the arithmetic is unchanged.
+- [x] `ctx.interact` accepts `reference_pairs` (rows default to the declared links; outputs must
+  belong to selected models) and `report_arbitration`, and keeps its own pool.
+- [x] Results:
+  - `trech_pair_interaction`: the routing split matches the trained regimes, and the uncovered
+    pair is untouched. On late calls 30–39, alternatives reach RMSE 0.0000 on heat and bond state
+    with a 0.00 sum share. Cooperation reaches RMSE 0.0000 with a 1.00 sum share.
+    Antisymmetric cancellation stays exact, and a call without evidence is byte-identical.
+  - `trech_js_runtime`: the routed call reports domain grouping and 64 canonical pairs. A
+    deployed ungraded call reaches heat RMSE 3e-17.
+  - `glass_from_sand`'s declared-kind `ctx.interact` is unchanged (offline validation passes).
+- With this item, every multi-method engine path selects through `MethodArbiter`; `ctx.predict`
+  names one model.
+- Residuals (queued above): no scenario routes or grades pair rivals; assignments and
+  intermediates are not arbitrated; arbiters are not exported.
 
 ## Rival arbitration for ctx.cascade (2026-11-20)
 
@@ -192,7 +216,7 @@ dated record below, and queue its residuals in the same change.
   polyurethane foam reproduced the suite's hook emits byte for byte (the H2O cycle apart from
   PubChem `fetched_at_utc`). Dev CTest passed 64/64.
 - Residual (queued above): uncovered regimes do not yet trigger experiment planning or generation;
-  routing summaries are not in run outputs; `ctx.interact` does not route; overlapping non-rate
+  routing summaries are not in run outputs; `ctx.interact` did not route (routes since 2026-11-20); overlapping non-rate
   outputs are last-writer-wins.
 - [x] Routing domains and the first routed scenario (2026-11-18):
   - `GenericSurrogate` loads an optional `routing_domain`, and malformed blocks fail closed.

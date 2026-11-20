@@ -344,7 +344,8 @@ tracking action only when one of them is registered.
   Both non-selected outcomes return `ran:false` and leave state untouched. Point/cascade models
   without an operator role are recorded as `not_operator`, never executed accidentally.
 
-  **Domain routing: unnamed groups, decided up the scale ladder** (`ctx.evolve` and `ctx.react`).
+  **Domain routing: unnamed groups, decided up the scale ladder** (`ctx.evolve`, `ctx.react` and,
+  over pairs, `ctx.interact`).
   A call that declares no `element_kind` does not have to name its populations. When the
   compatible operators share ONE role but carry several element kinds (formerly `ambiguous`), or
   when the pool holds operator models with a role and no `element_kind`, the engine selects the
@@ -412,8 +413,8 @@ tracking action only when one of them is registered.
   `glass_domain_routing_matches_declared`).
   `group_by: "declared"` keeps the label-only contract (an undeclared call over several kinds
   stays `ambiguous`); any other value than `"domain"`/`"declared"` throws. Different roles stay
-  ambiguous, declared kinds and explicit `models` lists keep their semantics, and `ctx.interact`
-  does not route. Calls that selected before this change produce byte-identical results: the
+  ambiguous, and declared kinds and explicit `models` lists keep their semantics. `ctx.interact`
+  routes too, with each canonical pair as the routed element (see that call). Calls that selected before this change produce byte-identical results: the
   `grouping` and `routing` fields appear only on routed calls.
 
   **Several materials in one call (dynamic, in-scenario inference level).** `element_kind` may be
@@ -614,6 +615,25 @@ tracking action only when one of them is registered.
   between two grains of one solid, a grain and its melt, and two melt cells are three different
   interactions. Each `trace[i]` reports `pairKind` + `pairsMatched`; a combination nobody declared
   is simply not evaluated (and its members stay untouched).
+
+  **Pairs routed by trained domain.** A call without `element_kind` over several kinds of one
+  role routes like `ctx.evolve` (`group_by: "declared"` keeps the `ambiguous` verdict). Rival
+  laws (same band, a shared output, kind-free) run on a pair only when their trained domain
+  covers that pair's context: member facts, geometry, pair state and lower-band intermediates.
+  The result adds `routing` (its `elementGroups` holds one id per canonical pair) and
+  `pairs: [[a, b], ...]` in the same order. Rivals that cover the same pair both contribute
+  unless evidence arbitrates them. A routed call may carry
+  `reference_pairs: {pairs?: [[a,b], ...], values: {output: [value per pair]}}`. `pairs` defaults
+  to the declared links, and each value is the pair's total contribution to an accumulating
+  output (`d_<field>_dt`, `add_<field>`, `d_<pair field>_dt`) of a selected model. The engine
+  then chooses per pair between each rival alone and their `cooperating_sum`. The choice is
+  applied to both members with the declared symmetry, so an antisymmetric exchange still cancels
+  exactly. The pair's own state integrates after the choice. The arbiter's context is the union
+  of the members' inputs, plus each rival's extrapolation distance. `ctx.interact` keeps its own
+  arbiters. Later ungraded calls apply what was learned. Without evidence and without a learned
+  arbiter, results are byte-identical. `set_` and intermediate outputs are not arbitrated. The
+  result's `rival_arbitration` has the shape described for `ctx.evolve` (`fields` lists the
+  arbitrated outputs).
   Optional `require_complete_selection:true` instead blocks the entire call before inference or
   element/pair-state writes, returning `ran:false`, `blockedReason:"incomplete_selection"`, zero
   inference/draw counts and the selection report. It conservatively checks all combinations of

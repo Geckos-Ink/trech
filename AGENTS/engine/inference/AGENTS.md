@@ -330,7 +330,7 @@ separated its training population (`GenericSurrogate::routingDomain`, written by
 `trech-measure-routing-domain`). Elements in a thin gap inside the rivals' combined envelope run the
 nearest rival (`elementsNearest`), and elements outside it stay untouched. Each element's unnamed
 group is its path of covering rivals, with id `d` + FNV-1a-32 of that path. `group_by: "declared"`
-opts out, and `ctx.interact` does not route. `glass_from_sand.js` `grouping: "domain"` is the
+opts out. `ctx.interact` routes canonical pairs the same way (see the arbitration list below). `glass_from_sand.js` `grouping: "domain"` is the
 worked scenario (validation `glass_domain_routing_matches_declared`). Tests:
 `trech_state_evolution`, `trech_discrete_transition`, `trech_js_runtime`, `trech_routing_domain`. Contract:
 [scenario hooks](../../../docs/engine/scenario_hooks.md).
@@ -394,7 +394,18 @@ methods that must predict before a call's reference exists. Paths using it:
   Covered by `trech_scale_cascade` and `trech_js_runtime`. On late calls the arbiter's error is
   7× below the best single rival, and its misses fall only where the two laws differ by
   ≤ 0.175. The test also covers the ensemble case and the unchanged no-evidence result.
-- `ctx.predict` names one model and has no rivals.
+- `ctx.interact` pair rivals. `PairInteraction` routes with `DomainRouter`, treating each
+  canonical pair as an element (`routeByDomain`; `selectOperatorModels` allows domain routing
+  for interact as well). Arbitration covers the accumulating outputs that two or more members of a
+  set produce: `d_f_dt`, `add_f` and `d_p_dt`. Its candidates are each rival alone and the
+  cooperating sum, valued as the pair's total contribution. A choice is applied as a correction to
+  both members with the declared symmetry. Link state integrates after arbitration. The callback
+  receives the canonical pairs and the arbitrated output names, and the JS host maps
+  `reference_pairs` through them into its fourth pool. Covered by `trech_pair_interaction`
+  (routing split, uncovered pair, alternatives and cooperation on both element and bond state,
+  exact antisymmetric cancellation, no-evidence identity) and `trech_js_runtime`.
+- `ctx.predict` names one model and has no rivals. Every multi-method engine path now selects
+  through `MethodArbiter`.
 
 The remaining multi-method paths are queued in the [roadmap](ROADMAP.md#priority-queue).
 

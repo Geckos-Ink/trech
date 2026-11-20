@@ -1,11 +1,13 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <limits>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "trech/ml/DomainRouting.hpp"
 #include "trech/ml/ScaleCascade.hpp"  // DimensionScale (shared band ordering)
 
 namespace trech::ml {
@@ -216,6 +218,24 @@ struct PairInteractionRequest {
   std::vector<std::string> elementKindNames;
   std::vector<std::size_t> elementKindIndex;
   std::vector<std::string> pairKindNames;
+
+  // Domain routing (DomainRouting.hpp) with each canonical pair as the routed
+  // element: same-band, kind-free stages with a shared output are rivals, and
+  // one runs on a pair only when its trained domain covers that pair's
+  // context (member facts, geometry, pair state, lower-band intermediates).
+  // Off by default.
+  bool routeByDomain = false;
+  // Optional, routing only: rival arbitration (RivalCandidates). The
+  // arbitrated values are the pair's total contribution to each accumulating
+  // output (`d_f_dt`, `add_f`, `d_p_dt`) that two or more members of a set
+  // produce: every rival alone, then the cooperating sum (the pre-arbitration
+  // behaviour). `pairs` is the canonical pair list (a < b) the candidates'
+  // elements index; `outputs` the names their fields index. Assignments and
+  // intermediates are not arbitrated. Choice -1 changes nothing.
+  std::function<void(const std::vector<PairLink>& pairs,
+                     const std::vector<std::string>& outputs,
+                     std::vector<RivalCandidates>& sets)>
+      arbitrateRivals;
 };
 
 struct PairInteractionResult {
@@ -257,6 +277,12 @@ struct PairInteractionResult {
   std::size_t starvedInferenceCount = 0;
   std::size_t scaleMismatchedInferenceCount = 0;
   std::vector<PairStageTrace> stages;  // executed (ascending-scale) order
+  // Routing only: unnamed groups per canonical pair (`elementGroup[pair]`)
+  // and that pair list, so a caller can map groups back to members.
+  DomainRouting routing;
+  std::vector<PairLink> pairs;
+  // Arbitrated sets with the choices (arbitrateRivals only).
+  std::vector<RivalCandidates> rivals;
 };
 
 // The operator.  Register stages (any order), then interact.

@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/ml/RivalArbitration.hpp"
 
 namespace {
 
@@ -534,6 +535,146 @@ int main() {
     expect(blocked.inferenceCount == 0 && blocked.starvedInferenceCount == 0 &&
                blocked.scaleMismatchedInferenceCount == 0,
            "missing-input pairs add no density or band count");
+  }
+
+  // Domain routing over PAIRS: two heat-exchange laws of one band trained on
+  // separate composition regimes (`a_comp` around -5 and +5). Each pair runs
+  // the law whose domain covers it; without routing both laws run everywhere.
+  {
+    static const trech::test::TemporaryDirectory directory;
+    auto shifted = [&](const std::string& file, double mean, double rate) {
+      const std::string path = (directory.path() / file).string();
+      {
+        std::ofstream f(path);
+        f << "{\"model\":\"generic_surrogate_v1\",\"input_features\":[\"a_comp\"],"
+          << "\"output_features\":[\"d_heat_dt\"],\"input_mean\":[" << mean << "],\"input_std\":[1],"
+          << "\"input_domain\":{\"standardized_radius\":[1]},"
+          << "\"layers\":[{\"weights\":[[0.0]],\"bias\":[" << rate << "],\"activation\":\"none\"}]}";
+      }
+      auto m = std::make_unique<trech::ml::GenericSurrogate>();
+      m->load(path);
+      std::remove(path.c_str());
+      return m;
+    };
+    auto low = shifted("pair_route_low.json", -5.0, 1.0);
+    auto high = shifted("pair_route_high.json", 5.0, 2.0);
+    trech::ml::PairInteraction op;
+    op.addStage("law_low", DimensionScale::kMeso, low.get());
+    op.addStage("law_high", DimensionScale::kMeso, high.get());
+    trech::ml::PairInteractionRequest req;
+    req.elementCount = 6;
+    req.fields.push_back({"heat", PairSymmetry::kAntisymmetric});
+    req.auxNames = {"comp"};
+    req.state.assign(6, 0.0);
+    req.aux = {-5, -5, 5, 5, 50, 50};
+    req.links = {{0, 1}, {2, 3}, {4, 5}};
+    req.dt = 1.0;
+    const auto everywhere = op.interact(req);
+    expect(approx(everywhere.state[0], 3.0) && everywhere.pairs.empty() && !everywhere.routing.active,
+           "without routing both rival pair laws run on every pair");
+    req.routeByDomain = true;
+    const auto routed = op.interact(req);
+    expect(approx(routed.state[0], 1.0) && approx(routed.state[1], -1.0) &&
+               approx(routed.state[2], 2.0) && approx(routed.state[3], -2.0) &&
+               approx(routed.state[4], 0.0) && approx(routed.state[5], 0.0),
+           "each pair runs the law whose domain covers it; the uncovered pair is untouched");
+    expect(routed.routing.active && routed.routing.sets.size() == 1 &&
+               routed.routing.sets[0].elementsUncovered == 1 && routed.routing.groups.size() == 3 &&
+               routed.routing.elementGroup.size() == 3 && routed.pairs.size() == 3 &&
+               routed.pairs[1].a == 2 && routed.pairs[1].b == 3 && routed.inferenceCount == 2,
+           "routing reports one rival set, three unnamed pair groups and the canonical pairs");
+  }
+
+  // Rival arbitration over pairs: two laws cover the SAME pairs for the same
+  // element rate and pair-state rate. Evidence (the pair's total contribution)
+  // decides alternatives vs cooperation.
+  //   up: d_heat_dt = d_bond_dt = a_x      down: d_heat_dt = d_bond_dt = 1 - a_x
+  {
+    auto up = makeLinear("pair_rival_up.json", {"a_x"}, {"d_heat_dt", "d_bond_dt"}, {{1.0}, {1.0}}, {0.0, 0.0}, 10.0);
+    auto down = makeLinear("pair_rival_down.json", {"a_x"}, {"d_heat_dt", "d_bond_dt"}, {{-1.0}, {-1.0}}, {1.0, 1.0}, 10.0);
+    trech::ml::PairInteraction op;
+    op.addStage("law_up", DimensionScale::kMeso, up.get());
+    op.addStage("law_down", DimensionScale::kMeso, down.get());
+    constexpr std::size_t kPairs = 64;
+    auto request = [&](int call) {
+      trech::ml::PairInteractionRequest req;
+      req.elementCount = 2 * kPairs;
+      req.fields.push_back({"heat", PairSymmetry::kAntisymmetric});
+      req.auxNames = {"x"};
+      req.state.assign(2 * kPairs, 0.0);
+      req.pairFields.push_back({"bond"});
+      for (std::size_t i = 0; i < kPairs; ++i) {
+        const double x = static_cast<double>((i * 37 + static_cast<std::size_t>(call) * 11) % kPairs) / 63.0;
+        req.aux.push_back(x);
+        req.aux.push_back(x);
+        req.links.push_back({2 * i, 2 * i + 1});
+        req.pairState.push_back(0.0);
+      }
+      req.dt = 1.0;
+      req.routeByDomain = true;
+      return req;
+    };
+    const auto plain = op.interact(request(0));
+    expect(approx(plain.state[0], 1.0) && approx(plain.pairState[0], 1.0) && plain.rivals.empty(),
+           "overlapping pair rivals cooperate without arbitration");
+
+    auto run = [&](auto truth, double* lateError, double* lateSumShare, double* bondError, bool* exact) {
+      trech::ml::RivalArbitration pool;
+      double err = 0, berr = 0, n = 0, sum = 0, chosen = 0;
+      *exact = true;
+      for (int call = 0; call < 40; ++call) {
+        auto req = request(call);
+        const std::vector<double> aux = req.aux;
+        req.arbitrateRivals = [&](const std::vector<trech::ml::PairLink>& pairs,
+                                  const std::vector<std::string>& outputs,
+                                  std::vector<trech::ml::RivalCandidates>& sets) {
+          trech::ml::RivalArbitration::Call c;
+          c.fieldNames = outputs;
+          for (const auto& pair : pairs)
+            for (std::size_t f = 0; f < outputs.size(); ++f) c.reference.push_back(truth(aux[pair.a]));
+          c.seed = 5;
+          pool.arbitrate(sets, c);
+        };
+        const auto r = op.interact(req);
+        if (call >= 30) {
+          for (std::size_t i = 0; i < kPairs; ++i) {
+            const double t = truth(aux[2 * i]);
+            const double d = r.state[2 * i] - t, b = r.pairState[i] - t;
+            err += d * d; berr += b * b; n += 1;
+            if (r.state[2 * i] + r.state[2 * i + 1] != 0.0) *exact = false;
+          }
+          for (const auto& rc : r.rivals)
+            for (int ch : rc.choice) { sum += ch < 0 || ch == static_cast<int>(rc.members.size()) ? 1 : 0; chosen += 1; }
+        }
+      }
+      *lateError = std::sqrt(err / n);
+      *bondError = std::sqrt(berr / n);
+      *lateSumShare = chosen > 0 ? sum / chosen : 0.0;
+    };
+    double altError = 0, altSum = 0, altBond = 0, coopError = 0, coopSum = 0, coopBond = 0;
+    bool altExact = false, coopExact = false;
+    run([](double x) { return x < 0.5 ? x : 1.0 - x; }, &altError, &altSum, &altBond, &altExact);
+    run([](double) { return 1.0; }, &coopError, &coopSum, &coopBond, &coopExact);
+    std::printf("pair rival arbitration: alternatives late rmse %.4f (bond %.4f, sum share %.2f); "
+                "cooperation late rmse %.4f (bond %.4f, sum share %.2f)\n",
+                altError, altBond, altSum, coopError, coopBond, coopSum);
+    expect(altError < 0.05 && altBond < 0.05 && altSum < 0.1,
+           "alternative pair rivals: the evidence picks the right law per context domain, for element and pair state");
+    expect(coopError < 1e-9 && coopBond < 1e-9 && coopSum > 0.9,
+           "cooperating pair rivals: the evidence keeps their sum");
+    expect(altExact && coopExact, "an arbitrated antisymmetric contribution still cancels exactly");
+
+    trech::ml::RivalArbitration fresh;
+    auto req = request(0);
+    req.arbitrateRivals = [&](const std::vector<trech::ml::PairLink>&, const std::vector<std::string>& outputs,
+                              std::vector<trech::ml::RivalCandidates>& sets) {
+      trech::ml::RivalArbitration::Call c;
+      c.fieldNames = outputs;
+      fresh.arbitrate(sets, c);
+    };
+    const auto same = op.interact(req);
+    expect(same.state == plain.state && same.pairState == plain.pairState && fresh.empty(),
+           "no evidence and no learned arbiter: byte-identical pair results");
   }
 
   if (failures == 0) {

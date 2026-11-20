@@ -1959,6 +1959,88 @@ int main() {
   fs::remove(cascObs);
   fs::remove(cascExp);
 
+  // ctx.interact domain routing + rival arbitration: two heat-exchange pair
+  // laws of one role and different kinds. An undeclared call routes pairs by
+  // trained domain; `reference_pairs` evidence (per declared link) teaches the
+  // per-context choice, and a later ungraded call applies it.
+  fs::path pairUp = fixture.path() / ("trech_js_pair_rival_up_" + stamp + ".json");
+  fs::path pairDown = fixture.path() / ("trech_js_pair_rival_down_" + stamp + ".json");
+  fs::path pairExp = fixture.path() / ("trech_js_pair_rival_" + stamp + ".js");
+  try {
+    auto writePair = [](const fs::path& path, double weight, double bias) {
+      std::ofstream m(path);
+      m << "{\"model\":\"generic_surrogate_v1\",\"input_features\":[\"a_x\"],"
+        << "\"output_features\":[\"d_heat_dt\"],\"input_mean\":[0],\"input_std\":[1],"
+        << "\"input_domain\":{\"standardized_radius\":[10]},"
+        << "\"layers\":[{\"weights\":[[" << weight << "]],\"bias\":[" << bias
+        << "],\"activation\":\"none\"}]}";
+    };
+    writePair(pairUp, 1.0, 0.0);
+    writePair(pairDown, -1.0, 1.0);
+    {
+      std::ofstream out(pairExp);
+      out << "globalThis.TRECH_CONFIG={run:{nEvents:1,seed:5},determinism:{mode:\"predictive\"},\n";
+      out << " models:[{name:\"law_up\",scale:\"meso\",operator_role:\"exchange\",element_kind:\"a\",path:\""
+          << pairUp.generic_string() << "\"},\n";
+      out << "  {name:\"law_down\",scale:\"meso\",operator_role:\"exchange\",element_kind:\"b\",path:\""
+          << pairDown.generic_string() << "\"}]};\n";
+      out << "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n";
+      out << " const N=64; const truth=x=>x<0.5?x:1-x;\n";
+      out << " const spec=(call,ref)=>{const x=[],a=[],b=[];\n";
+      out << "  for(let i=0;i<N;i++){const v=((i*37+call*11)%N)/63; x.push(v,v); a.push(2*i); b.push(2*i+1);}\n";
+      out << "  const s={dt:1,fields:[{name:\"heat\",symmetry:\"antisymmetric\"}],state:{heat:new Array(2*N).fill(0)},\n";
+      out << "   aux:{x},links:{a,b},operator_role:\"exchange\"};\n";
+      out << "  if(ref) s.reference_pairs={values:{d_heat_dt:a.map((_,i)=>truth(x[2*i]))}};\n";
+      out << "  return s;};\n";
+      out << " const plain=ctx.interact(spec(0,false));\n";
+      out << " let late=null; for(let call=0;call<40;call++){const r=ctx.interact(spec(call,true)); if(call===39) late=r.rival_arbitration.sets[0];}\n";
+      out << " const d=spec(40,false); d.report_arbitration=true; const dep=ctx.interact(d);\n";
+      out << " let err=0; for(let i=0;i<N;i++){const e=d.state.heat[2*i]-truth(d.aux.x[2*i]); err+=e*e;}\n";
+      out << " let bad=null; try{const b=spec(41,false); b.reference_pairs={values:{nope:[]}}; ctx.interact(b);}catch(e){bad=String(e.message);}\n";
+      out << " const declared=spec(0,false); declared.group_by=\"declared\"; const dec=ctx.interact(declared);\n";
+      out << " ctx.emit(\"pair_rivals\",{grouping:plain.selection.grouping,\n";
+      out << "  routed:!!plain.routing,pairs:plain.pairs.length,firstPair:plain.pairs[0],groups:plain.routing.groups.length,\n";
+      out << "  plainArb:plain.rival_arbitration===undefined,lateApplied:late.applied,lateRmse:late.arbitrated_rmse,\n";
+      out << "  depApplied:dep.rival_arbitration.sets[0].applied,depGraded:dep.rival_arbitration.sets[0].graded,\n";
+      out << "  depRmse:Math.sqrt(err/N),fields:dep.rival_arbitration.sets[0].fields,\n";
+      out << "  declaredStatus:dec.selection.status,bad});\n";
+      out << "}};\n";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(pairExp.string());
+    trech::HookRuntimeContext pCtx{};
+    pCtx.determinismMode = "predictive";
+    pCtx.seed = 5;
+    pCtx.eventId = 0;
+    (void)js.dispatchHook("onEventEnd", pCtx, nullptr, false);
+    const auto pEmits = js.takeEmittedRecords();
+    failures += expect(pEmits.size() == 1, "Expected one ctx.interact rival-arbitration emit.");
+    if (!pEmits.empty()) {
+      const auto j = nlohmann::json::parse(pEmits[0].payloadJson);
+      std::cout << "ctx.interact rival arbitration: " << pEmits[0].payloadJson << "\n";
+      failures += expect(j.at("grouping") == "domain" && j.at("routed").get<bool>() &&
+                             j.at("pairs").get<int>() == 64 && j.at("firstPair") == nlohmann::json::array({0, 1}) &&
+                             j.at("plainArb").get<bool>(),
+                         "Expected an undeclared same-role ctx.interact pool to route pairs by domain.");
+      failures += expect(j.at("lateApplied").get<bool>() && j.at("lateRmse").get<double>() < 0.02 &&
+                             j.at("depApplied").get<bool>() && !j.at("depGraded").get<bool>() &&
+                             j.at("depRmse").get<double>() < 0.02 &&
+                             j.at("fields") == nlohmann::json::array({"d_heat_dt"}),
+                         "Expected pair evidence to teach a per-context choice that an ungraded call applies.");
+      failures += expect(j.at("declaredStatus") == "ambiguous",
+                         "Expected group_by declared to keep the ambiguous verdict for ctx.interact.");
+      failures += expect(j.at("bad").is_string() &&
+                             j.at("bad").get<std::string>().find("reference_pairs.values.nope") != std::string::npos,
+                         "Expected reference_pairs to name outputs of the selected models only.");
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ctx.interact rival arbitration error: " << ex.what() << "\n";
+    failures += 1;
+  }
+  fs::remove(pairUp);
+  fs::remove(pairDown);
+  fs::remove(pairExp);
+
   // ctx.evolve with PER-ELEMENT material kinds: one call, several materials,
   // each advanced by the operator its own context selected. This is the
   // "inference level is not fixed for the run" contract -- a scenario holding

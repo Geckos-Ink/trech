@@ -101,7 +101,8 @@ struct JsRuntimeState {
   // The same for overlapping ctx.react hazard rivals (separate evidence).
   trech::ml::RivalArbitration reactRivalArbitration;
   // The same for ctx.cascade stages of one band that declare a shared output.
-  trech::ml::RivalArbitration cascadeRivalArbitration;
+  trech::ml::RivalArbitration cascadeRivalArbitration;  // The same for routed ctx.interact pair rivals.
+  trech::ml::RivalArbitration interactRivalArbitration;
 };
 
 struct JsRuntime::Impl {
@@ -4361,11 +4362,92 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
 
   // ---- stage selection: explicit override or contextual role match --------
   OperatorSelection selection = selectOperatorModels(
-      ctx, spec, runtime, request.shared, requestedPairKinds);
+      ctx, spec, runtime, request.shared, requestedPairKinds, /*allowDomainRouting=*/true);
+  if (!selection.groupByError.empty()) {
+    releaseArrays();
+    return JS_ThrowTypeError(ctx, "ctx.interact %s", selection.groupByError.c_str());
+  }
+  request.routeByDomain = selection.routeByDomain;
   JSValue selectionGate = checkCompleteOperatorSelection(ctx, spec, selection);
   if (!JS_IsUndefined(selectionGate)) {
     releaseArrays();
     return selectionGate;
+  }
+  // Rival arbitration (routing only): optional `reference_pairs` is evidence,
+  // {pairs?: [[a,b], ...], values: {output: [value per pair]}} where `pairs`
+  // defaults to the declared links; each value is the pair's total
+  // contribution to that accumulating output (RivalArbitration.hpp).
+  std::map<std::pair<std::size_t, std::size_t>, std::size_t> referenceRow;
+  std::map<std::string, std::vector<double>> referenceValues;
+  bool reportArbitration = false;
+  nlohmann::json rivalReports = nlohmann::json::array();
+  {
+    JSValue ref = JS_GetPropertyStr(ctx, spec, "reference_pairs");
+    if (!JS_IsUndefined(ref) && !JS_IsNull(ref)) {
+      nlohmann::json j;
+      try { j = nlohmann::json::parse(jsonStringifyValue(ctx, ref)); } catch (const std::exception&) { j = nullptr; }
+      JS_FreeValue(ctx, ref);
+      const char* shape = "ctx.interact reference_pairs must be {pairs?: [[a,b], ...], values: {output: [value per pair]}}";
+      if (!j.is_object() || !j.contains("values") || !j["values"].is_object()) {
+        releaseArrays();
+        return JS_ThrowTypeError(ctx, "%s", shape);
+      }
+      std::vector<std::pair<std::size_t, std::size_t>> rows;
+      if (j.contains("pairs")) {
+        if (!j["pairs"].is_array()) { releaseArrays(); return JS_ThrowTypeError(ctx, "%s", shape); }
+        for (const auto& pr : j["pairs"]) {
+          if (!pr.is_array() || pr.size() != 2 || !pr[0].is_number_unsigned() || !pr[1].is_number_unsigned()) {
+            releaseArrays();
+            return JS_ThrowTypeError(ctx, "%s", shape);
+          }
+          rows.emplace_back(pr[0].get<std::size_t>(), pr[1].get<std::size_t>());
+        }
+      } else {
+        for (const auto& link : request.links) rows.emplace_back(link.a, link.b);
+      }
+      std::set<std::string> known;
+      for (const auto& [name, model] : runtime->models)
+        if (selection.selected.count(name))
+          known.insert(model->outputNames().begin(), model->outputNames().end());
+      for (auto& [name, column] : j["values"].items()) {
+        if (!known.count(name) || !column.is_array() || column.size() != rows.size()) {
+          releaseArrays();
+          return JS_ThrowTypeError(ctx, "ctx.interact reference_pairs.values.%s must be an output of a selected model with one value per pair", name.c_str());
+        }
+        std::vector<double>& out = referenceValues[name];
+        for (const auto& v : column) out.push_back(v.is_number() ? v.get<double>() : std::numeric_limits<double>::quiet_NaN());
+      }
+      for (std::size_t r = 0; r < rows.size(); ++r)
+        referenceRow.emplace(std::minmax(rows[r].first, rows[r].second), r);
+    } else {
+      JS_FreeValue(ctx, ref);
+    }
+    JSValue rep = JS_GetPropertyStr(ctx, spec, "report_arbitration");
+    reportArbitration = JS_ToBool(ctx, rep) > 0;
+    JS_FreeValue(ctx, rep);
+  }
+  if (request.routeByDomain && (!referenceValues.empty() || !runtime->interactRivalArbitration.empty())) {
+    const std::uint64_t seed = runtime->activeHookContext.seed;
+    request.arbitrateRivals = [&, seed](const std::vector<trech::ml::PairLink>& pairs,
+                                        const std::vector<std::string>& outputs,
+                                        std::vector<trech::ml::RivalCandidates>& sets) {
+      trech::ml::RivalArbitration::Call call;
+      call.fieldNames = outputs;
+      call.seed = seed;
+      if (!referenceValues.empty()) {
+        const std::size_t F = outputs.size();
+        call.reference.assign(pairs.size() * F, std::numeric_limits<double>::quiet_NaN());
+        for (std::size_t i = 0; i < pairs.size(); ++i) {
+          const auto row = referenceRow.find(std::minmax(pairs[i].a, pairs[i].b));
+          if (row == referenceRow.end()) continue;
+          for (std::size_t f = 0; f < F; ++f) {
+            const auto column = referenceValues.find(outputs[f]);
+            if (column != referenceValues.end()) call.reference[i * F + f] = column->second[row->second];
+          }
+        }
+      }
+      rivalReports = runtime->interactRivalArbitration.arbitrate(sets, call);
+    };
   }
   trech::ml::PairInteraction op;
   for (const OperatorSelectionGroup& group : selection.groups) {
@@ -4455,6 +4537,20 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
                                          run.outOfDomainInferenceCount)));
   JS_SetPropertyStr(ctx, result, "selection",
                     operatorSelectionToJs(ctx, selection));
+  if (run.routing.active) {
+    // `elementGroups` holds one group id per canonical pair, aligned with `pairs`.
+    JS_SetPropertyStr(ctx, result, "routing", domainRoutingToJs(ctx, run.routing));
+    nlohmann::json pairsJson = nlohmann::json::array();
+    for (const auto& pair : run.pairs) pairsJson.push_back({pair.a, pair.b});
+    const std::string text = pairsJson.dump();
+    JS_SetPropertyStr(ctx, result, "pairs", JS_ParseJSON(ctx, text.c_str(), text.size(), "<pairs>"));
+  }
+  if (!rivalReports.empty() || reportArbitration) {
+    nlohmann::json out = {{"sets", rivalReports}};
+    if (reportArbitration) out["summary"] = runtime->interactRivalArbitration.summary();
+    const std::string text = out.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    JS_SetPropertyStr(ctx, result, "rival_arbitration", JS_ParseJSON(ctx, text.c_str(), text.size(), "<rival_arbitration>"));
+  }
   std::vector<std::string> sharedKeys;
   sharedKeys.reserve(request.shared.size());
   for (const auto& [key, value] : request.shared) {
