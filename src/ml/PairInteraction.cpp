@@ -101,6 +101,10 @@ std::string PairInteraction::assignOutputName(const std::string& field) {
   return "set_" + field;
 }
 
+std::string PairInteraction::boundInputName(bool upper, const std::string& name) {
+  return (upper ? "hi_" : "lo_") + name;
+}
+
 std::string PairInteraction::memberInputName(int member,
                                              const std::string& name) {
   return (member == 0 ? "a_" : "b_") + name;
@@ -286,13 +290,19 @@ PairInteractionResult PairInteraction::interact(
                    });
 
   // ---- working-vector layout ----------------------------------------------
-  // pair state | geometry | a fields | b fields | a aux | b aux | intermediates
+  // pair state | geometry | a fields | b fields | a aux | b aux |
+  // lo fields | hi fields | lo aux | hi aux | intermediates
   // Precedence when a name appears twice is pair state > member facts >
-  // geometry: the pair's own state is the most specific meaning of a name.
+  // geometry > ordered member facts: the pair's own state is the most specific
+  // meaning of a name. `lo_`/`hi_` are the smaller and larger of the two
+  // members' values: facts of an UNORDERED pair, independent of which member
+  // the canonical order calls `a`.
   const std::size_t geometryBase = pairFieldCount;
   const std::size_t memberFieldBase = geometryBase + kGeometrySlots;
   const std::size_t memberAuxBase = memberFieldBase + 2 * fieldCount;
-  std::size_t workingSize = memberAuxBase + 2 * auxCount;
+  const std::size_t boundBase = memberAuxBase + 2 * auxCount;
+  const std::size_t factEnd = boundBase + 2 * (fieldCount + auxCount);
+  std::size_t workingSize = factEnd;
 
   std::unordered_map<std::string, std::size_t> slotOf;
   slotOf.reserve(pairFieldCount + kGeometrySlots + 2 * (fieldCount + auxCount) + 8);
@@ -312,6 +322,14 @@ PairInteractionResult PairInteraction::interact(
   }
   for (std::size_t g = 0; g < kGeometrySlots; ++g) {
     slotOf.emplace(kGeometryInputNames[g], geometryBase + g);
+  }
+  for (std::size_t f = 0; f < fieldCount; ++f) {
+    slotOf.emplace(boundInputName(false, request.fields[f].name), boundBase + f);
+    slotOf.emplace(boundInputName(true, request.fields[f].name), boundBase + fieldCount + f);
+  }
+  for (std::size_t a = 0; a < auxCount; ++a) {
+    slotOf.emplace(boundInputName(false, request.auxNames[a]), boundBase + 2 * fieldCount + a);
+    slotOf.emplace(boundInputName(true, request.auxNames[a]), boundBase + 2 * fieldCount + auxCount + a);
   }
 
   // ---- plan every stage, registering intermediates as they appear ---------
@@ -458,9 +476,9 @@ PairInteractionResult PairInteraction::interact(
   std::vector<double> initialWorking(workingSize, 0.0);
   std::vector<unsigned char> initialAvailable(workingSize, 0);
   std::fill(initialAvailable.begin(),
-            initialAvailable.begin() + (memberAuxBase + 2 * auxCount), 1);
+            initialAvailable.begin() + factEnd, 1);
   for (const auto& [name, slot] : slotOf) {
-    if (slot < (memberAuxBase + 2 * auxCount)) continue;
+    if (slot < factEnd) continue;
     const auto fact = request.shared.find(name);
     if (fact != request.shared.end()) {
       initialWorking[slot] = fact->second;
@@ -683,6 +701,16 @@ PairInteractionResult PairInteraction::interact(
     for (std::size_t a = 0; a < auxCount; ++a) {
       working[memberAuxBase + a] = request.aux[pair.a * auxCount + a];
       working[memberAuxBase + auxCount + a] = request.aux[pair.b * auxCount + a];
+    }
+    for (std::size_t f = 0; f < fieldCount; ++f) {
+      const double va = request.state[aBase + f], vb = request.state[bBase + f];
+      working[boundBase + f] = std::min(va, vb);
+      working[boundBase + fieldCount + f] = std::max(va, vb);
+    }
+    for (std::size_t a = 0; a < auxCount; ++a) {
+      const double va = request.aux[pair.a * auxCount + a], vb = request.aux[pair.b * auxCount + a];
+      working[boundBase + 2 * fieldCount + a] = std::min(va, vb);
+      working[boundBase + 2 * fieldCount + auxCount + a] = std::max(va, vb);
     }
 
     if (routing) router.beginElement();

@@ -330,7 +330,7 @@ separated its training population (`GenericSurrogate::routingDomain`, written by
 `trech-measure-routing-domain`). Elements in a thin gap inside the rivals' combined envelope run the
 nearest rival (`elementsNearest`), and elements outside it stay untouched. Each element's unnamed
 group is its path of covering rivals, with id `d` + FNV-1a-32 of that path. `group_by: "declared"`
-opts out. `ctx.interact` routes canonical pairs the same way (see the arbitration list below). `glass_from_sand.js` `grouping: "domain"` is the
+opts out. `ctx.interact` routes canonical pairs the same way (see the arbitration list below); an unordered pair's routing features are the `lo_`/`hi_` member facts (the furnace's six pair conduction laws, routing domains measured from `build/glass_routing/pair_train_*`). `glass_from_sand.js` `grouping: "domain"` is the
 worked scenario (validation `glass_domain_routing_matches_declared`). Tests:
 `trech_state_evolution`, `trech_discrete_transition`, `trech_js_runtime`, `trech_routing_domain`. Contract:
 [scenario hooks](../../../docs/engine/scenario_hooks.md).

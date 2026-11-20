@@ -66,7 +66,11 @@ class GenericSurrogate;
 //   * anything else -> an INTERMEDIATE merged into the per-pair context for
 //                  higher-scale stages, exactly like a cascade stage output.
 // Each member's own facts are read with the reserved `a_`/`b_` prefixes
-// (`a_temperature_k`, `b_mass`), and the pair geometry through the reserved
+// (`a_temperature_k`, `b_mass`); `lo_`/`hi_` give the smaller and larger of the
+// two members' values (`lo_melt_fraction`), facts of the unordered pair that do
+// not depend on which member the canonical order calls `a` (routing features
+// of a law that serves a pair of materials in either order read them). The pair
+// geometry is read through the reserved
 // inputs `r`, `dx`/`dy`/`dz` and `ux`/`uy`/`uz` (b - a, and its unit vector)
 // plus the reserved `dt`.
 //
@@ -306,6 +310,9 @@ class PairInteraction {
   static std::string assignOutputName(const std::string& field);     // set_f
   // Member-qualified input name: memberInputName(0, "mass") == "a_mass".
   static std::string memberInputName(int member, const std::string& name);
+  // Ordered member fact of the UNORDERED pair: boundInputName(false, "mass") == "lo_mass"
+  // (the smaller of the two members' values), boundInputName(true, "mass") == "hi_mass".
+  static std::string boundInputName(bool upper, const std::string& name);
   // Canonical (unordered) pair-kind name: pairKindName("melt", "sand") ==
   // pairKindName("sand", "melt") == "melt|sand". Exposed so scenarios, trainers
   // and tests compose the same string the engine looks up.

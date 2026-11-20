@@ -605,10 +605,13 @@ tracking action only when one of them is registered.
   is an intermediate a higher-scale stage consumes. `set_<element field>` is refused and reported in
   `unappliedFieldOutputs`: many pairs cannot assign one element a single value.
 
-  Each member's facts are read with the reserved `a_`/`b_` prefixes (`a_mass`, `b_temperature_k`)
-  and the pair geometry through the reserved `r`, `dx`/`dy`/`dz`, `ux`/`uy`/`uz` (separation
-  `b - a` and its unit vector) plus `dt`. Input precedence is pair state > member facts > geometry >
-  `dt` > `context`/ambient. Missing inputs skip the affected pair-stage and appear in
+  Each member's facts are read with the reserved `a_`/`b_` prefixes (`a_mass`, `b_temperature_k`).
+  `lo_`/`hi_` give the smaller and larger of the two members' values (`lo_melt_fraction`): facts
+  of the unordered pair that do not depend on which member the canonical order calls `a`. A law
+  that serves a pair of materials in either order reads them as inputs or as `routing_domain`
+  features. The pair geometry is read through the reserved `r`, `dx`/`dy`/`dz`, `ux`/`uy`/`uz`
+  (separation `b - a` and its unit vector) plus `dt`. Input precedence is pair state > member
+  facts > geometry > `lo_`/`hi_` > `dt` > `context`/ambient. Missing inputs skip the affected pair-stage and appear in
   `missingInputs`. Neighbours without a persistent link have no pair state; links without
   positions have no geometry inputs. Unclaimed/blocked links keep their state bit-identical.
   When supplied, `positions` must contain complete x/y/z arrays (Array or Float64Array), each

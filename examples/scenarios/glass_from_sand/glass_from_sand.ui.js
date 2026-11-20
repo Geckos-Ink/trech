@@ -49,12 +49,12 @@ TRECH_PARAMETERS({
 }, {type: "choice"}); },
 "grouping": function() { return Object.assign({}, {
   label: "Population grouping", group: "Inference",
-  description: "domain (default) = the thermal and chemistry calls name no material: the engine " +
-               "routes every cell to the operator whose measured training domain (inputs + " +
-               "routing_domain) covers it, band by band, in unnamed groups; declared = each cell's " +
-               "material, classified in the scenario, names the operator (the validation reference " +
-               "the routed grouping is graded against). Conduction still uses the cell materials " +
-               "in both modes.",
+  description: "domain (default) = the thermal, chemistry and pair-conduction calls name no " +
+               "material: the engine routes every cell (and every neighbour pair) to the operator " +
+               "whose measured training domain (inputs + routing_domain) covers it, band by band, " +
+               "in unnamed groups; declared = each cell's material, classified in the scenario, " +
+               "names the operator (the validation reference the routed grouping is graded " +
+               "against). The opt-in set-network conduction still uses the cell materials.",
   default: "domain", choices: ["domain", "declared"]
 }, {type: "choice"}); },
 "emit_training_rows": function() { return Object.assign({}, {

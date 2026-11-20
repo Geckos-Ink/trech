@@ -103,11 +103,12 @@ const LEARNER_STATE = domainLearnerModel
 if ((learnDomains === "deploy" || learnDomains === "evaluate") && !LEARNER_STATE) {
   throw new Error("learn_domains=" + learnDomains + " needs domain_learner_model");
 }
-// `domain` (default) names no material for the per-cell thermal and chemistry operators:
-// the engine routes each cell by measured training domain (docs/engine/scenario_hooks.md,
-// domain routing). `declared` names each cell's material and is the reference the routed
-// grouping is validated against. Conduction still passes the cell materials in both modes:
-// its pair and set models carry no routing domain yet (inference roadmap).
+// `domain` (default) names no material for the per-cell thermal and chemistry operators or
+// the pair conduction: the engine routes each cell, and each face-neighbour pair by the
+// lo_/hi_ facts of its two cells, by measured training domain (docs/engine/scenario_hooks.md,
+// domain routing). `declared` names each cell's and pair's material and is the reference the
+// routed grouping is validated against. The opt-in set-network conduction still passes the
+// cell materials (its set models carry no routing domain yet; inference roadmap).
 const grouping = TRECH_PARAMETER("grouping");
 const routeByDomain = grouping === "domain";
 // How cell-to-cell conduction is inferred. `pair` (default) runs the per-pair-
@@ -225,9 +226,10 @@ const state = {
   unclaimedGlassCells: 0,
   // Domain grouping bookkeeping (grouping = "domain" only): how the engine's
   // unnamed routing compares with the scenario's own classifier.
+  pairRouting: { calls: 0, pairs: 0, agree: 0, disagree: 0, nearest: 0, uncovered: 0, disagreements: {} },
   routing: { calls: 0, elements: 0, agree: 0, disagree: 0, nearest: 0, uncovered: 0,
              groups: {}, disagreements: {}, examples: [] },
-  harvest: { thermal: {}, chemistry: {}, conduction: {} },
+  harvest: { thermal: {}, chemistry: {}, conduction: {}, pairs: {} },
   // set_network conduction bookkeeping (stays zero on the pair path).
   conductionSet: {
     evaluations: 0, outOfDomain: 0, kinds: {}, stages: 0, domainMeasured: true,
@@ -474,6 +476,40 @@ function recordSelection(bucket, result) {
   }
 }
 
+// The pair conduction laws, by unordered material pair (model names carry the materials only
+// because this scenario declared them that way; routing never reads them).
+const CONDUCTION_PAIRS = [[KIND_BATCH, KIND_BATCH], [KIND_BATCH, KIND_MELT], [KIND_BATCH, KIND_GLASS],
+                          [KIND_MELT, KIND_MELT], [KIND_GLASS, KIND_MELT], [KIND_GLASS, KIND_GLASS]];
+function conductionModelOf(kindA, kindB) {
+  const key = [kindA, kindB].sort().join("|");
+  const pair = CONDUCTION_PAIRS.find((p) => p.slice().sort().join("|") === key);
+  return pair ? "conduction_" + pair[0] + "_" + pair[1] : null;
+}
+
+// Pair routing graded the same way: the law the engine routed each canonical pair to,
+// against the law the classifier's materials of its two cells would name.
+function recordPairRouting(result, kinds) {
+  if (!result || !result.routing || !result.pairs) return;
+  const routing = state.pairRouting;
+  const pathOf = {};
+  for (const group of result.routing.groups) pathOf[group.id] = group.path;
+  routing.calls += 1;
+  for (let p = 0; p < result.pairs.length; ++p) {
+    const path = pathOf[result.routing.elementGroups[p]] || [];
+    const routed = path.length === 1 ? path[0] : (path.length === 0 ? null : path.join("+"));
+    const expected = conductionModelOf(kinds[result.pairs[p][0]], kinds[result.pairs[p][1]]);
+    routing.pairs += 1;
+    if (routed === expected) { routing.agree += 1; continue; }
+    routing.disagree += 1;
+    const key = (expected || "(none)") + " -> " + (routed || "(none)");
+    routing.disagreements[key] = (routing.disagreements[key] || 0) + 1;
+  }
+  for (const set of result.routing.sets) {
+    routing.nearest += set.elementsNearest;
+    routing.uncovered += set.elementsUncovered + set.elementsUnscorable;
+  }
+}
+
 // Compare the engine's unnamed routing with the scenario's classifier applied to
 // the state the call actually saw. Each
 // element's group path names the operator that covered it (model names carry the
@@ -547,8 +583,40 @@ function harvestTeacherRows(ctx, cells, kinds, subStep, family) {
   }
 }
 
+// Pair-state harvest (routing domains of the pair conduction laws): for face-neighbour pairs
+// on a fixed stride, the ordered member facts the engine exposes to an unordered pair
+// (lo_/hi_ of melt fraction and converted-silica fraction), keyed by the declared pair
+// material. Only the routing domains are measured from these rows; no law is fitted here.
+const PAIR_HARVEST_CELL_STRIDE = 7;
+function harvestPairStates(cells, kinds, subStep) {
+  if (!emitTrainingRows || (subStep % HARVEST_SUBSTEP_STRIDE) !== 0) return;
+  const silica = glassSilicaFractions(cells);
+  for (let i = 0; i < CELL_COUNT; i += PAIR_HARVEST_CELL_STRIDE) {
+    for (let k = 0; k < NEIGHBOUR_SLOTS; ++k) {
+      const j = cells.neighbours[i * NEIGHBOUR_SLOTS + k];
+      if (j <= i) continue;  // each unordered pair once
+      const kind = [kinds[i], kinds[j]].sort().join("|");
+      const row = {
+        lo_melt_fraction: Math.min(cells.melt_fraction[i], cells.melt_fraction[j]),
+        hi_melt_fraction: Math.max(cells.melt_fraction[i], cells.melt_fraction[j]),
+        lo_glass_silica_fraction: Math.min(silica[i], silica[j]),
+        hi_glass_silica_fraction: Math.max(silica[i], silica[j])
+      };
+      (state.harvest.pairs[kind] = state.harvest.pairs[kind] || []).push(row);
+    }
+  }
+}
+
 function flushHarvest(ctx) {
   if (!emitTrainingRows) return;
+  for (const kind of Object.keys(state.harvest.pairs)) {
+    const rows = state.harvest.pairs[kind];
+    if (!rows || rows.length === 0) continue;
+    state.harvestRows += rows.length;
+    ctx.emit("pair_state_sample_" + kind.replace("|", "__"),
+             { teacher: "declared pair material (routing-domain measurement only)", samples: rows });
+    state.harvest.pairs[kind] = [];
+  }
   for (const kind of Object.keys(state.harvest.conduction)) {
     const rows = state.harvest.conduction[kind];
     if (!rows || rows.length === 0) continue;
@@ -742,27 +810,35 @@ function advance(ctx, cells, kinds, dt, subStepIndex) {
   const harvesting = emitTrainingRows && (subStepIndex % HARVEST_SUBSTEP_STRIDE) === 0;
   const pairFeatures = harvesting ? neighbourSetFeatures(cells, kinds) : null;
   const pairBefore = harvesting ? cells.temperature_k.slice() : null;
-  const conduction = ctx.interact({
+  // Domain grouping names no material: the engine routes every pair to the conduction law
+  // whose measured routing domain (the lo_/hi_ melt and converted-silica fractions of the
+  // two members) covers it. Declared grouping names each pair's materials (the reference).
+  const conduction = ctx.interact(Object.assign({
     dt,
     cutoff: CELL_PITCH_MM * 1.05,
     fields: [{ name: "temperature_k", symmetry: "antisymmetric", min: 0.0, max: 4000.0 }],
     state: { temperature_k: cells.temperature_k },
     positions: { x: cells.x, y: cells.y, z: cells.z },
     context,
-    operator_role: "cell_conduction",
-    element_kind: kinds
-  });
+    operator_role: "cell_conduction"
+  }, routeByDomain
+    ? { aux: { melt_fraction: cells.melt_fraction, glass_silica_fraction: glassSilicaFractions(cells) } }
+    : { element_kind: kinds }));
   if (harvesting) {
     harvestConductionRows(cells, kinds, pairFeatures, pairBefore, dt, subStepIndex);
+    harvestPairStates(cells, kinds, subStepIndex);
   }
   if (conduction) {
     state.inference.interact += conduction.inferenceCount;
     state.inference.outOfDomain += conduction.outOfDomainInferences;
     recordSelection("interact", conduction);
+    recordPairRouting(conduction, kinds);
     for (const stage of conduction.trace || []) {
       if (stage.ran && stage.pairsMatched > 0) {
-        state.pairKindsRun[stage.pairKind] =
-          (state.pairKindsRun[stage.pairKind] || 0) + stage.pairsMatched;
+        // Declared grouping keys by the pair material; routed pairs name none, so the pair
+        // law the engine routed to stands in.
+        const key = stage.pairKind || stage.model;
+        state.pairKindsRun[key] = (state.pairKindsRun[key] || 0) + stage.pairsMatched;
       }
     }
   }
@@ -1088,7 +1164,20 @@ globalThis.TRECH_HOOKS = {
           disagreement_examples: state.routing.examples,
           nearest_in_gap: state.routing.nearest,
           left_untouched: state.routing.uncovered,
-          groups: state.routing.groups
+          groups: state.routing.groups,
+          // cell_conduction names no material either: each face-neighbour pair is routed by
+          // the lo_/hi_ melt and converted-silica fractions of its two cells.
+          pair_routing: state.pairRouting.calls > 0 ? {
+            calls: state.pairRouting.calls,
+            pair_evaluations: state.pairRouting.pairs,
+            agree: state.pairRouting.agree,
+            disagree: state.pairRouting.disagree,
+            agreement: state.pairRouting.pairs > 0
+              ? round4(state.pairRouting.agree / state.pairRouting.pairs) : null,
+            disagreements: state.pairRouting.disagreements,
+            nearest_in_gap: state.pairRouting.nearest,
+            left_untouched: state.pairRouting.uncovered
+          } : undefined
         } : undefined,
         conduction: conductionSource === "set_network" ? {
           source: "set_network",
@@ -1248,9 +1337,7 @@ if (conductionSource === "set_network") {
     });
   }
 }
-for (const pair of (conductionSource === "set_network" ? [] : [
-                    [KIND_BATCH, KIND_BATCH], [KIND_BATCH, KIND_MELT], [KIND_BATCH, KIND_GLASS],
-                    [KIND_MELT, KIND_MELT], [KIND_GLASS, KIND_MELT], [KIND_GLASS, KIND_GLASS]])) {
+for (const pair of (conductionSource === "set_network" ? [] : CONDUCTION_PAIRS)) {
   const kind = pair.slice().sort().join("|");
   MODELS.push({
     name: "conduction_" + pair[0] + "_" + pair[1], scale: OPERATOR_SCALE,
@@ -1287,8 +1374,8 @@ globalThis.TRECH_CONFIG = {
   materialProbe: { enable: true, materials: [SAND, SODA, LIME, GLASS, CRUCIBLE] },
   models: MODELS,
   system: { enable: true, mode: "transient", frame: "observer", ensemble: "glass_furnace" },
-  // The harvest sideband adds up to three conduction-set emits per tick.
-  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: emitTrainingRows ? 12 : 8,
+  // The harvest sideband adds up to three conduction-set and six pair-state emits per tick.
+  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: emitTrainingRows ? 18 : 8,
            // The final learner state carries its reservoir rows (tens of MB).
            maxEmitPayloadBytes: learnDomains === "off" ? 524288 : 268435456 },
   viz: TRECH_VIEWS["glass_from_sand"]["viz1"](),

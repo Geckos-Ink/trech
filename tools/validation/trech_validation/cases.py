@@ -5481,12 +5481,16 @@ class GlassDomainRoutingMatchesDeclared(ValidationCase):
     exact_observables = False
     description = (
         "glass_from_sand with grouping=domain names no material for its per-cell thermal "
-        "(ctx.evolve) and chemistry (ctx.react) operators. The engine routes every cell band by "
+        "(ctx.evolve) and chemistry (ctx.react) operators and its pair conduction (ctx.interact). "
+        "The engine routes every cell band by "
         "band to the operator whose measured training domain covers it: the model's own input "
         "hull plus a routing_domain (melt fraction and converted-silica fraction) measured by "
         "trech-measure-routing-domain from the scenario's teacher harvest. Paired against the "
         "declared-grouping run (same seed, furnace, cells, sub-steps, horizon), the routed "
         "operators must agree with the scenario's classifier applied to the state each call saw, "
+        "every face-neighbour pair must be routed to the conduction law its two cells' materials "
+        "name (agreement >= 0.999, none left untouched; routing_domain over the members' lo_/hi_ "
+        "melt and converted-silica fractions), "
         "the formed glass must stay unclaimed by any chemistry law (outside every chemistry "
         "domain), the created-product observables must stay inside the scenario's operator "
         "tolerances and every scenario check must pass. Honest reading: the routing domains are "
@@ -5530,6 +5534,12 @@ class GlassDomainRoutingMatchesDeclared(ValidationCase):
         checks["identical_conditions"] = bool(d_key) and d_key == r_key
         agreement = routing.get("agreement")
         checks["routing_agrees_with_classifier"] = agreement is not None and float(agreement) >= 0.999
+        # Pair conduction routes by the lo_/hi_ member facts: graded the same way, and no pair
+        # may be left without a law (a pair left untouched would stop conducting).
+        pair = routing.get("pair_routing") or {}
+        checks["pair_routing_agrees_with_classifier"] = (pair.get("agreement") is not None
+                                                          and float(pair["agreement"]) >= 0.999
+                                                          and int(pair.get("left_untouched") or 0) == 0)
         paths = set((routing.get("groups") or {}).values())
         checks["every_operator_routed"] = all(
             any(name in path for path in paths)
@@ -5550,9 +5560,11 @@ class GlassDomainRoutingMatchesDeclared(ValidationCase):
             measured={"checks": dict(sorted(checks.items())), "gaps": gaps,
                       "agreement": agreement, "groups": routing.get("groups"),
                       "nearest_in_gap": routing.get("nearest_in_gap"),
-                      "disagreements": routing.get("disagreements")},
+                      "disagreements": routing.get("disagreements"),
+                      "pair_routing": pair},
             expected={"tolerances": {k: 0.0 for k in tolerances} if self.exact_observables else tolerances,
                       "agreement": ">= 0.999",
+                      "pair_agreement": ">= 0.999, no pair left untouched",
                       "unclaimed": "glass cells outside every chemistry domain stay untouched"},
             notes=["Routing domains are measured from rows the scenario labelled with its own "
                    "classifier; this guards the unnamed-routing mechanism, not glass metrology."])

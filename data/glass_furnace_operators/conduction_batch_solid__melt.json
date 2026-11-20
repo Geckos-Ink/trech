@@ -32,5 +32,46 @@
       ],
       "activation": "none"
     }
-  ]
+  ],
+  "routing_domain": {
+    "features": [
+      "lo_melt_fraction",
+      "hi_melt_fraction",
+      "lo_glass_silica_fraction",
+      "hi_glass_silica_fraction"
+    ],
+    "min": [
+      0.0,
+      0.5002531322162883,
+      0.0,
+      0.0
+    ],
+    "max": [
+      0.4999897751636534,
+      1.0,
+      0.0,
+      0.8
+    ],
+    "scale": [
+      0.06429736511286131,
+      0.07642818724646937,
+      1e-09,
+      0.07017759375482673
+    ],
+    "n_rows": 51098,
+    "source": {
+      "runs": [
+        "build/glass_routing/pair_train_1500",
+        "build/glass_routing/pair_train_1600",
+        "build/glass_routing/pair_train_1700",
+        "build/glass_routing/pair_train_1750",
+        "build/glass_routing/pair_train_1880",
+        "build/glass_routing/pair_train_high_1600",
+        "build/glass_routing/pair_train_high_1880"
+      ],
+      "source": "hook_emits",
+      "tag": "pair_state_sample_batch_solid__melt",
+      "expand": "samples"
+    }
+  }
 }

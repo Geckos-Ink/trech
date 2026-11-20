@@ -585,6 +585,67 @@ int main() {
            "routing reports one rival set, three unnamed pair groups and the canonical pairs");
   }
 
+  // Ordered member facts of the UNORDERED pair: lo_/hi_ are the smaller and larger of the
+  // two members' values whichever member the canonical order calls `a`. A routing_domain over
+  // them separates a mixed pair (one member of each material, in either order) from
+  // same-material pairs, which a box over a_/b_ facts cannot.
+  {
+    auto hi = makeLinear("pair_bound_hi.json", {"hi_x"}, {"d_heat_dt"}, {{1.0}}, {0.0});
+    trech::ml::PairInteraction op;
+    op.addStage("hi_law", DimensionScale::kMeso, hi.get());
+    trech::ml::PairInteractionRequest req;
+    req.elementCount = 4;
+    req.fields.push_back({"heat", PairSymmetry::kAntisymmetric});
+    req.auxNames = {"x"};
+    req.state.assign(4, 0.0);
+    req.aux = {3.0, 1.0, 1.0, 3.0};
+    req.links = {{0, 1}, {2, 3}};
+    req.dt = 1.0;
+    const auto r = op.interact(req);
+    expect(approx(r.state[0], 3.0) && approx(r.state[2], 3.0) && approx(r.state[1], -3.0) && approx(r.state[3], -3.0),
+           "hi_ is the larger member value in either member order");
+    expect(PairInteraction::boundInputName(false, "x") == "lo_x" && PairInteraction::boundInputName(true, "x") == "hi_x",
+           "bound input names are lo_/hi_");
+
+    static const trech::test::TemporaryDirectory directory;
+    auto routed = [&](const std::string& file, double rate, double loMin, double loMax, double hiMin, double hiMax) {
+      const std::string path = (directory.path() / file).string();
+      {
+        std::ofstream f(path);
+        f << "{\"model\":\"generic_surrogate_v1\",\"input_features\":[\"a_heat\"],\"output_features\":[\"d_heat_dt\"],"
+          << "\"input_mean\":[0],\"input_std\":[1],\"input_domain\":{\"standardized_radius\":[10]},"
+          << "\"routing_domain\":{\"features\":[\"lo_phase\",\"hi_phase\"],\"min\":[" << loMin << "," << hiMin
+          << "],\"max\":[" << loMax << "," << hiMax << "],\"scale\":[0.1,0.1]},"
+          << "\"layers\":[{\"weights\":[[0.0]],\"bias\":[" << rate << "],\"activation\":\"none\"}]}";
+      }
+      auto m = std::make_unique<trech::ml::GenericSurrogate>();
+      m->load(path);
+      std::remove(path.c_str());
+      return m;
+    };
+    auto solid = routed("pair_bound_solid.json", 1.0, 0.0, 0.2, 0.0, 0.2);   // solid|solid
+    auto mixed = routed("pair_bound_mixed.json", 2.0, 0.0, 0.2, 0.8, 1.0);   // solid|melt, either order
+    auto melt = routed("pair_bound_melt.json", 4.0, 0.8, 1.0, 0.8, 1.0);     // melt|melt
+    trech::ml::PairInteraction rop;
+    rop.addStage("solid_solid", DimensionScale::kMeso, solid.get());
+    rop.addStage("solid_melt", DimensionScale::kMeso, mixed.get());
+    rop.addStage("melt_melt", DimensionScale::kMeso, melt.get());
+    trech::ml::PairInteractionRequest rr;
+    rr.elementCount = 8;
+    rr.fields.push_back({"heat", PairSymmetry::kAntisymmetric});
+    rr.auxNames = {"phase"};
+    rr.state.assign(8, 0.0);
+    //            solid|solid   solid|melt    melt|solid    melt|melt
+    rr.aux = {0.1, 0.0, 0.1, 0.9, 1.0, 0.0, 0.9, 1.0};
+    rr.links = {{0, 1}, {2, 3}, {4, 5}, {6, 7}};
+    rr.dt = 1.0;
+    rr.routeByDomain = true;
+    const auto rres = rop.interact(rr);
+    expect(approx(rres.state[0], 1.0) && approx(rres.state[2], 2.0) && approx(rres.state[4], 2.0) &&
+               approx(rres.state[6], 4.0) && rres.routing.groups.size() == 3,
+           "lo_/hi_ routing features select the pair law in either member order");
+  }
+
   // Rival arbitration over pairs: two laws cover the SAME pairs for the same
   // element rate and pair-state rate. Evidence (the pair's total contribution)
   // decides alternatives vs cooperation.

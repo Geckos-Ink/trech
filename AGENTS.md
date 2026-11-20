@@ -154,9 +154,9 @@ It must then label that purpose in code and records (`reference`, `validation`, 
   instruction; a rendering indication never changes physics, RNG or emitted physical fields. Where a scenario still forces such a choice, that is debt in
   the owning roadmap, never a pattern to copy. Today:
   - **Grouping:** domain routing lets grouping emerge. The furnace defaults to
-    `grouping: "domain"`, and declared grouping is its validation reference. Single-population
-    scenarios select operators by role, with no kind label. Furnace conduction still passes
-    cell materials; this is queued in the
+    `grouping: "domain"` (thermal, chemistry and pair conduction), and declared grouping is its
+    validation reference. Single-population scenarios select operators by role, with no kind
+    label. The furnace's opt-in set conduction still passes cell materials; this is queued in the
     [inference roadmap](AGENTS/engine/inference/ROADMAP.md#priority-queue).
   - **Fields:** no scenario declares a continuum field. The lamp's and the furnace's
     declarations live in their `.validation.js` companions (moved 2026-11-20), which grade the

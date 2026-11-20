@@ -19,7 +19,8 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 dated record below, and queue its residuals in the same change.
 
 - **P1** · R3 · Emergent grouping by default (root principle *A scenario forces nothing*). Done 2026-11-20: the furnace defaults to `grouping: "domain"`; foam, electrolysis and efflux no longer force `element_kind` in their operator calls. Remaining:
-  - Furnace conduction (the `cell_conduction_set` `ctx.evolve` and the `cell_conduction` `ctx.interact`) still passes cell materials in both modes. Its pair-kind and set models carry no `routing_domain`. Measure routing domains for them with `trech-measure-routing-domain` from the conduction harvest, then route pairs by domain (`ctx.interact` now routes) and grade against declared kinds.
+  - Furnace pair conduction routes by domain since 2026-11-20 (see the dated record). The opt-in set-network conduction (`cell_conduction_set`, `ctx.evolve`) still passes cell materials: measure routing domains for its three set models the same way, from the members' facts, and grade against declared kinds.
+  - At high precision, routed pair conduction disagrees with the declared pair materials on 33 of 11.4 M pair evaluations. Most are `glass|melt` routed as `batch|glass`, where the classifier's glass rule and the melt threshold meet. The run then ends with 170 glass units against 171 and a mean temperature 2.2 K lower than with declared conduction. Narrow that boundary (more high-precision harvest, or a joint membership model).
   - Under domain grouping, `learn_domains=deploy` at 1820 K fails `per_material_operator_selection`: the learner drives the thermal update, so no routed thermal group forms. Its shadowed thermal operators also degrade (melt shadow RMSE 0.30 vs 0.011 declared; temperature gaps are identical, 15.06 K mean). The suite pins that run to declared. Decide how the check reads deploy mode, and why learner-driven states fall outside the thermal routing domains.
   - Audit scenario `system`/ensemble declarations and process-library kind labels the same way.
 
@@ -54,6 +55,33 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
+
+## Furnace pair conduction routed by domain (2026-11-20)
+
+- [x] Engine: `PairInteraction` exposes `lo_<name>`/`hi_<name>`, the smaller and larger of the two
+  members' values of every element field and aux fact. An unordered pair then has facts that do
+  not depend on member order. `trech_pair_interaction` shows the values are order-independent,
+  and that a `routing_domain` over them selects the right law in either member order.
+- [x] `glass_from_sand`, domain mode: the conduction `ctx.interact` passes the cells'
+  `melt_fraction` and `glass_silica_fraction` as aux and no kinds. Declared mode is unchanged
+  (byte-identical emits; only the model content IDs differ). Training-row runs emit
+  `pair_state_sample_<pair>` rows. The summary's `domain_routing.pair_routing` grades routed
+  pairs against the classifier's pair materials.
+- [x] Routing domains of the six pair laws, measured with `trech-measure-routing-domain` over
+  `lo_`/`hi_` melt and converted-silica fractions. The rows come from seven declared
+  training-row runs: `build/glass_routing/pair_train_{1500,1600,1700,1750,1880}` and
+  `pair_train_high_{1600,1880}`. That is 4,225–1,172,060 rows per law. The domains are disjoint,
+  with thin gaps where the nearest law runs.
+- [x] Results:
+  - **Default and 1820 K:** 324,000 pair evaluations each with zero disagreements and none
+    untouched. The default's observables equal the declared run's.
+  - **Held-out high-precision run at 1750 K:** 33 disagreements in 11.4 M evaluations (queued
+    above).
+  - **Cases:** all eight furnace cases pass. `glass_domain_routing_matches_declared` (also at
+    1820 K) gains `pair_routing_agrees_with_classifier`. The suite also pins the learn run to
+    declared, because its case compares states exactly.
+- [x] Probe that was not kept: domains measured from balanced-precision runs only left 943k
+  high-precision glass pairs untouched (agreement 0.917), so high-precision rows were added.
 
 ## Emergent grouping default (2026-11-20)
 

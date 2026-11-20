@@ -430,7 +430,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     echo "  - glass_from_sand online response-domain learning (unlabelled, diagnostic)"
     rm -rf "${RUNS_DIR}/out_glass_from_sand_learn_domains"
     trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
-      --param learn_domains='"learn"' \
+      --param learn_domains='"learn"' --param grouping='"declared"' \
       --output "${RUNS_DIR}/out_glass_from_sand_learn_domains" >/dev/null 2>&1
     echo "  - glass_from_sand at 1820 K driven by the frozen learned-domain thermal law"
     rm -rf "${RUNS_DIR}/out_glass_from_sand_hot_learned_deploy"
