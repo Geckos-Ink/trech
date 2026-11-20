@@ -64,10 +64,10 @@ TRECH_PARAMETERS({
                "Repository-relative unless absolute."
 }; },
 "engine_field_evolution": function() { return {
-  type: "boolean", label: "Declare carrier field to the engine", group: "Inference", default: true,
-  description: "The carrier temperature column is declared to ctx.evolveField; the engine runs the " +
-               "prediction methods it owns and selects the best per context from their prequential " +
-               "error against the lamp's column (a validation reference). Never feeds back."
+  type: "boolean", label: "Validate engine field methods", group: "Inference", default: true,
+  description: "Validation only: the validation companion declares the carrier column to " +
+               "ctx.evolveField, and the engine's methods are graded against the lamp's authored " +
+               "column (the reference). The scenario declares no field. Never feeds back."
 }; },
 "ambient_temperature_k": function() { return Object.assign({}, {
   label: "Ambient temperature", group: "Conditions", unit: "K",

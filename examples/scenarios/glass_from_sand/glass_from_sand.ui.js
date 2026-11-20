@@ -82,10 +82,10 @@ TRECH_PARAMETERS({
                "Repository-relative unless absolute."
 }; },
 "engine_field_evolution": function() { return {
-  type: "boolean", label: "Declare charge temperature to the engine", group: "Inference", default: true,
-  description: "The charge temperature field is declared to ctx.evolveField; the engine runs the " +
-               "prediction methods it owns and selects the best per context from their prequential " +
-               "error against the run's own temperatures (a validation reference). Never feeds back."
+  type: "boolean", label: "Validate engine field methods", group: "Inference", default: true,
+  description: "Validation only: the validation companion declares the charge temperature to " +
+               "ctx.evolveField, and the engine's methods are graded against the run's own " +
+               "temperatures (the reference). The scenario declares no field. Never feeds back."
 }; },
 "hold_seconds": function() { return Object.assign({}, {
   label: "Furnace hold", group: "Time", unit: "s",

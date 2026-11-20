@@ -33,11 +33,15 @@ statistics favour it.
    or a learned model, is one `registerFieldMethod` call. Arbitration, accounting and reports
    pick it up with no change to `FieldEvolution`, the hook or any scenario. Methods name no
    material, scenario or domain. No scenario or `js/` module may contain or construct a method.
-2. **Scenarios declare, the engine selects.** A scenario reaches the methods only through
-   `ctx.evolveField`. It declares:
-   - the region, its own cells and values;
+2. **Fields emerge; only validation declares them today.** A scenario never declares a
+   continuum field (root principle *Fields emerge; scenarios never declare them*). The field
+   should emerge from the declared materials, composition and structure; that engine
+   capability is the P1 in the [roadmap](ROADMAP.md#priority-queue). Until it exists, only a
+   `<name>.validation.js` companion calls `ctx.evolveField`, to grade the engine's methods
+   against a reference. It declares:
+   - the region, the cells and values;
    - the transport properties and their source;
-   - the exchanges and an optional reference.
+   - the exchanges and the reference.
 
    Options carry method numerics (cell size, Mach target, twin ratio), never a method choice. A
    method that cannot represent the declared system is excluded, with its reason recorded.
@@ -107,12 +111,12 @@ statistics favour it.
 | Field evolution | [`FieldEvolution.hpp`](../../../include/trech/ml/FieldEvolution.hpp) · [`.cpp`](../../../src/ml/FieldEvolution.cpp) | Builds the system and every registered method, computes the context, runs the arbiter, reports. |
 | Hook | `jsHookEvolveField` in [`JsRuntime.cpp`](../../../src/js/JsRuntime.cpp) | `ctx.evolveField`, predictive only, persistent by name. Contract in [scenario hooks](../../../docs/engine/scenario_hooks.md#engine-field-evolution); emits in [output schema](../../../docs/engine/output_schema.md#engine-field-evolution-emits). |
 | Tests | [`test_lattice_continuum.cpp`](../../../tests/test_lattice_continuum.cpp) · [`test_field_evolution.cpp`](../../../tests/test_field_evolution.cpp) | Pure C++; about 3 s and 30 s in Release. |
-| Declarations | `declareCarrierField` in [`lava_lamp.js`](../../../examples/scenarios/lava_lamp/lava_lamp.js) · `declareChargeField` in [`glass_from_sand.js`](../../../examples/scenarios/glass_from_sand/glass_from_sand.js) | Declare only. The authored column and the furnace's operator temperatures are validation references. |
+| Validation declarations | `observeFrame` in [`lava_lamp.validation.js`](../../../examples/scenarios/lava_lamp/lava_lamp.validation.js) · `observeFrame` in [`glass_from_sand.validation.js`](../../../examples/scenarios/glass_from_sand/glass_from_sand.validation.js) | Validation only; the physics scripts declare no field and only hand over observed state. The authored column and the furnace's operator temperatures are the references. |
 
 ## Recorded arbitration on the lava lamp (default 600 s, 2026-11-19)
 
 Recorded under a pinned budget: `TRECH_COMPUTE_BUDGET` with 300 GFLOPS, 8 hardware and 6 torch
-threads, 16 GiB, memory fraction 0.05 and 0.05 s per call. The lamp declares its 24-cell carrier
+threads, 16 GiB, memory fraction 0.05 and 0.05 s per call. The lamp's validation companion declares its 24-cell carrier
 column (cylinder R = 30 mm, H = 180 mm). Properties come from the cascade:
 
 - ν = 258 mm²/s, from the effective dynamic viscosity and the Geant4 density;
@@ -156,7 +160,7 @@ Reading:
 
 ## Recorded arbitration on the glass furnace (default 150 ticks, 2026-11-19)
 
-Same pinned budget; two runs gave byte-identical emits. The furnace declares its 6³ = 216-cell
+Same pinned budget; two runs gave byte-identical emits. The furnace's validation companion declares its 6³ = 216-cell
 charge (box 120 mm, 20 mm pitch) with:
 
 - κ = c·pitch² = 7.4 mm²/s, from the cascade conduction coefficient c = 0.0185 s⁻¹;
@@ -244,6 +248,10 @@ Reading:
 - **Wiring a method in a scenario.** The first lattice companion (commit `916a60d`) imported the
   JavaScript lattice into `lava_lamp.js` and decided there where it ran. Move the method into the
   engine and declare the system instead.
+- **Declaring a field in a scenario.** The lamp and the furnace declared their fields in the
+  physics script until 2026-11-20. A field is a way of predicting the system, not part of what
+  the system is: keep any validation declaration in the `.validation.js` companion, and let
+  the scenario hand over only its observed state.
 - **Comparing free-running methods with one-step methods.** Persistence of the last reference
   then wins everywhere. Synchronise every method to the same observed state.
 - **Lambda = 1/4 for a weakly diffusive scalar.** It makes τ⁺ ≈ 0.25/(τ⁻ − ½) huge, and the

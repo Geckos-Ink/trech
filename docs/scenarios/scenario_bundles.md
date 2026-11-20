@@ -6,7 +6,7 @@ Every shipped scenario has its own folder under `examples/scenarios/<name>/`:
 | --- | --- |
 | `<name>.js` | Materials, geometry, physical inputs, interactions, inference, state evolution and engine hooks |
 | `<name>.view.js` | Recorded-state presentation, visualization tags, colors, legends, HUD, display clocks and render surfaces |
-| `<name>.validation.js` | Expected behavior, comparison references, numerical acceptance predicates and output checks |
+| `<name>.validation.js` | Expected behavior, comparison references, numerical acceptance predicates, output checks and validation-only engine declarations (continuum fields) |
 | `<name>.ui.js` | Typed parameter definitions, documentation, bounds, units, choices and optional Studio panel/process descriptions |
 
 Reusable TRECH JavaScript modules live in `js/`; committed data modules/models stay in `data/`.
@@ -70,7 +70,11 @@ editor through the engine's source inventory. Run remains bound to the physics r
 
 Validation companions register JSON metadata in `TRECH_VALIDATIONS["example"]` and numerical
 predicates/reference factories in `TRECH_CHECKS["example"]`. Predicates retain the original
-summary fields and tolerances. They grade observed state; they do not advance it. Optics comparison
+summary fields and tolerances. They grade observed state; they do not advance it. A scenario never
+declares a continuum field (fields must emerge from the engine). A companion may: its
+`TRECH_CHECKS[name].observeFrame(ctx, observed)`, called by the physics script at each output
+frame with its observed state, may call `ctx.evolveField` with a reference to grade the engine's
+methods. The result is emitted and never fed back (see `lava_lamp` and `glass_from_sand`). Optics comparison
 references still enter their existing config fields, preserving their provenance/hash contract.
 `authoring.validation` exposes the JSON declarations outside physics config.
 

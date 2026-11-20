@@ -1005,11 +1005,12 @@ learned update and the declared operator applied to a copy, untouched and extrap
 
 ## Engine field-evolution emits
 
-Scenarios that declare a field to [`ctx.evolveField`](scenario_hooks.md#engine-field-evolution)
-emit one `field_evolution` record per call:
+Validation companions that declare a field to [`ctx.evolveField`](scenario_hooks.md#engine-field-evolution)
+emit one `field_evolution` record per call (scenarios themselves never declare fields):
 
-- the lava lamp declares its carrier column, once per output frame from frame 0;
-- `glass_from_sand` declares its charge temperature, once per tick from tick 0.
+- `lava_lamp.validation.js` declares the lamp's carrier column, once per output frame from frame 0;
+- `glass_from_sand.validation.js` declares the furnace's charge temperature, once per tick from
+  tick 0.
 
 Each scenario has an `engine_field_evolution` parameter (default `true`); `false` emits none. The
 normal-path emits are byte-identical either way. The payload is the engine result (`time_s`,

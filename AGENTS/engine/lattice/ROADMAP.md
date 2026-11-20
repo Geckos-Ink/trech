@@ -14,7 +14,9 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
+- **P1** · R3 · Emergent continuum fields. Today a field exists only when a validation companion declares it to `ctx.evolveField`: region, cells, transport properties and exchanges. Scenarios may no longer declare fields (2026-11-20). The engine must derive the field from what a scenario declares: its materials, composition and structure (geometry volumes, contacts, conditions). That means inferring the region and its cells, the transport properties (from the cascade over the Geant4 base) and the exchanges at boundaries and contacts. It then evolves the field through the registered methods. The lamp and furnace validation declarations become graded checks of that emergent field. ([detail](AGENTS.md#points-to-keep-stable))
 - **P1** · R3 · Make the arbitration beat the best full-coverage single method in every phase, not only overall. The lamp now wins overall (0.100 vs 0.127 K) and in its first and last windows, but only ties conduction in the middle window (0.099 vs 0.100 K, oracle 0.020 K). The furnace's heating window only ties persistence (48.8 vs 49.0 K, oracle 24.0 K). Candidates: per-domain policies instead of one global policy; the learned operator's abstention (it covers 49 % of furnace cells while heating); and the blind first informative call, where only the median prior is possible. ([detail](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-19))
+- **P2** · R5 · Rerun the lamp and the furnace with `engine_field_evolution=false` after the 2026-11-20 move of their field declarations into the validation companions, and confirm the normal-path emits are byte-identical with the default run (only `trech inspect` was checked). ([detail](#2026-11-20--field-declarations-moved-out-of-the-scenarios))
 - **P2** · R4 · Held-out grading on the scenarios. Export and frozen restore now exist (`export_state`, `options.warm_start`, 2026-11-20). Run the lamp (heater 318 K) and the furnace (1820 K) from a state exported on their default conditions as the gate-2 evidence. ([detail](#promotion-gates))
 - **P2** · R4 · The `learned_operator` forgets (default `DomainLearner` forgetting), so an exported state covers only the late phase it saw last. Deployed frozen on its own regime, it predicted 14% of cells in the opening window, against 51% while it was learning; it abstained on the rest. Its law is time-invariant by design (`tendencyPredictor` off), so give it a stationary reservoir. That changes the pinned lamp and furnace records, which must be re-pinned in the same change. ([detail](AGENTS.md#cross-run-state-2026-11-20))
 - **P3** · R7 · `trech_field_evolution` now takes about 85 s (43 s before cross-run case 5, which adds five 61-frame runs). Shorten the case-5 runs or split them into their own CTest entry if the suite needs to stay fast. ([detail](AGENTS.md#cross-run-state-2026-11-20))
@@ -52,6 +54,25 @@ checkout:
 5. **Property provenance:** every declared property comes from a recorded cascade output or a
    Geant4 fact, with held-out error metadata.
 6. **Owner decision:** the gated item above, recorded here with the scores that justified it.
+
+## 2026-11-20 · Field declarations moved out of the scenarios
+
+- [x] Principle: scenarios never declare continuum fields; fields must emerge from the engine
+  (root `AGENTS.md`). Only a `.validation.js` companion may declare one, to grade the engine's
+  methods.
+- [x] `lava_lamp` and `glass_from_sand` now call their companion's `observeFrame` with their
+  observed state. The region, cells, properties, exchanges, the reference and the
+  `ctx.evolveField` call live in `lava_lamp.validation.js` and
+  `glass_from_sand.validation.js`. The companion owns the `engine_field_evolution` parameter, and
+  the lamp reserves the companion's emit through `observeFrameEmits`.
+- [x] Proof of a pure relocation, run with the pinned budget before and after: both scenarios'
+  `trech_hook_emits.jsonl` (including every `field_evolution` record) and `trech_scores.jsonl`
+  are byte-identical, with the same config hash. Lamp: 244 emits, `660511b1c96e29f3`. Furnace:
+  303 emits, `09d20fe422851825`.
+- [ ] Not rerun: the `engine_field_evolution=false` path (inspect passes; the companion returns
+  before declaring).
+- Residual (queued above, P1): emergent fields. The validation declarations still hand-write
+  the region, cells and properties that the engine should derive.
 
 ## 2026-11-20 · Cross-run field state and the unseen-context prior
 

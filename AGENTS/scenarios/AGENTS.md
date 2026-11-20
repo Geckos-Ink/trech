@@ -30,6 +30,13 @@ Read the root principles and the parent handbook first; then open only the subca
   lamp's first lattice Boltzmann companion broke this rule and was moved into the engine as
   `ctx.evolveField`. Before adding any `TRECH_INCLUDE` of a physics or solver module, ask which
   engine operator should own it.
+- **Never declare a continuum field in a scenario.** A field (region, cells, transport
+  properties, exchanges, loads) must emerge from the engine, from the declared materials,
+  composition and structure (root principle *Fields emerge; scenarios never declare them*).
+  `ctx.evolveField` may be called only from a `<name>.validation.js` companion, to grade the
+  engine's methods against a reference. The physics script calls the companion's generic
+  per-frame observer (`TRECH_CHECKS[name].observeFrame`) with its observed state, and nothing
+  returned feeds back. `lava_lamp` and `glass_from_sand` follow this pattern.
 
 Each family's micro-base → observer-target and honest scope is in [`README.md`](../../README.md)
 and the per-scenario notes. The linked category handbooks carry family status and reusable lessons;

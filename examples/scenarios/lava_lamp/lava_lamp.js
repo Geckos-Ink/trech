@@ -102,9 +102,10 @@ const detectDomains = TRECH_PARAMETER("detect_domains");
 const domainMethod = TRECH_PARAMETER("domain_method");
 // Online response-domain learning of the frame-scale parcel response.
 const learnDomains = TRECH_PARAMETER("learn_domains");
-// Declare the carrier temperature field to the engine (ctx.evolveField); the engine owns and
-// chooses the prediction methods. Off only for timing and identity checks.
-const engineFieldEvolution = TRECH_PARAMETER("engine_field_evolution");
+// The validation companion may grade the engine's field methods against the authored carrier
+// column (lava_lamp.validation.js, observeFrame). It owns that declaration and its parameter;
+// this script declares no field and only reserves the emits the companion asks for.
+const validationFrameEmits = TRECH_CHECKS["lava_lamp"].observeFrameEmits();
 const domainLearnerModel = TRECH_PARAMETER("domain_learner_model");
 const LEARNER_STATE = domainLearnerModel
   ? TRECH_READ_JSON(domainLearnerModel.startsWith("/") ? domainLearnerModel : "../../../" + domainLearnerModel)
@@ -360,10 +361,10 @@ function applyThermalAndPhaseState(state, dt) {
   for (let c = 0; c < APPARATUS.carrierThermalCells; c += 1) {
     state.carrierTemperatureK[c] += state.carrierHeatDeltaK[c];
   }
-  // Read-only tap: the wax heat load each carrier cell received, declared to the engine.
-  if (state.carrierFieldLoadK) {
+  // Observation: the wax heat each carrier cell received during the current output frame.
+  if (state.carrierWaxHeatFrameK) {
     for (let c = 0; c < APPARATUS.carrierThermalCells; c += 1) {
-      state.carrierFieldLoadK[c] += state.carrierHeatDeltaK[c];
+      state.carrierWaxHeatFrameK[c] += state.carrierHeatDeltaK[c];
     }
   }
 }
@@ -592,46 +593,13 @@ function advanceTo(state, targetTimeS) {
   state.physicsTimeS = targetTimeS;
 }
 
-// --- Carrier field declared to the engine ------------------------------------------------
-// The lamp does not choose how its carrier evolves beyond its own (authored) column. It declares
-// the carrier as a continuum field: the cylinder, its 24 column cells and values, the
-// cascade-inferred transport properties, the heater/top exchanges and the wax heat load. The
-// ENGINE advances every prediction method it owns and selects, per context domain, the one
-// whose prequential error against the reference is lowest (trech/ml/FieldEvolution.hpp). The
-// authored column is passed only as that reference (a validation teacher); nothing returned
-// feeds back into the lamp. Contract: AGENTS/engine/lattice/AGENTS.md.
-function declareCarrierField(ctx, state, timeS, frameIndex, final) {
-  if (!engineFieldEvolution) return;
-  const cells = APPARATUS.carrierThermalCells, slab = APPARATUS.liquidHeightMm / cells;
-  const R = APPARATUS.innerRadiusMm, interval = timeS - (state.carrierFieldTimeS || 0.0);
-  const rate = new Array(cells).fill(0.0), target = new Array(cells).fill(APPARATUS.ambientTemperatureK);
-  rate[0] = state.params.heaterCouplingPerS; target[0] = APPARATUS.heaterTemperatureK;
-  rate[cells - 1] = state.params.topCoolingPerS;
-  const load = Array.from(state.carrierFieldLoadK, k => (interval > 0.0 ? k / interval : 0.0));
-  const spec = {name: "lamp_carrier", time_s: timeS, reference: Array.from(state.carrierTemperatureK),
-    exchanges: {rate_per_s: rate, target, load_per_s: load}, report: final ? "summary" : "step"};
-  if (frameIndex === 0) {
-    Object.assign(spec, {
-      region: {shape: "cylinder", radius_mm: R, length_mm: APPARATUS.liquidHeightMm},
-      cells: {min_mm: Array.from({length: cells}, (_, c) => [-R, -R, c * slab]),
-        max_mm: Array.from({length: cells}, (_, c) => [R, R, (c + 1) * slab])},
-      values: Array.from(state.carrierTemperatureK),
-      properties: {
-        kinematic_viscosity_m2_s: state.params.effectiveDynamicViscosityPaS /
-          (1000.0 * state.carrierReferenceDensityGcm3),
-        diffusivity_m2_s: 1e-6 * state.params.carrierThermalDiffusivityMm2S,
-        expansion_per_unit: state.params.carrierThermalExpansionPerK,
-        body_acceleration_m_s2: [0.0, 0.0, -9.81]}});
-  }
-  const record = ctx.evolveField(spec);
-  state.carrierFieldLoadK.fill(0.0);
-  state.carrierFieldTimeS = timeS;
-  if (record) {
-    ctx.emit("field_evolution", Object.assign({scenario: "lava_lamp", frame: frameIndex,
-      reference_role: "validation teacher: the lamp's authored carrier column", feeds_back: false,
-      property_sources: "viscosity = cascade effective dynamic viscosity / Geant4 carrier density; " +
-        "diffusivity and expansion = cascade carrier outputs"}, record));
-  }
+// --- Validation observer ---------------------------------------------------------------
+// At each output frame the lamp hands its observed state to its validation companion, which
+// may grade engine methods against it (lava_lamp.validation.js). Nothing returned feeds back.
+// The frame's wax-heat observation is then cleared.
+function observeValidationFrame(ctx, state, timeS, frameIndex, final) {
+  TRECH_CHECKS["lava_lamp"].observeFrame(ctx, {state, apparatus: APPARATUS, timeS, frameIndex, final});
+  state.carrierWaxHeatFrameK.fill(0.0);
 }
 
 function componentLabels(state, linkMm) {
@@ -932,7 +900,7 @@ function initState(ctx) {
 globalThis.TRECH_HOOKS = {
   onRunStart(ctx) {
     const state = initState(ctx);
-    state.carrierFieldLoadK = new Float64Array(APPARATUS.carrierThermalCells);
+    state.carrierWaxHeatFrameK = new Float64Array(APPARATUS.carrierThermalCells);
     ctx.emit("lava_lamp_scenario", {
       name: "lava_lamp",
       apparatus: APPARATUS,
@@ -961,7 +929,7 @@ globalThis.TRECH_HOOKS = {
       representation_override: REPRESENTATION
     });
     emitFrame(ctx, state, 0);
-    declareCarrierField(ctx, state, 0.0, 0, false);
+    observeValidationFrame(ctx, state, 0.0, 0, false);
   },
   onEventEnd(ctx) {
     const state = ctx.state && ctx.state.lavaLamp;
@@ -976,7 +944,7 @@ globalThis.TRECH_HOOKS = {
     advanceTo(state, target);
     if (start) learnParcelResponse(ctx, state, start, target, frameIndex);
     emitFrame(ctx, state, frameIndex);
-    declareCarrierField(ctx, state, target, frameIndex, frameIndex >= APPARATUS.outputTicks);
+    observeValidationFrame(ctx, state, target, frameIndex, frameIndex >= APPARATUS.outputTicks);
   },
   onRunEnd(ctx) {
     const state = ctx.state && ctx.state.lavaLamp;
@@ -1126,7 +1094,7 @@ globalThis.TRECH_CONFIG = {
   ],
   system: { enable: true, mode: "transient", frame: "observer", ensemble: "lava_lamp" },
   hooks: { maxStepCallbacks: 1,
-           maxEmitsPerCallback: (learnDomains === "off" ? 4 : 6) + (engineFieldEvolution ? 1 : 0),
+           maxEmitsPerCallback: (learnDomains === "off" ? 4 : 6) + validationFrameEmits,
            // The final learner state carries its reservoir rows.
            maxEmitPayloadBytes: learnDomains === "off" ? 524288 : 268435456 },
   viz: TRECH_VIEWS["lava_lamp"]["viz1"](),

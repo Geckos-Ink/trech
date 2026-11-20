@@ -67,7 +67,8 @@ physics engine**. A `predictive`-mode inferred result is never a strict Geant4 t
 > `ctx.interact` (pair/neighbour interaction), `GroupHierarchy` + `ctx.lift` (recursive
 > elements → groups → observer lifting through trained set models), and `DomainLearner` +
 > `ctx.learnDomains` (online emergence of response domains with per-domain learned laws), and
-> `FieldEvolution` + `ctx.evolveField` (engine-owned methods for a declared continuum field, the
+> `FieldEvolution` + `ctx.evolveField` (engine-owned methods for a continuum field, declared today only by
+> validation companions until fields emerge from the engine, the
 > best one chosen per context domain by prequential error). This callout is deliberately
 > redundant with those sections so
 > the thesis survives even if one place is trimmed — keep it.
@@ -130,9 +131,9 @@ particle-level data** and compare — they never calibrate the physics derivatio
 
 ### Scenarios declare systems; prediction methods emerge from the engine
 
-A scenario declares **what the system is**: geometry, materials, conditions, the state it hands
-to the engine, and references it wants graded. It never decides **how the system is
-predicted**. Every prediction method (Geant4 transport, learned surrogates and operators, the
+A scenario declares **what the system is**: the materials, their composition and structure,
+geometry, conditions, the state it hands to the engine, and references it wants graded. It
+never decides **how the system is predicted**. Every prediction method (Geant4 transport, learned surrogates and operators, the
 lattice Boltzmann continuum method, any future solver) belongs to the engine. The engine
 selects among them statistically, by context domain, from prequential evidence. If a scenario
 imports, constructs or wires a method so that the method can be used, the engine is bypassed,
@@ -141,12 +142,25 @@ or law only to **validate** it, or to **force** a specific feature or functional
 It must then label that purpose in code and records (`reference`, `validation`, `teacher`,
 `forced`), and keep it off the decision path.
 
+- **Fields emerge; scenarios never declare them.** A continuum field (a region discretized into
+  cells, with transport properties, boundary exchanges and loads: what `ctx.evolveField` takes)
+  is a way of predicting the system, so it must emerge from the engine. The engine works it out
+  from the declared materials, composition and structure, and the scenario never writes it.
+  Only a `<name>.validation.js` companion may declare a field. It does so to grade the engine's
+  methods against a reference, labels the purpose `validation`, and never feeds the result
+  back. The scenario calls a generic per-frame observer in its validation companion and passes
+  only its observed state; it names no field, cell layout or transport property. Engine-emergent
+  fields are queued in the [lattice roadmap](AGENTS/engine/lattice/ROADMAP.md#priority-queue).
 - **Wrong:** the lava lamp's first lattice Boltzmann companion
   (commits `916a60d` and earlier). It imported the LBM module and built the lattice in the
   scenario, so the scenario decided where LBM ran. This was replaced by the engine-owned
   `ctx.evolveField` (see the [lattice handbook](AGENTS/engine/lattice/AGENTS.md)).
-- **Right:** the lamp declares its carrier field and passes its authored column as the
-  validation reference. The engine runs the methods it owns and records which one wins where.
+- **Also wrong:** the lamp and furnace scenarios declaring their carrier and charge fields in
+  the physics script (until 2026-11-20). Those declarations now live in the validation
+  companions.
+- **Right:** `lava_lamp.validation.js` declares the carrier column as a validation field and
+  passes the lamp's authored column as the reference. The engine runs the methods it owns and
+  records which one wins where. The scenario only hands over its observed state.
 - **Every multi-method path selects the same way.** Where the engine owns more than one way to
   predict a quantity (lattice methods, learned operators, surrogate networks, baselines, and any
   algorithm or model added later), the domain-free `MethodArbiter` chooses per context domain

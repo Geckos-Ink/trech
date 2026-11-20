@@ -83,3 +83,50 @@ TRECH_CHECKS["glass_from_sand"] = {
           state.inference.draws > 0 && state.inference.draws <= state.inference.react
       }; }
 };
+
+// --- Validation field: the charge temperature graded against the engine's field methods ----
+// Validation only. A scenario never declares a continuum field (root AGENTS.md, "Fields emerge;
+// scenarios never declare them"). This companion declares the furnace charge to
+// ctx.evolveField so the engine's registered methods are graded against the run's own
+// per-material operator temperatures (the reference, a validation teacher). The engine selects
+// per context domain. The record is emitted and never fed back into the furnace.
+// Property source: the cascade's per-face conduction coefficient c (1/s) on the cell pitch
+// gives the diffusivity c * pitch^2; a floor or roof contact is one face at the same c.
+const GLASS_CHARGE_FIELD = {enabled: null};
+TRECH_CHECKS["glass_from_sand"].observeFrame = function(ctx, observed) {
+  // Read on first use (TRECH_PARAMETER may be read once per run; the physics script never reads it).
+  if (GLASS_CHARGE_FIELD.enabled === null) GLASS_CHARGE_FIELD.enabled = !!TRECH_PARAMETER("engine_field_evolution");
+  if (!GLASS_CHARGE_FIELD.enabled) return;
+  const {cells, final, tick, timeS, params, geometry: g, conditions} = observed;
+  const CELL_COUNT = g.cellCount, CELL_PITCH_MM = g.cellPitchMm;
+  const c = params.conduction_coefficient;
+  const rate = new Array(CELL_COUNT).fill(0.0), target = new Array(CELL_COUNT).fill(conditions.ambientTemperatureK);
+  for (let i = 0; i < CELL_COUNT; ++i) {
+    if (cells.boundary[i] === "floor") { rate[i] = c; target[i] = conditions.furnaceTemperatureK; }
+    else if (cells.boundary[i] === "roof") { rate[i] = c; target[i] = conditions.ambientTemperatureK; }
+  }
+  const spec = {name: "glass_charge", time_s: timeS, reference: Array.from(cells.temperature_k),
+    exchanges: {rate_per_s: rate, target}, report: final ? "summary" : "step"};
+  if (tick === 0) {
+    const half = 0.5 * g.crucibleWidthMm, pitchY = g.chargeHeightMm / g.side;
+    const lo = [], hi = [];
+    for (let i = 0; i < CELL_COUNT; ++i) {
+      lo.push([cells.x[i] + half - 0.5 * CELL_PITCH_MM, cells.y[i] - 0.5 * pitchY, cells.z[i] + half - 0.5 * CELL_PITCH_MM]);
+      hi.push([cells.x[i] + half + 0.5 * CELL_PITCH_MM, cells.y[i] + 0.5 * pitchY, cells.z[i] + half + 0.5 * CELL_PITCH_MM]);
+    }
+    Object.assign(spec, {
+      region: {shape: "box", size_mm: [g.crucibleWidthMm, g.chargeHeightMm, g.crucibleWidthMm]},
+      cells: {min_mm: lo, max_mm: hi},
+      values: Array.from(cells.temperature_k),
+      // A granular batch and a viscous melt: no flow property (viscosity, expansion, body
+      // force) is inferred, so none is declared.
+      properties: {diffusivity_m2_s: 1e-6 * c * CELL_PITCH_MM * CELL_PITCH_MM}});
+  }
+  const record = ctx.evolveField(spec);
+  if (record) {
+    ctx.emit("field_evolution", Object.assign({scenario: "glass_from_sand", tick,
+      reference_role: "validation teacher: the run's per-material operator temperatures", feeds_back: false,
+      property_sources: "diffusivity = cascade conduction_coefficient x cell pitch^2; floor/roof contacts " +
+        "relax at the same coefficient toward the furnace/ambient temperature"}, record));
+  }
+};

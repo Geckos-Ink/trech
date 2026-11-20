@@ -95,3 +95,51 @@ TRECH_CHECKS["lava_lamp"] = {
         state.maxRenderComponents <= 10
     }; }
 };
+
+// --- Validation field: the carrier column graded against the engine's field methods --------
+// Validation only. A scenario never declares a continuum field (root AGENTS.md, "Fields emerge;
+// scenarios never declare them"). This companion declares the lamp's carrier column to
+// ctx.evolveField so the engine's registered methods are graded against the lamp's authored
+// column (the reference, a validation teacher). The engine selects per context domain. The
+// record is emitted and never fed back into the lamp.
+const LAVA_LAMP_FIELD = {enabled: null, lastTimeS: 0.0};
+function lavaLampFieldEnabled() {
+  if (LAVA_LAMP_FIELD.enabled === null) LAVA_LAMP_FIELD.enabled = !!TRECH_PARAMETER("engine_field_evolution");
+  return LAVA_LAMP_FIELD.enabled;
+}
+// Emits per output frame the observer adds (the scenario reserves them in its hook budget).
+TRECH_CHECKS["lava_lamp"].observeFrameEmits = function() { return lavaLampFieldEnabled() ? 1 : 0; };
+TRECH_CHECKS["lava_lamp"].observeFrame = function(ctx, observed) {
+  if (!lavaLampFieldEnabled()) return;
+  const {state, apparatus: APPARATUS, timeS, frameIndex, final} = observed;
+  if (frameIndex === 0) LAVA_LAMP_FIELD.lastTimeS = 0.0;
+  const cells = APPARATUS.carrierThermalCells, slab = APPARATUS.liquidHeightMm / cells;
+  const R = APPARATUS.innerRadiusMm, interval = timeS - LAVA_LAMP_FIELD.lastTimeS;
+  const rate = new Array(cells).fill(0.0), target = new Array(cells).fill(APPARATUS.ambientTemperatureK);
+  rate[0] = state.params.heaterCouplingPerS; target[0] = APPARATUS.heaterTemperatureK;
+  rate[cells - 1] = state.params.topCoolingPerS;
+  const load = Array.from(state.carrierWaxHeatFrameK, k => (interval > 0.0 ? k / interval : 0.0));
+  const spec = {name: "lamp_carrier", time_s: timeS, reference: Array.from(state.carrierTemperatureK),
+    exchanges: {rate_per_s: rate, target, load_per_s: load}, report: final ? "summary" : "step"};
+  if (frameIndex === 0) {
+    Object.assign(spec, {
+      region: {shape: "cylinder", radius_mm: R, length_mm: APPARATUS.liquidHeightMm},
+      cells: {min_mm: Array.from({length: cells}, (_, c) => [-R, -R, c * slab]),
+        max_mm: Array.from({length: cells}, (_, c) => [R, R, (c + 1) * slab])},
+      values: Array.from(state.carrierTemperatureK),
+      properties: {
+        kinematic_viscosity_m2_s: state.params.effectiveDynamicViscosityPaS /
+          (1000.0 * state.carrierReferenceDensityGcm3),
+        diffusivity_m2_s: 1e-6 * state.params.carrierThermalDiffusivityMm2S,
+        expansion_per_unit: state.params.carrierThermalExpansionPerK,
+        body_acceleration_m_s2: [0.0, 0.0, -9.81]}});
+  }
+  const record = ctx.evolveField(spec);
+  LAVA_LAMP_FIELD.lastTimeS = timeS;
+  if (record) {
+    ctx.emit("field_evolution", Object.assign({scenario: "lava_lamp", frame: frameIndex,
+      reference_role: "validation teacher: the lamp's authored carrier column", feeds_back: false,
+      property_sources: "viscosity = cascade effective dynamic viscosity / Geant4 carrier density; " +
+        "diffusivity and expansion = cascade carrier outputs"}, record));
+  }
+};

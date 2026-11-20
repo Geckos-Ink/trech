@@ -118,9 +118,6 @@ const routeByDomain = grouping === "domain";
 // creates or destroys instead of hiding it.
 const conductionSource = TRECH_PARAMETER("conduction_source");
 const holdSeconds = TRECH_PARAMETER("hold_seconds");
-// Declare the charge temperature to the engine (ctx.evolveField); the engine owns and chooses
-// the prediction methods. Off only for timing and identity checks.
-const engineFieldEvolution = TRECH_PARAMETER("engine_field_evolution");
 
 const overrideOf = (value, balanced) => (value === balanced ? 0 : value);
 const PRECISION = helpers.precision.resolve({
@@ -928,48 +925,15 @@ function aggregate(cells) {
   };
 }
 
-// --- Charge temperature declared to the engine -------------------------------------------
-// The furnace does not choose how its charge temperature could be predicted. It declares the
-// charge as a continuum field: the crucible box, its cells and temperatures, the conduction
-// property from the cascade and the floor/roof contacts as exchanges. The ENGINE advances
-// every prediction method it owns and selects, per context domain, the one whose prequential
-// error against the reference is lowest (trech/ml/FieldEvolution.hpp). The run's own
-// temperatures (from the per-material operators) are passed only as that reference (a
-// validation teacher); nothing returned feeds back. Contract: AGENTS/engine/lattice/AGENTS.md.
-// Property source: the cascade's per-face conduction coefficient c (1/s) on the declared cell
-// pitch gives the diffusivity c * pitch^2; a boundary contact is one face at the same c.
-function declareChargeField(ctx, cells, final) {
-  if (!engineFieldEvolution) return;
-  const c = state.params.conduction_coefficient;
-  const rate = new Array(CELL_COUNT).fill(0.0), target = new Array(CELL_COUNT).fill(ambientTemperatureK);
-  for (let i = 0; i < CELL_COUNT; ++i) {
-    if (cells.boundary[i] === "floor") { rate[i] = c; target[i] = furnaceTemperatureK; }
-    else if (cells.boundary[i] === "roof") { rate[i] = c; target[i] = ambientTemperatureK; }
-  }
-  const spec = {name: "glass_charge", time_s: state.timeS, reference: Array.from(cells.temperature_k),
-    exchanges: {rate_per_s: rate, target}, report: final ? "summary" : "step"};
-  if (state.tick === 0) {
-    const half = 0.5 * CRUCIBLE_WIDTH_MM, pitchY = CHARGE_HEIGHT_MM / SIDE;
-    const lo = [], hi = [];
-    for (let i = 0; i < CELL_COUNT; ++i) {
-      lo.push([cells.x[i] + half - 0.5 * CELL_PITCH_MM, cells.y[i] - 0.5 * pitchY, cells.z[i] + half - 0.5 * CELL_PITCH_MM]);
-      hi.push([cells.x[i] + half + 0.5 * CELL_PITCH_MM, cells.y[i] + 0.5 * pitchY, cells.z[i] + half + 0.5 * CELL_PITCH_MM]);
-    }
-    Object.assign(spec, {
-      region: {shape: "box", size_mm: [CRUCIBLE_WIDTH_MM, CHARGE_HEIGHT_MM, CRUCIBLE_WIDTH_MM]},
-      cells: {min_mm: lo, max_mm: hi},
-      values: Array.from(cells.temperature_k),
-      // A granular batch and a viscous melt: no flow property (viscosity, expansion, body
-      // force) is inferred, so none is declared.
-      properties: {diffusivity_m2_s: 1e-6 * c * CELL_PITCH_MM * CELL_PITCH_MM}});
-  }
-  const record = ctx.evolveField(spec);
-  if (record) {
-    ctx.emit("field_evolution", Object.assign({scenario: "glass_from_sand", tick: state.tick,
-      reference_role: "validation teacher: the run's per-material operator temperatures", feeds_back: false,
-      property_sources: "diffusivity = cascade conduction_coefficient x cell pitch^2; floor/roof contacts " +
-        "relax at the same coefficient toward the furnace/ambient temperature"}, record));
-  }
+// --- Validation observer ---------------------------------------------------------------
+// At each tick the furnace hands its observed state to its validation companion, which may
+// grade engine methods against it (glass_from_sand.validation.js). Nothing returned feeds back.
+function observeValidationFrame(ctx, cells, final) {
+  TRECH_CHECKS["glass_from_sand"].observeFrame(ctx, {
+    cells, final, tick: state.tick, timeS: state.timeS, params: state.params,
+    geometry: {cellCount: CELL_COUNT, side: SIDE, cellPitchMm: CELL_PITCH_MM,
+      crucibleWidthMm: CRUCIBLE_WIDTH_MM, chargeHeightMm: CHARGE_HEIGHT_MM},
+    conditions: {furnaceTemperatureK, ambientTemperatureK}});
 }
 
 globalThis.TRECH_HOOKS = {
@@ -1026,7 +990,7 @@ globalThis.TRECH_HOOKS = {
     }
 
     const cells = state.cells;
-    if (state.tick === 0) declareChargeField(ctx, cells, false);
+    if (state.tick === 0) observeValidationFrame(ctx, cells, false);
     for (let s = 0; s < SUB_STEPS; ++s) {
       refreshContacts(cells);
       const kinds = cells.kind.slice();
@@ -1036,7 +1000,7 @@ globalThis.TRECH_HOOKS = {
     flushHarvest(ctx);
     state.tick += 1;
     state.timeS += TICK_INTERVAL_S;
-    declareChargeField(ctx, cells, state.tick >= TICKS);
+    observeValidationFrame(ctx, cells, state.tick >= TICKS);
 
     const summary = aggregate(cells);
     state.history.push({

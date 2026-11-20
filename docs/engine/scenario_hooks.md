@@ -47,8 +47,12 @@ Geant4 training labels. The exact 3D Euler verification fixture uses this API.
 
 ## Engine field evolution
 
-`ctx.evolveField(spec)` hands a continuum field to the engine. The scenario declares the system;
-the engine owns every prediction method and chooses among them (`trech::ml::FieldEvolution`,
+`ctx.evolveField(spec)` hands a continuum field to the engine. **Validation companions only:** a
+scenario never declares a field, because fields must emerge from the engine from the declared
+materials, composition and structure. Until that capability exists (lattice roadmap P1), a
+`<name>.validation.js` companion may declare a field to grade the engine's methods against a
+reference ([scenario bundles](../scenarios/scenario_bundles.md)). The engine owns every
+prediction method and chooses among them (`trech::ml::FieldEvolution`,
 [lattice handbook](../../AGENTS/engine/lattice/AGENTS.md)). It runs in predictive mode only (the
 choice is statistical); strict mode returns `null`. The arbiter persists across hook calls under
 `name`. The creating call must carry:

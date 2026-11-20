@@ -14,13 +14,18 @@ frame. `domain_method=density` uses a shared spatial scale. Each frame records
 mutual-majority persistent IDs and predecessor overlaps for the wax inventory. The [domain emit](../../../../docs/engine/output_schema.md#statistical-domain-discovery-emits)
 uses parcel order and carries call-local assignments.
 
-`engine_field_evolution=true` (the default) declares the carrier column to the engine through
-[`ctx.evolveField`](../../../engine/lattice/AGENTS.md). The declaration covers the cylinder, the
-24 cells, cascade-inferred viscosity, diffusivity and expansion, the heater and top exchanges,
-and the wax heat load (a read-only tap in `applyThermalAndPhaseState`). The engine chooses its
-prediction method per context domain against the authored column, which is passed only as the
-validation reference. The scenario imports no solver. Nothing feeds back; the normal-path emits
-are byte-identical with `false`.
+`engine_field_evolution=true` (the default) makes the validation companion
+(`lava_lamp.validation.js`, `observeFrame`) declare the carrier column to the engine through
+[`ctx.evolveField`](../../../engine/lattice/AGENTS.md). The physics script declares no field:
+- at each output frame it hands its observed state to the companion;
+- it keeps one neutral observation, the wax heat each carrier cell received during the frame
+  (`carrierWaxHeatFrameK`, accumulated in `applyThermalAndPhaseState`).
+
+The companion's declaration covers the cylinder, the 24 cells, the cascade-inferred viscosity,
+diffusivity and expansion, the heater and top exchanges, and that heat load. The engine chooses
+its prediction method per context domain against the authored column, which is passed only as
+the validation reference. Nothing feeds back, and the normal-path emits are byte-identical with
+`false`.
 
 `learn_domains=learn|evaluate` drives `ctx.learnDomains` on the frame-scale parcel response:
 features at the start of an output interval (height, radius, wax temperature, molten fraction,
