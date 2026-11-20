@@ -68,7 +68,7 @@ physics engine**. A `predictive`-mode inferred result is never a strict Geant4 t
 > elements → groups → observer lifting through trained set models), and `DomainLearner` +
 > `ctx.learnDomains` (online emergence of response domains with per-domain learned laws), and
 > `FieldEvolution` + `ctx.evolveField` (engine-owned methods for a continuum field, declared today only by
-> validation companions until fields emerge from the engine, the
+> validation companions, the
 > best one chosen per context domain by prequential error). This callout is deliberately
 > redundant with those sections so
 > the thesis survives even if one place is trimmed — keep it.
@@ -142,25 +142,35 @@ or law only to **validate** it, or to **force** a specific feature or functional
 It must then label that purpose in code and records (`reference`, `validation`, `teacher`,
 `forced`), and keep it off the decision path.
 
-- **Fields emerge; scenarios never declare them.** A continuum field (a region discretized into
-  cells, with transport properties, boundary exchanges and loads: what `ctx.evolveField` takes)
-  is a way of predicting the system, so it must emerge from the engine. The engine works it out
-  from the declared materials, composition and structure, and the scenario never writes it.
-  Only a `<name>.validation.js` companion may declare a field. It does so to grade the engine's
-  methods against a reference, labels the purpose `validation`, and never feeds the result
-  back. The scenario calls a generic per-frame observer in its validation companion and passes
-  only its observed state; it names no field, cell layout or transport property. Engine-emergent
-  fields are queued in the [lattice roadmap](AGENTS/engine/lattice/ROADMAP.md#priority-queue).
+- **A scenario forces nothing; the organisation of the system emerges.** A scenario states the
+  physical setup: the materials, their composition and structure (geometry), and the
+  conditions. How the engine organises that setup emerges from TRECH: which elements group into
+  kinds or domains, which systems they form and, possibly, the continuum fields it evolves.
+  Anything else a scenario writes is for validation or UI data categorization: element-kind
+  labels, group names, field layouts, categories. The engine must not need it to run and must
+  not take it as an instruction. Where a scenario still forces such a choice, that is debt in
+  the owning roadmap, never a pattern to copy. Today:
+  - **Grouping:** domain routing (`group_by: "domain"`, the furnace's `grouping: "domain"`) lets
+    grouping emerge, but several scenarios still select operators through declared
+    `element_kind` labels, and the furnace defaults to declared grouping. Queued in the
+    [inference roadmap](AGENTS/engine/inference/ROADMAP.md#priority-queue).
+  - **Fields:** no scenario declares a continuum field. The lamp's and the furnace's
+    declarations live in their `.validation.js` companions (moved 2026-11-20), which grade the
+    engine's methods against a reference; nothing feeds back. The scenario calls a generic
+    per-frame observer in its companion and passes only its observed state. Whether fields
+    should emerge from the engine in general is an open question in the
+    [lattice roadmap](AGENTS/engine/lattice/ROADMAP.md#priority-queue).
 - **Wrong:** the lava lamp's first lattice Boltzmann companion
   (commits `916a60d` and earlier). It imported the LBM module and built the lattice in the
   scenario, so the scenario decided where LBM ran. This was replaced by the engine-owned
   `ctx.evolveField` (see the [lattice handbook](AGENTS/engine/lattice/AGENTS.md)).
 - **Also wrong:** the lamp and furnace scenarios declaring their carrier and charge fields in
-  the physics script (until 2026-11-20). Those declarations now live in the validation
-  companions.
-- **Right:** `lava_lamp.validation.js` declares the carrier column as a validation field and
-  passes the lamp's authored column as the reference. The engine runs the methods it owns and
-  records which one wins where. The scenario only hands over its observed state.
+  the physics script (until 2026-11-20), and any scenario that makes the engine depend on its
+  labels (a declared kind that selects the operator).
+- **Right:** the lamp's validation companion declares the carrier column only to grade the
+  engine's methods against the lamp's authored column. The engine runs the methods it owns and
+  records which one wins where. The scenario only hands over its observed state. In the
+  furnace's `grouping: "domain"` mode, the engine routes every cell without a material label.
 - **Every multi-method path selects the same way.** Where the engine owns more than one way to
   predict a quantity (lattice methods, learned operators, surrogate networks, baselines, and any
   algorithm or model added later), the domain-free `MethodArbiter` chooses per context domain

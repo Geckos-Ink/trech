@@ -33,12 +33,12 @@ statistics favour it.
    or a learned model, is one `registerFieldMethod` call. Arbitration, accounting and reports
    pick it up with no change to `FieldEvolution`, the hook or any scenario. Methods name no
    material, scenario or domain. No scenario or `js/` module may contain or construct a method.
-2. **Fields emerge; only validation declares them today.** A scenario never declares a
-   continuum field (root principle *Fields emerge; scenarios never declare them*). The field
-   should emerge from the declared materials, composition and structure; that engine
-   capability is the P1 in the [roadmap](ROADMAP.md#priority-queue). Until it exists, only a
+2. **Scenarios do not declare fields; validation may.** A scenario forces nothing about how
+   the engine organises its system (root principle *A scenario forces nothing*). Only a
    `<name>.validation.js` companion calls `ctx.evolveField`, to grade the engine's methods
-   against a reference. It declares:
+   against a reference. Whether fields should also emerge from the declared materials,
+   composition and structure is an open question in the [roadmap](ROADMAP.md#priority-queue).
+   The companion declares:
    - the region, the cells and values;
    - the transport properties and their source;
    - the exchanges and the reference.
@@ -249,9 +249,9 @@ Reading:
   JavaScript lattice into `lava_lamp.js` and decided there where it ran. Move the method into the
   engine and declare the system instead.
 - **Declaring a field in a scenario.** The lamp and the furnace declared their fields in the
-  physics script until 2026-11-20. A field is a way of predicting the system, not part of what
-  the system is: keep any validation declaration in the `.validation.js` companion, and let
-  the scenario hand over only its observed state.
+  physics script until 2026-11-20. A scenario forces nothing about how the engine organises
+  the system: keep any validation declaration in the `.validation.js` companion, and let the
+  scenario hand over only its observed state.
 - **Comparing free-running methods with one-step methods.** Persistence of the last reference
   then wins everywhere. Synchronise every method to the same observed state.
 - **Lambda = 1/4 for a weakly diffusive scalar.** It makes τ⁺ ≈ 0.25/(τ⁻ − ½) huge, and the

@@ -30,11 +30,14 @@ Read the root principles and the parent handbook first; then open only the subca
   lamp's first lattice Boltzmann companion broke this rule and was moved into the engine as
   `ctx.evolveField`. Before adding any `TRECH_INCLUDE` of a physics or solver module, ask which
   engine operator should own it.
-- **Never declare a continuum field in a scenario.** A field (region, cells, transport
-  properties, exchanges, loads) must emerge from the engine, from the declared materials,
-  composition and structure (root principle *Fields emerge; scenarios never declare them*).
-  `ctx.evolveField` may be called only from a `<name>.validation.js` companion, to grade the
-  engine's methods against a reference. The physics script calls the companion's generic
+- **Force nothing about how the engine organises the system.** A scenario states materials,
+  composition, structure and conditions. Grouping (kinds, domains), systems and possibly fields
+  emerge from the engine (root principle *A scenario forces nothing*). Labels a scenario writes,
+  such as `element_kind`, group names or categories, are for validation and UI data
+  categorization. The engine must not need them: prefer domain routing over declared kinds, and
+  treat a declared kind that selects the operator as debt. A scenario never declares a
+  continuum field. Only a `<name>.validation.js` companion may call `ctx.evolveField`, to grade
+  the engine's methods against a reference. The physics script calls the companion's generic
   per-frame observer (`TRECH_CHECKS[name].observeFrame`) with its observed state, and nothing
   returned feeds back. `lava_lamp` and `glass_from_sand` follow this pattern.
 

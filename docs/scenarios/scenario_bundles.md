@@ -70,8 +70,10 @@ editor through the engine's source inventory. Run remains bound to the physics r
 
 Validation companions register JSON metadata in `TRECH_VALIDATIONS["example"]` and numerical
 predicates/reference factories in `TRECH_CHECKS["example"]`. Predicates retain the original
-summary fields and tolerances. They grade observed state; they do not advance it. A scenario never
-declares a continuum field (fields must emerge from the engine). A companion may: its
+summary fields and tolerances. They grade observed state; they do not advance it. A scenario forces
+nothing about how the engine organises its system: grouping, systems and possibly fields emerge
+from the engine, and labels a scenario writes are for validation and UI categorization. A
+scenario never declares a continuum field. A companion may: its
 `TRECH_CHECKS[name].observeFrame(ctx, observed)`, called by the physics script at each output
 frame with its observed state, may call `ctx.evolveField` with a reference to grade the engine's
 methods. The result is emitted and never fed back (see `lava_lamp` and `glass_from_sand`). Optics comparison
