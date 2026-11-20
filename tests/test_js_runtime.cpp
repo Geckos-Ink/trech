@@ -2041,6 +2041,113 @@ int main() {
   fs::remove(pairDown);
   fs::remove(pairExp);
 
+  // Rival arbiters across runs: run 1 learns ctx.react rivals from evidence and
+  // exports every pool; run 2 (a new runtime) restores the export frozen and
+  // deploys the learned choice without evidence, learning nothing more.
+  fs::path carryUp = fixture.path() / ("trech_js_carry_up_" + stamp + ".json");
+  fs::path carryDown = fixture.path() / ("trech_js_carry_down_" + stamp + ".json");
+  fs::path carryState = fixture.path() / ("trech_js_carry_state_" + stamp + ".json");
+  fs::path carryTrain = fixture.path() / ("trech_js_carry_train_" + stamp + ".js");
+  fs::path carryDeploy = fixture.path() / ("trech_js_carry_deploy_" + stamp + ".js");
+  try {
+    auto writeHazard = [](const fs::path& path, double weight, double bias) {
+      std::ofstream m(path);
+      m << "{\"model\":\"generic_surrogate_v1\",\"input_features\":[\"x\"],"
+        << "\"output_features\":[\"hazard_electrolysis\"],\"input_mean\":[0],"
+        << "\"input_std\":[1],\"input_domain\":{\"standardized_radius\":[10]},"
+        << "\"layers\":[{\"weights\":[[" << weight << "]],\"bias\":[" << bias
+        << "],\"activation\":\"none\"}]}";
+    };
+    writeHazard(carryUp, 0.4, 0.0);
+    writeHazard(carryDown, -0.4, 0.4);
+    auto writeScenario = [&](const fs::path& path, const std::string& body) {
+      std::ofstream out(path);
+      out << "globalThis.TRECH_CONFIG={run:{nEvents:1,seed:5},determinism:{mode:\"predictive\"},\n";
+      out << " models:[{name:\"law_up\",scale:\"meso\",operator_role:\"split\",element_kind:\"a\",path:\""
+          << carryUp.generic_string() << "\"},\n";
+      out << "  {name:\"law_down\",scale:\"meso\",operator_role:\"split\",element_kind:\"b\",path:\""
+          << carryDown.generic_string() << "\"}]};\n";
+      out << "const N=64; const spec=(call,ref)=>{const x=[],water=[],hydrogen=[],oxygen=[];\n";
+      out << " for(let e=0;e<N;e++){x.push(((e*37+call*11)%N)/63);water.push(4);hydrogen.push(0);oxygen.push(0);}\n";
+      out << " const s={dt:1,species:[\"water\",\"hydrogen\",\"oxygen\"],state:{water,hydrogen,oxygen},aux:{x},\n";
+      out << "  operator_role:\"split\",channels:[{name:\"electrolysis\",delta:{water:-2,hydrogen:2,oxygen:1}}],\n";
+      out << "  conservation:[{name:\"H\",coefficients:{water:2,hydrogen:2}},{name:\"O\",coefficients:{water:1,oxygen:2}}]};\n";
+      out << " if(ref) s.reference_hazards={electrolysis:x.map(v=>v<0.5?0.4*v:0.4*(1-v))};\n";
+      out << " return s;};\n";
+      out << body;
+    };
+    writeScenario(carryTrain,
+        "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n"
+        " for(let call=0;call<40;call++) ctx.react(spec(call,true));\n"
+        " const st=ctx.arbitrationState();\n"
+        " ctx.emit(\"arbitration_state\",{state:st,reactSets:Object.keys(st.pools.react.sets).length,\n"
+        "  evolveSets:Object.keys(st.pools.evolve.sets).length});\n"
+        "}};\n");
+    writeScenario(carryDeploy,
+        "const STATE=TRECH_READ_JSON(\"" + carryState.generic_string() + "\");\n"
+        "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n"
+        " const restored=ctx.restoreArbitration(STATE,{frozen:true});\n"
+        " const d=spec(40,false); d.report_arbitration=true; const dep=ctx.react(d);\n"
+        " const g=spec(41,true); g.report_arbitration=true; const graded=ctx.react(g);\n"
+        " const after=ctx.arbitrationState();\n"
+        " let bad=null; try{ctx.restoreArbitration({format:\"nope\"});}catch(e){bad=String(e.message);}\n"
+        " const set=dep.rival_arbitration.sets[0], key=Object.keys(graded.rival_arbitration.summary)[0];\n"
+        " ctx.emit(\"deploy\",{restored,applied:set.applied,up:set.selected.law_up,down:set.selected.law_down,\n"
+        "  combined:set.selected.cooperating_sum,frozen:graded.rival_arbitration.summary[key].frozen===true,\n"
+        "  gradedRmse:graded.rival_arbitration.sets[0].arbitrated_rmse,\n"
+        "  unchanged:JSON.stringify(after.pools.react.sets[key].arbiter)===JSON.stringify(STATE.pools.react.sets[key].arbiter),bad});\n"
+        "}};\n");
+    {
+      trech::JsRuntime js;
+      (void)js.evalExperimentAndGetConfigJson(carryTrain.string());
+      trech::HookRuntimeContext tCtx{};
+      tCtx.determinismMode = "predictive";
+      tCtx.seed = 5;
+      (void)js.dispatchHook("onEventEnd", tCtx, nullptr, false);
+      const auto emits = js.takeEmittedRecords();
+      failures += expect(emits.size() == 1, "Expected one arbitration-state emit.");
+      if (!emits.empty()) {
+        const auto j = nlohmann::json::parse(emits[0].payloadJson);
+        failures += expect(j.at("reactSets").get<int>() == 1 && j.at("evolveSets").get<int>() == 0,
+                           "Expected the export to hold the learned react set and empty other pools.");
+        std::ofstream(carryState) << j.at("state").dump();
+      }
+    }
+    {
+      trech::JsRuntime js;
+      (void)js.evalExperimentAndGetConfigJson(carryDeploy.string());
+      trech::HookRuntimeContext dCtx{};
+      dCtx.determinismMode = "predictive";
+      dCtx.seed = 6;
+      (void)js.dispatchHook("onEventEnd", dCtx, nullptr, false);
+      const auto emits = js.takeEmittedRecords();
+      failures += expect(emits.size() == 1, "Expected one frozen-deployment emit.");
+      if (!emits.empty()) {
+        const auto j = nlohmann::json::parse(emits[0].payloadJson);
+        std::cout << "restored rival arbitration: " << emits[0].payloadJson << "\n";
+        failures += expect(j.at("restored").at("frozen").get<bool>() &&
+                               j.at("restored").at("pools").at("react").get<int>() == 1 &&
+                               j.at("applied").get<bool>() && j.at("up").get<int>() == 32 &&
+                               j.at("down").get<int>() == 32 && j.at("combined").get<int>() == 0,
+                           "Expected a new run to deploy the restored per-domain choice without evidence.");
+        failures += expect(j.at("frozen").get<bool>() && j.at("gradedRmse").get<double>() < 0.02 &&
+                               j.at("unchanged").get<bool>(),
+                           "Expected a frozen restored pool to grade a held-out call and learn nothing.");
+        failures += expect(j.at("bad").is_string() &&
+                               j.at("bad").get<std::string>().find("trech_rival_arbitration_pools_v1") != std::string::npos,
+                           "Expected an unknown arbitration state to be rejected.");
+      }
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS rival arbitration export/restore error: " << ex.what() << "\n";
+    failures += 1;
+  }
+  fs::remove(carryUp);
+  fs::remove(carryDown);
+  fs::remove(carryState);
+  fs::remove(carryTrain);
+  fs::remove(carryDeploy);
+
   // ctx.evolve with PER-ELEMENT material kinds: one call, several materials,
   // each advanced by the operator its own context selected. This is the
   // "inference level is not fixed for the run" contract -- a scenario holding

@@ -25,7 +25,7 @@ nlohmann::json RivalArbitration::arbitrate(std::vector<RivalCandidates>& sets, c
     for (std::size_t f : rc.fields) key += " " + call.fieldNames.at(f);
     auto it = arbiters_.find(key);
     if (it == arbiters_.end()) {
-      if (!graded) continue;  // no evidence yet: cooperating sum, as before
+      if (!graded || frozen_) continue;  // no evidence yet (or a frozen pool): unchanged
       MethodArbiterOptions o;
       o.methods = rc.members;
       o.methods.push_back(call.combination);
@@ -43,6 +43,12 @@ nlohmann::json RivalArbitration::arbitrate(std::vector<RivalCandidates>& sets, c
       it = arbiters_.emplace(key, std::move(entry)).first;
     }
     Entry& entry = it->second;
+    // A restored arbiter met a call whose context has another shape: leave the set unchanged.
+    if (entry.arbiter->options().features.size() != A + M || entry.arbiter->options().outputs != K) {
+      reports.push_back({{"models", rc.members}, {"fields", entry.fields}, {"elements", n}, {"graded", graded},
+                         {"applied", false}, {"error", "context differs from the learned arbiter"}});
+      continue;
+    }
     MethodArbiterBatch b;
     b.time = static_cast<double>(++entry.calls);
     b.count = n;
@@ -61,7 +67,7 @@ nlohmann::json RivalArbitration::arbitrate(std::vector<RivalCandidates>& sets, c
         for (std::size_t k = 0; k < K; ++k) {
           const double r = call.reference.at(rc.elements[j] * F + rc.fields[k]);
           b.reference.push_back(r);
-          if (std::isfinite(r)) entry.scale[k] = std::max(entry.scale[k], std::abs(r));
+          if (std::isfinite(r) && !frozen_) entry.scale[k] = std::max(entry.scale[k], std::abs(r));
         }
     }
     for (double s : entry.scale) b.scale.push_back(s > 0 ? s : 1.0);
@@ -86,6 +92,35 @@ nlohmann::json RivalArbitration::arbitrate(std::vector<RivalCandidates>& sets, c
                        {"call_rmse", callRmse}, {"arbitrated_rmse", r.arbitratedRmse}, {"oracle_rmse", r.oracleRmse}});
   }
   return reports;
+}
+
+nlohmann::json RivalArbitration::exportState(bool includeRows) const {
+  nlohmann::json sets = nlohmann::json::object();
+  for (const auto& [key, entry] : arbiters_) {
+    sets[key] = {{"fields", entry.fields}, {"scale", entry.scale}, {"calls", entry.calls},
+                 {"combination", entry.combination}, {"arbiter", entry.arbiter->exportState(includeRows)}};
+  }
+  return {{"format", "trech_rival_arbitration_v1"}, {"sets", sets}};
+}
+
+void RivalArbitration::restore(const nlohmann::json& state, bool frozen) {
+  if (!state.is_object() || state.value("format", "") != "trech_rival_arbitration_v1" ||
+      !state.contains("sets") || !state.at("sets").is_object())
+    throw std::invalid_argument("rival arbitration state: expected format trech_rival_arbitration_v1");
+  std::map<std::string, Entry> restored;
+  for (const auto& [key, item] : state.at("sets").items()) {
+    Entry entry;
+    entry.fields = item.at("fields").get<std::vector<std::string>>();
+    entry.scale = item.at("scale").get<std::vector<double>>();
+    entry.calls = item.at("calls").get<long>();
+    entry.combination = item.at("combination").get<std::string>();
+    if (entry.scale.size() != entry.fields.size())
+      throw std::invalid_argument("rival arbitration state: one scale per field expected for " + key);
+    entry.arbiter = std::make_unique<MethodArbiter>(MethodArbiter::fromState(item.at("arbiter"), frozen));
+    restored.emplace(key, std::move(entry));
+  }
+  arbiters_ = std::move(restored);
+  frozen_ = frozen;
 }
 
 nlohmann::json RivalArbitration::summary() const {

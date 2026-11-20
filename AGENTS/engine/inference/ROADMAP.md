@@ -24,7 +24,7 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R3 · No scenario feeds `reference_hazards` to `ctx.react`: hazard-rival arbitration is exercised only by `trech_discrete_transition` and `trech_js_runtime`. Give a chemistry family two candidate hazard laws for one channel and grade them against an evidence source that is not one of the rivals (held-out Geant4-derived or measured transition rates). ([detail](AGENTS.md))
 - **P2** · R3 · No scenario has overlapping `ctx.evolve` rivals today: the glass furnace's trained laws split its population cleanly, so rival arbitration is exercised only by `trech_state_evolution`. Exercise it on a family with two candidate operator families for one quantity and an evidence source that is not one of the rivals (a held-out Geant4-derived or measured rate). The scenario-chosen `physics_source` families of the furnace are the obvious place to retire into emergent selection. ([detail](AGENTS.md))
 - **P2** · R3 · Rival arbitration covers rate outputs (`ctx.evolve`), hazard/weight outputs (`ctx.react`), shared outputs (`ctx.cascade`) and accumulating pair outputs (`ctx.interact`) only. Intermediates and `set_` assignments of every covering rival still apply, so a chosen rival's higher-band consumers may read a rejected rival's intermediate. In `ctx.react`, a hazard output that a non-rival stage also writes is recomposed as if only the set's members wrote it. Arbitrate the whole rival output, and re-run the higher bands from the chosen rival's intermediates. ([detail](../../../docs/engine/scenario_hooks.md))
-- **P2** · R4 · Rival and field arbiters live for one run only. Export and restore their learned state (as `ctx.learnDomains` does) so a later run can deploy them frozen, which is also the held-out test of the choice. ([detail](AGENTS.md))
+- **P2** · R4 · Field arbiters (`ctx.evolveField`) still live for one run. Rival pools are exported and restored (2026-11-20), but a `FieldEvolution` also carries its methods' learned state (the online learned operator, lattice tuning). Export the arbiter together with every registered method's state, and deploy them frozen as the held-out test on the lamp and the furnace. ([detail](AGENTS.md))
 - **P1** · R2 · Close residual CHNO observer coverage holes and validate transfer across composition, geometry and source context. The larger campaign reduced error and measured sparse coverage, and 29 of 48 new conditions still show per-feature starvation with 10 jointly starved. ([study](../../../docs/inference/multiscale_domain_study.md#final-runs-and-validation))
 - **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
@@ -49,6 +49,26 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
+
+## Rival arbiters across runs (2026-11-20)
+
+- [x] `MethodArbiter::exportState`/`fromState` (`trech_method_arbiter_v1`) save options, error
+  learners, and leader and policy scores. A frozen arbiter selects and grades, but learns
+  nothing. Its summary carries `frozen` only when it is set, so existing field-evolution emits
+  are unchanged.
+- [x] `RivalArbitration::exportState`/`restore` (`trech_rival_arbitration_v1`). A frozen pool
+  creates no arbiter and keeps its scales. A restored arbiter that meets another context shape
+  leaves its set unchanged and reports `error`.
+- [x] `ctx.arbitrationState({rows})` and `ctx.restoreArbitration(state, {frozen})` cover the
+  evolve, react, cascade and interact pools. Restore validates every pool before replacing any.
+- [x] Results:
+  - `trech_state_evolution`: a frozen restore deploys on held-out calls 100–119 with mean RMSE
+    0.0000, and only its call clock moves. A restore with rows continues byte-identically for
+    10 calls. An unseen set is unchanged, and an unknown format throws.
+  - `trech_js_runtime`, two runtimes: run 1 trains `ctx.react` rivals and exports; run 2 reads
+    the state with `TRECH_READ_JSON`, restores it frozen and deploys a 32/32 split. A graded
+    held-out call reaches RMSE 6e-18 without changing the arbiter. A bad state is rejected.
+- Residual (queued above): `ctx.evolveField` field arbiters and their methods' learned state.
 
 ## Pair routing and rival arbitration for ctx.interact (2026-11-20)
 

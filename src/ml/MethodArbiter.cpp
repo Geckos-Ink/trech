@@ -53,6 +53,7 @@ struct MethodArbiter::Impl {
   // small wins.
   std::array<double, 2> policyTotal{0.0, 0.0};
   bool informative = false;
+  bool frozen = false;  // restored for deployment: select and grade, never learn
 
   // Variance (log units) of a method's error learner; unknown until it has been graded.
   double uncertainty(std::size_t m) const { return learnerW[m] > 0 ? learnerSq[m] / learnerW[m] : std::numeric_limits<double>::infinity(); }
@@ -222,6 +223,7 @@ MethodArbiterResult MethodArbiter::step(const MethodArbiterBatch& b) {
   for (std::size_t m = 0; m < M; ++m) {
     s.sumSq[m] += callSq[m]; s.count[m] += callN[m]; s.commonSq[m] += callCommonSq[m];
     r.callRmse[m] = rmseOf(callSq[m], callN[m]);
+    if (s.frozen) continue;
     s.ewSq[m] = s.o.policyForgetting * s.ewSq[m] + callSq[m];
     s.ewN[m] = s.o.policyForgetting * s.ewN[m] + callN[m];
     s.ewLog[m] *= s.o.policyForgetting; s.ewCalls[m] *= s.o.policyForgetting;
@@ -230,7 +232,7 @@ MethodArbiterResult MethodArbiter::step(const MethodArbiterBatch& b) {
   s.common += callCommon;
   s.arbitratedSq += arbitratedSq; s.oracleSq += oracleSq; s.graded += g;
   r.arbitratedRmse = std::sqrt(arbitratedSq / g); r.oracleRmse = std::sqrt(oracleSq / g);
-  {
+  if (!s.frozen) {
     const double tiny = g * s.floor * s.floor;
     s.policyScore = s.o.policyForgetting * s.policyScore + std::log((policySq[0] + tiny) / (policySq[1] + tiny));
     for (std::size_t p = 0; p < 2; ++p) s.policyTotal[p] = s.o.policyForgetting * s.policyTotal[p] + policySq[p];
@@ -254,7 +256,7 @@ MethodArbiterResult MethodArbiter::step(const MethodArbiterBatch& b) {
   nlohmann::json domains = nlohmann::json::object();
   for (std::size_t m = 0; m < M; ++m) {
     nlohmann::json list = nlohmann::json::array();
-    if (batches[m].count) {
+    if (batches[m].count && !s.frozen) {
       batches[m].time = b.time;
       const auto learned = s.learners[m]->update(batches[m]);
       if (learned.scored && !learned.routedRmse.empty() && std::isfinite(learned.routedRmse[0])) {
@@ -279,6 +281,78 @@ MethodArbiterResult MethodArbiter::step(const MethodArbiterBatch& b) {
   return r;
 }
 
+namespace {
+nlohmann::json finiteOrNull(double v) { return std::isfinite(v) ? nlohmann::json(v) : nlohmann::json(nullptr); }
+double numberOr(const nlohmann::json& j, double fallback) { return j.is_number() ? j.get<double>() : fallback; }
+std::vector<double> readSeries(const nlohmann::json& j, std::size_t n, const char* name) {
+  if (!j.is_array() || j.size() != n) throw std::invalid_argument(std::string("method arbiter state: bad ") + name);
+  std::vector<double> out;
+  for (const auto& v : j) out.push_back(numberOr(v, kNaN));
+  return out;
+}
+nlohmann::json writeSeries(const std::vector<double>& v) {
+  nlohmann::json out = nlohmann::json::array();
+  for (double x : v) out.push_back(finiteOrNull(x));
+  return out;
+}
+}  // namespace
+
+bool MethodArbiter::frozen() const { return impl_->frozen; }
+
+nlohmann::json MethodArbiter::exportState(bool includeRows) const {
+  const auto& s = *impl_;
+  nlohmann::json learners = nlohmann::json::array();
+  for (const auto& l : s.learners) learners.push_back(l->exportState(includeRows));
+  return {{"format", "trech_method_arbiter_v1"},
+          {"options", {{"methods", s.o.methods}, {"features", s.o.features}, {"outputs", s.o.outputs},
+                       {"fallback", s.o.methods[s.fallback]}, {"min_elements", s.o.minElements},
+                       {"forgetting", s.o.forgetting}, {"policy_forgetting", s.o.policyForgetting},
+                       {"seed", s.o.seed}}},
+          {"floor", finiteOrNull(s.floor)}, {"informative", s.informative},
+          {"policy_score", finiteOrNull(s.policyScore)},
+          {"policy_total", {finiteOrNull(s.policyTotal[0]), finiteOrNull(s.policyTotal[1])}},
+          {"ew_sq", writeSeries(s.ewSq)}, {"ew_n", writeSeries(s.ewN)},
+          {"ew_log", writeSeries(s.ewLog)}, {"ew_calls", writeSeries(s.ewCalls)},
+          {"learner_sq", writeSeries(s.learnerSq)}, {"learner_w", writeSeries(s.learnerW)},
+          {"learners", learners}};
+}
+
+MethodArbiter MethodArbiter::fromState(const nlohmann::json& state, bool frozen) {
+  if (!state.is_object() || state.value("format", "") != "trech_method_arbiter_v1")
+    throw std::invalid_argument("method arbiter state: expected format trech_method_arbiter_v1");
+  const auto& o = state.at("options");
+  MethodArbiterOptions options;
+  options.methods = o.at("methods").get<std::vector<std::string>>();
+  options.features = o.at("features").get<std::vector<std::string>>();
+  options.outputs = o.at("outputs").get<std::size_t>();
+  options.fallback = o.at("fallback").get<std::string>();
+  options.minElements = o.at("min_elements").get<std::size_t>();
+  options.forgetting = o.at("forgetting").get<double>();
+  options.policyForgetting = o.at("policy_forgetting").get<double>();
+  options.seed = o.at("seed").get<std::uint64_t>();
+  MethodArbiter arbiter(options);
+  auto& s = *arbiter.impl_;
+  const auto& learners = state.at("learners");
+  if (!learners.is_array() || learners.size() != s.M)
+    throw std::invalid_argument("method arbiter state: one learner per method expected");
+  for (std::size_t m = 0; m < s.M; ++m)
+    s.learners[m] = std::make_unique<DomainLearner>(DomainLearner::fromState(learners[m], frozen));
+  s.floor = numberOr(state.at("floor"), kErrorFloor);
+  s.informative = state.at("informative").get<bool>();
+  s.policyScore = numberOr(state.at("policy_score"), 0.0);
+  const auto& total = state.at("policy_total");
+  if (!total.is_array() || total.size() != 2) throw std::invalid_argument("method arbiter state: bad policy_total");
+  s.policyTotal = {numberOr(total[0], 0.0), numberOr(total[1], 0.0)};
+  s.ewSq = readSeries(state.at("ew_sq"), s.M, "ew_sq");
+  s.ewN = readSeries(state.at("ew_n"), s.M, "ew_n");
+  s.ewLog = readSeries(state.at("ew_log"), s.M, "ew_log");
+  s.ewCalls = readSeries(state.at("ew_calls"), s.M, "ew_calls");
+  s.learnerSq = readSeries(state.at("learner_sq"), s.M, "learner_sq");
+  s.learnerW = readSeries(state.at("learner_w"), s.M, "learner_w");
+  s.frozen = frozen;
+  return arbiter;
+}
+
 nlohmann::json MethodArbiter::summary() const {
   const auto& s = *impl_;
   nlohmann::json methods = nlohmann::json::object();
@@ -289,13 +363,15 @@ nlohmann::json MethodArbiter::summary() const {
                                {"selected_share", s.totalSelections > 0 ? s.selected[m] / s.totalSelections : kNaN}};
     if (s.commonSq[m] < s.commonSq[best]) best = m;
   }
-  return {{"calls", s.calls}, {"graded_elements", s.graded}, {"common_elements", s.common}, {"features", s.o.features},
+  nlohmann::json out = {{"calls", s.calls}, {"graded_elements", s.graded}, {"common_elements", s.common}, {"features", s.o.features},
           {"methods", methods}, {"best_single_method", s.o.methods[best]},
           {"arbitrated_rmse", rmseOf(s.arbitratedSq, s.graded)}, {"oracle_rmse", rmseOf(s.oracleSq, s.graded)},
           {"learned_selection_share", s.totalSelections > 0 ? s.learnedSelections / s.totalSelections : kNaN},
           {"learned_policy_share", s.calls > 0 ? s.learnedPolicyCalls / static_cast<double>(s.calls) : kNaN},
           {"arbitrated_rmse_learned", rmseOf(s.learnedSq, s.learnedGraded)},
           {"final_domains", s.lastDomains}, {"phases", phases(3)}};
+  if (s.frozen) out["frozen"] = true;  // only restored deployments carry the flag
+  return out;
 }
 
 nlohmann::json MethodArbiter::phases(std::size_t windows) const {

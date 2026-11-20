@@ -12,6 +12,8 @@
 #include "trech/ml/StateEvolution.hpp"
 #include "trech/ml/RivalArbitration.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -685,6 +687,70 @@ int main() {
     req.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) { fresh.arbitrate(sets, c); };
     const EvolutionResult same = op.evolve(req);
     expect(same.state == plain.state && fresh.empty(), "no evidence and no learned arbiter: byte-identical");
+
+    // Export and restore: a later run deploys the learned choice frozen (the
+    // held-out test), or continues learning exactly where the pool stopped.
+    {
+      auto truth = [](double x) { return x < 0.5 ? x : 1.0 - x; };
+      auto step = [&](trech::ml::RivalArbitration& pool, int call, bool graded) {
+        EvolutionRequest r = request(call);
+        trech::ml::RivalArbitration::Call c;
+        c.fieldNames = {"temp"};
+        c.featureNames = {"temp", "x"};
+        for (int e = 0; e < 64; ++e) { c.features.push_back(0.0); c.features.push_back(r.aux[static_cast<std::size_t>(e)]); }
+        if (graded) for (int e = 0; e < 64; ++e) c.reference.push_back(truth(r.aux[static_cast<std::size_t>(e)]));
+        c.seed = 5;
+        r.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) { pool.arbitrate(sets, c); };
+        const EvolutionResult out = op.evolve(r);
+        double err = 0;
+        for (int e = 0; e < 64; ++e) {
+          const double d = out.state[static_cast<std::size_t>(e)] - truth(r.aux[static_cast<std::size_t>(e)]);
+          err += d * d;
+        }
+        return std::make_pair(out.state, std::sqrt(err / 64.0));
+      };
+      trech::ml::RivalArbitration trained;
+      for (int call = 0; call < 40; ++call) step(trained, call, true);
+      // Through text, as a later run would read it.
+      const auto exported = nlohmann::json::parse(trained.exportState(true).dump());
+
+      trech::ml::RivalArbitration deployed;
+      deployed.restore(exported, /*frozen=*/true);
+      // The call clock advances (it is time, not learning); everything else must not change.
+      auto learned = [](nlohmann::json state) {
+        for (auto& [key, set] : state["sets"].items()) set.erase("calls");
+        return state.dump();
+      };
+      const std::string before = learned(deployed.exportState(true));
+      double heldOut = 0, n = 0;
+      for (int call = 100; call < 120; ++call) {  // contexts this pool never saw in order
+        heldOut += step(deployed, call, call % 2 == 0).second;
+        n += 1;
+      }
+      heldOut /= n;
+      const auto summary = deployed.summary();
+      std::printf("rival arbitration restored frozen: held-out mean rmse %.4f over 20 calls (half graded)\n", heldOut);
+      expect(heldOut < 0.05, "a frozen restored pool deploys the learned per-domain choice on new calls");
+      expect(learned(deployed.exportState(true)) == before && deployed.frozen(),
+             "a frozen pool grades but learns nothing");
+      expect(summary.begin()->contains("frozen") && summary.begin()->at("graded_elements").get<double>() > 0,
+             "the frozen pool's summary grades the held-out calls");
+
+      trech::ml::RivalArbitration continued;
+      continued.restore(exported, /*frozen=*/false);
+      bool identical = true;
+      for (int call = 40; call < 50; ++call)
+        identical = identical && step(trained, call, true).first == step(continued, call, true).first;
+      expect(identical, "a restored pool (with rows) continues byte-identically to the original");
+
+      trech::ml::RivalArbitration unseen;
+      unseen.restore(nlohmann::json{{"format", "trech_rival_arbitration_v1"}, {"sets", nlohmann::json::object()}}, true);
+      expect(step(unseen, 0, true).first == plain.state && unseen.empty(),
+             "a frozen pool creates no arbiter for a set it has not seen");
+      bool threw = false;
+      try { unseen.restore(nlohmann::json{{"format", "nope"}}, false); } catch (const std::exception&) { threw = true; }
+      expect(threw, "an unknown state format is rejected");
+    }
   }
 
   if (failures == 0) {

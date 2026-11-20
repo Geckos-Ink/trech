@@ -51,6 +51,15 @@ class RivalArbitration {
   nlohmann::json summary() const;
   bool empty() const { return arbiters_.empty(); }
 
+  // Every arbiter of the pool with its key, rated names, scales and call clock
+  // (`trech_rival_arbitration_v1`), so a later run can continue or deploy it.
+  nlohmann::json exportState(bool includeRows = false) const;
+  // Replace the pool with an exported one. A frozen pool selects from what it
+  // learned and grades graded calls, but learns nothing and creates no arbiter
+  // for a rival set it has not seen (that set stays unchanged).
+  void restore(const nlohmann::json& state, bool frozen);
+  bool frozen() const { return frozen_; }
+
 
  private:
   struct Entry {
@@ -61,6 +70,7 @@ class RivalArbitration {
     long calls = 0;
   };
   std::map<std::string, Entry> arbiters_;
+  bool frozen_ = false;
 };
 
 }  // namespace trech::ml

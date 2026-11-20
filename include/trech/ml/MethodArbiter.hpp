@@ -88,6 +88,16 @@ class MethodArbiter {
   nlohmann::json phases(std::size_t windows) const;
   const MethodArbiterOptions& options() const;
 
+  // Learned state: options, each method's error learner, the leader and policy scores, and
+  // the evidence flag (`trech_method_arbiter_v1`). Run totals and phase history are not part
+  // of it, so a restored arbiter reports only its new run. Buffered learner rows are data and
+  // are exported only on request.
+  nlohmann::json exportState(bool includeRows = false) const;
+  // Restore an exported arbiter. A frozen one selects from what it learned and grades graded
+  // calls in its summary (the held-out test of the choice), but learns nothing.
+  static MethodArbiter fromState(const nlohmann::json& state, bool frozen);
+  bool frozen() const;
+
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;

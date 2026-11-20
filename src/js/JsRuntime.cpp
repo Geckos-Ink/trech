@@ -3366,6 +3366,82 @@ static JSValue jsHookLift(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   return result;
 }
 
+// ctx.arbitrationState({rows?}) -> {format, pools: {evolve, react, cascade, interact}} | null
+// ctx.restoreArbitration(state, {frozen?}) -> {pools: {name: sets}, frozen} | null
+//
+// The learned rival arbiters of every operator path live for one run. Exporting them
+// lets a later run continue learning (`frozen: false`) or deploy them unchanged
+// (`frozen: true`): a frozen pool selects from what it learned and grades graded calls
+// in its summary, which is the held-out test of the choice, but learns nothing.
+// Strict mode returns null (no inference path is active).
+static JSValue jsHookArbitrationState(JSContext* ctx, JSValueConst /*this_val*/, int argc,
+                                      JSValueConst* argv) {
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state) return JS_EXCEPTION;
+  if (normalizeDeterminismMode(state->activeHookContext.determinismMode) != "predictive") return JS_NULL;
+  bool rows = false;
+  if (argc > 0 && JS_IsObject(argv[0])) {
+    JSValue v = JS_GetPropertyStr(ctx, argv[0], "rows");
+    rows = JS_ToBool(ctx, v) > 0;
+    JS_FreeValue(ctx, v);
+  }
+  const nlohmann::json out = {
+      {"format", "trech_rival_arbitration_pools_v1"},
+      {"pools", {{"evolve", state->rivalArbitration.exportState(rows)},
+                 {"react", state->reactRivalArbitration.exportState(rows)},
+                 {"cascade", state->cascadeRivalArbitration.exportState(rows)},
+                 {"interact", state->interactRivalArbitration.exportState(rows)}}}};
+  const std::string text = out.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+  return JS_ParseJSON(ctx, text.c_str(), text.size(), "<arbitration_state>");
+}
+
+static JSValue jsHookRestoreArbitration(JSContext* ctx, JSValueConst /*this_val*/, int argc,
+                                        JSValueConst* argv) {
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state) return JS_EXCEPTION;
+  if (normalizeDeterminismMode(state->activeHookContext.determinismMode) != "predictive") return JS_NULL;
+  if (argc < 1 || !JS_IsObject(argv[0])) {
+    return JS_ThrowTypeError(ctx, "ctx.restoreArbitration(state, {frozen}) requires an exported state");
+  }
+  bool frozen = false;
+  if (argc > 1 && JS_IsObject(argv[1])) {
+    JSValue v = JS_GetPropertyStr(ctx, argv[1], "frozen");
+    frozen = JS_ToBool(ctx, v) > 0;
+    JS_FreeValue(ctx, v);
+  }
+  nlohmann::json j;
+  try { j = nlohmann::json::parse(jsonStringifyValue(ctx, argv[0])); } catch (const std::exception&) { j = nullptr; }
+  if (!j.is_object() || j.value("format", "") != "trech_rival_arbitration_pools_v1" ||
+      !j.contains("pools") || !j["pools"].is_object()) {
+    return JS_ThrowTypeError(ctx, "ctx.restoreArbitration expects a trech_rival_arbitration_pools_v1 state");
+  }
+  const std::pair<const char*, trech::ml::RivalArbitration*> pools[] = {
+      {"evolve", &state->rivalArbitration}, {"react", &state->reactRivalArbitration},
+      {"cascade", &state->cascadeRivalArbitration}, {"interact", &state->interactRivalArbitration}};
+  for (const auto& [name, value] : j["pools"].items()) {
+    if (std::none_of(std::begin(pools), std::end(pools), [&](const auto& p) { return name == p.first; }))
+      return JS_ThrowTypeError(ctx, "ctx.restoreArbitration: unknown pool %s", name.c_str());
+    (void)value;
+  }
+  // Validate every pool before replacing any, so a bad state changes nothing.
+  std::vector<trech::ml::RivalArbitration> restored(std::size(pools));
+  nlohmann::json counts = nlohmann::json::object();
+  for (std::size_t i = 0; i < std::size(pools); ++i) {
+    if (!j["pools"].contains(pools[i].first)) continue;
+    try {
+      restored[i].restore(j["pools"][pools[i].first], frozen);
+    } catch (const std::exception& e) {
+      return JS_ThrowTypeError(ctx, "ctx.restoreArbitration %s: %s", pools[i].first, e.what());
+    }
+    counts[pools[i].first] = j["pools"][pools[i].first]["sets"].size();
+  }
+  for (std::size_t i = 0; i < std::size(pools); ++i)
+    if (j["pools"].contains(pools[i].first)) *pools[i].second = std::move(restored[i]);
+  const nlohmann::json out = {{"pools", counts}, {"frozen", frozen}};
+  const std::string text = out.dump();
+  return JS_ParseJSON(ctx, text.c_str(), text.size(), "<restore_arbitration>");
+}
+
 // --- ctx.react: learned, seeded, discrete integer-state transitions --------
 //
 // The scenario declares integer species inventories, a stoichiometric channel
@@ -6571,6 +6647,10 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
                     JS_NewCFunction(ctx, jsHookEvolveField, "evolveField", 1));
   JS_SetPropertyStr(ctx, contextObj, "react",
                     JS_NewCFunction(ctx, jsHookReact, "react", 1));
+  JS_SetPropertyStr(ctx, contextObj, "arbitrationState",
+                    JS_NewCFunction(ctx, jsHookArbitrationState, "arbitrationState", 1));
+  JS_SetPropertyStr(ctx, contextObj, "restoreArbitration",
+                    JS_NewCFunction(ctx, jsHookRestoreArbitration, "restoreArbitration", 2));
   JS_SetPropertyStr(ctx, contextObj, "interact",
                     JS_NewCFunction(ctx, jsHookInteract, "interact", 1));
   JS_SetPropertyStr(ctx, contextObj, "lift",

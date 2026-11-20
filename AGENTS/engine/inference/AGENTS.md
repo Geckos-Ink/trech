@@ -407,6 +407,20 @@ methods that must predict before a call's reference exists. Paths using it:
 - `ctx.predict` names one model and has no rivals. Every multi-method engine path now selects
   through `MethodArbiter`.
 
+Rival arbiters persist across runs. `MethodArbiter::exportState`/`fromState` save and restore the
+options, the per-candidate `DomainLearner`s, and the leader and policy scores (run totals are not
+saved). `RivalArbitration::exportState`/`restore` do the same for a pool of keyed entries.
+`ctx.arbitrationState` and `ctx.restoreArbitration` carry all four rival pools. A frozen arbiter
+selects and grades, but does not update its scores or learners; a frozen pool creates no new
+arbiters and keeps its scales. Covered by `trech_state_evolution`:
+- a frozen deployment on held-out calls reaches RMSE 0.0000, and its learned state is unchanged
+  apart from the call clock;
+- a pool restored with rows continues byte-identically;
+- an unseen set stays unchanged, and an unknown format is rejected.
+
+`trech_js_runtime` also covers a two-run export → `TRECH_READ_JSON` → frozen deployment
+(32/32 split, graded RMSE 6e-18, arbiter unchanged).
+
 The remaining multi-method paths are queued in the [roadmap](ROADMAP.md#priority-queue).
 
 **Online response-domain learning:** [`DomainLearner.cpp`](../../../src/ml/DomainLearner.cpp)

@@ -753,6 +753,29 @@ tracking action only when one of them is registered.
   (the furnace's `learn_domains=deploy`) does so itself and must label the result as learned.
   Strict mode returns `null`. Set `TRECH_DEBUG_LEARNER=1` to print per-call errors and split and
   merge statistics to stderr. See [output schema](output_schema.md#response-domain-learning-emits).
+- `ctx.arbitrationState({rows?})` and `ctx.restoreArbitration(state, {frozen?})` carry the learned
+  rival arbiters of `ctx.evolve`, `ctx.react`, `ctx.cascade` and `ctx.interact` across runs.
+  - **Export.** `ctx.arbitrationState` returns
+    `{format: "trech_rival_arbitration_pools_v1", pools: {evolve, react, cascade, interact}}`.
+    Each pool (`trech_rival_arbitration_v1`) holds every learned rival set with its key, its
+    arbitrated names, its scales, its call clock and the arbiter (`trech_method_arbiter_v1`: its
+    options, its per-candidate error learners, and its leader and policy scores). Learner rows
+    are included only with `rows: true`. Run totals are not exported, so a restored pool reports
+    only its new run.
+  - **Restore.** `ctx.restoreArbitration` replaces the pools present in the state, after
+    validating all of them; a bad state throws and changes nothing. It returns
+    `{pools: {name: sets}, frozen}`.
+    - With `frozen: false`, learning continues. Restored with rows, a pool continues exactly where
+      the exporting run stopped.
+    - With `frozen: true`, the pool selects from what it learned. It grades calls that carry
+      evidence in its summary (`frozen: true`), but learns nothing. That is the held-out test of
+      the choice. A frozen pool creates no arbiter for a rival set it has not seen, so that set
+      stays unchanged. A restored arbiter that meets a call with another context shape leaves the
+      set unchanged and reports `error`.
+  - **Moving the state.** A scenario emits the export, and a later run reads it with
+    `TRECH_READ_JSON`.
+  - **Strict mode** returns `null`.
+  - **Not covered:** the field arbiters of `ctx.evolveField` are not exported yet.
 - `ctx.lift(spec)`: **recursive group lifting** of a population (elements → groups → … →
   observer). Each level partitions the current elements (`cell_size` lattice, explicit `groups`
   ids, or `all`) and evaluates a trained v3 set model carrying `group_lift` on every group's
