@@ -74,6 +74,25 @@ initialized Geant4 kernel:
 | `{"action":"params","values":{"name":<json>}}` | Change declared [`TRECH_VALUE`](scenario_hooks.md#typed-authoring-values)s and re-evaluate the scenario. `null` restores a value's default. Values accumulate across commands. |
 | `{"action":"reload"}` | Re-read the scenario and its includes from disk, for example after editing a hook. |
 
+Add `--watch` and you don't need to send `reload` at all. Before each batch, the lab checks
+the files the active script read: the entry, its `TRECH_INCLUDE`s and its `TRECH_READ_JSON`
+data files. If any of them now has different bytes, or is gone, the lab re-evaluates the
+scenario first, with the same all-or-nothing rules as `reload`. Saving a file without changing
+it is no edit, so hook state survives. A refused watched edit prints
+`lab error: watched edit refused, the previous script stays active: …` once for that on-disk
+state. The batch, and later ones, still run on the previous script, even from a command file.
+Edit the file again to try once more.
+
+```sh
+./build/dev/trech lab examples/lab/live_hook_tuning.js --watch --output build/dev/out_live_lab
+```
+
+For example, type `{"action":"simulate","events":20}`, change the threshold's `default: 0.5`
+to `0.15` in the file, save, and simulate again: the second `deposit_tally` reports
+`"threshold_mev":0.15` from script generation 2, with trigger `watch`. Studio's live lab
+(**Run ▸ Start live lab**) runs this mode for you; see the
+[Studio guide](../../studio/README.md#live-lab).
+
 Try the bundled [live tuning scenario](../../examples/lab/live_hook_tuning.js) with its
 [command stream](../../examples/lab/live_hook_tuning_commands.jsonl):
 
@@ -98,9 +117,10 @@ the hooks read is always accepted. In the example, `beam_energy_mev` is refused 
 `edep_threshold_mev` is accepted.
 
 Hook state, such as module variables and `ctx.state`, persists from batch to batch and starts
-afresh after each accepted re-evaluation. After every (re)load the lab prints one
-`{"phase":"lab_script",…}` line with the script generation, the source digest, the overrides
-and the resolved declarations; `snapshot` repeats it as `lab.script`. Each batch's provenance
+afresh after each accepted re-evaluation. After every (re)load the lab prints
+`Scenario re-evaluated (script generation N, <trigger>).` and one `{"phase":"lab_script",…}`
+line with the script generation, why it was made (`trigger`: `start`, `params`, `reload` or
+`watch`), the source digests, the overrides and the resolved declarations; `snapshot` repeats it as `lab.script`. Each batch's provenance
 and scores record which script generation drove it as
 [`lab_script`](output_schema.md#lab-script-identity), and `onInit` is counted once, in the
 first batch after each load. Use `run.threads: 1` when hooks accumulate state, as for

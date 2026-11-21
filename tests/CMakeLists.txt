@@ -383,6 +383,21 @@ if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
       "$<TARGET_FILE:trech>")
   set_tests_properties(trech_lab_geometry_refusal PROPERTIES TIMEOUT 300)
 endif()
+# Scenario-backed lab with --watch: on-disk hook edits reloaded before the next batch, a
+# kernel-bound edit refused once while the batches continue on the same kernel.
+if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
+  add_test(NAME trech_lab_watch
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_lab_watch.py"
+      "$<TARGET_FILE:trech>" "${PROJECT_SOURCE_DIR}/examples/lab/live_hook_tuning.js")
+  set_tests_properties(trech_lab_watch PROPERTIES TIMEOUT 300)
+endif()
+# No `**` operator in repository scripts: V8 cannot route it through trech_dmath, so it would
+# break QuickJS/V8 bit identity (docs/engine/v8.md). Math.pow is identical in QuickJS.
+if (Python3_Interpreter_FOUND)
+  add_test(NAME trech_js_pow_operator
+    COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/check_js_pow_operator.py"
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+endif()
 # Engine-level check of the scenario against the committed JS-trained models.
 if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
   add_test(NAME trech_spectrum_prediction_scenario

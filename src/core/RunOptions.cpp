@@ -44,6 +44,7 @@ std::string runUsage() {
       << "  --ui              Start interactive UI session (run only)\n"
       << "  --config <file>   Load initial JSON config (lab mode)\n"
       << "  --commands <file> Read JSON command stream from file (lab mode)\n"
+      << "  --watch           Re-evaluate a lab scenario before a batch when its files change\n"
       << "  --output <dir>    Write outputs under directory (default: .)\n"
       << "  --seed <n>        Override RNG seed\n"
       << "  --events <n>      Override event count\n"
@@ -231,6 +232,15 @@ RunOptions parseRunOptions(int argc, char** argv) {
         return options;
       }
       options.commandsPath = argv[++i];
+      continue;
+    }
+    if (arg == "--watch") {
+      if (options.command != CliCommand::Lab || options.experimentPath.empty()) {
+        options.valid = false;
+        options.error = "--watch needs a lab scenario: trech lab <experiment.js> --watch";
+        return options;
+      }
+      options.labWatch = true;
       continue;
     }
     if (arg == "--param") {

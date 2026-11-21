@@ -31,7 +31,7 @@
     let time = 0, steps = 0;
     const exchange = [0,0,0,0,0];
     function primitive(u) {
-      const p = (gamma - 1) * (u[4] - .5 * (u[1]**2 + u[2]**2 + u[3]**2) / u[0]);
+      const p = (gamma - 1) * (u[4] - .5 * (Math.pow(u[1], 2) + Math.pow(u[2], 2) + Math.pow(u[3], 2)) / u[0]);
       if (!u.every(Number.isFinite) || !(u[0] > 0) || !(p > 0))
         throw new Error('Nonphysical 3D Euler state; refine grid/timestep instead of clipping');
       return {rho:u[0], vx:u[1]/u[0], vy:u[2]/u[0], vz:u[3]/u[0], p,
@@ -44,7 +44,7 @@
     }
     function totals() {
       const sum = [0,0,0,0,0];
-      state.forEach((u,i) => {if(!solid[i]) for(let k=0;k<5;k++) sum[k]+=u[k]*dx**3;});
+      state.forEach((u,i) => {if(!solid[i]) for(let k=0;k<5;k++) sum[k]+=u[k]*Math.pow(dx, 3);});
       return sum;
     }
     const initial = totals();

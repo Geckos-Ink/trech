@@ -87,6 +87,7 @@ engine is located via `TRECH_BIN` or repo-relative `build/**/trech`.
    trech run exp.js --output <dir> ─────────►  engine/  → parses outputs
    trech inspect exp.js ────────────────────►  engine/parameters.py → Options controls
    trech lab (stdin JSONL @ 60 Hz)  ◄────────►  engine/lab.py (real-time)
+   trech lab exp.js --watch         ◄────────►  engine/live_lab.py (params, saved edits)
                                                     │
    trech_viz_scene.json ───────────────────►  scene/   → SceneModel (editable)
    trech_viz_trajectories.jsonl ───────────►  render/  → wgpu viewport

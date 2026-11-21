@@ -150,8 +150,11 @@ It uses integer bit access and IEEE add/sub/mul/div/sqrt only, returns one canon
   result is host-independent. CTest `trech_dmath_wasm` recomputes the 22 C goldens (parsed from
   `tests/test_deterministic_math.cpp`) in V8 and fails when the C source/header hash differs from
   the committed module (regenerate; `--check` verifies byte-reproducible output). The `**`
-  operator cannot be replaced from JavaScript: V8 keeps its own pow there. Regenerating needs
-  `emcc`; running needs only Node/V8.
+  operator cannot be replaced from JavaScript: V8 keeps its own pow there. QuickJS evaluates
+  `**` and `Math.pow` through the same `js_pow`, so repository scripts use `Math.pow` only;
+  [`scripts/check_js_pow_operator.py`](../../../scripts/check_js_pow_operator.py) (CTest
+  `trech_js_pow_operator`) tokenizes `js/`, `examples/` and `projects/` and fails on any `**`.
+  Regenerating needs `emcc`; running needs only Node/V8.
 
 - **Emit guardrails silently truncate observer frames.** Symptom: a GIF ends early (MRI stage 3
   lost its reconstruction act). Cause: a callback emitting more than `hooks.maxEmitsPerCallback`
@@ -161,7 +164,8 @@ It uses integer bit access and IEEE add/sub/mul/div/sqrt only, returns one canon
 #### Live lab script host — [`src/js/LabScriptHost.cpp`](../../../src/js/LabScriptHost.cpp)
 
 `trech lab <experiment.js>` (2026-11-21) hosts a scenario's hooks in the persistent Geant4
-session and re-evaluates the scenario between batches (`reload`, `params`). Header:
+session and re-evaluates the scenario between batches (`reload`, `params`, and with
+`--watch` automatically before a batch when a file it read changed). Header:
 [`LabScriptHost.hpp`](../../../include/trech/js/LabScriptHost.hpp).
 
 - **Stable runtime address.** The Geant4 actions copy `RunOptions::hookRuntime` when the
@@ -179,12 +183,34 @@ session and re-evaluates the scenario between batches (`reload`, `params`). Head
   labScriptJson}`; RunAction reads them at `BeginOfRunAction` into `activeHookInit_` /
   `activeLabScriptJson_` instead of the construction-time `RunOptions` copy. A load's `onInit`
   tallies go to the first completed batch after it (`batchCompleted`), and later batches report 0.
-  `lab_script` = generation, entry, per-source SHA-256 relative to the entry directory, a combined
+  `lab_script` = generation, trigger (`start`/`params`/`reload`/`watch`), entry, per-source
+  SHA-256 relative to the entry directory, `TRECH_READ_JSON` data digests (`data`), a combined
   digest and the overrides. It is written to provenance and scores only in this mode, so other
   outputs are byte-unchanged. Hook code is not in `config_json`, which is why the identity is needed.
+- **Digests are taken at read time.** `JsRuntime::sourceDigests()` returns the SHA-256 of the
+  bytes each evaluation read (first read wins), so an edit saved between evaluation and commit
+  is never credited to the generation that ran.
+- **Watch** (`--watch`, 2026-11-21). Before each batch the CLI calls
+  `changedSourceFingerprint()`: a size or modification-time change triggers a re-read and hash
+  of that file, and equal bytes are no edit (the new stamp is cached). A changed on-disk state
+  is re-evaluated through the same `reloadScript` path with trigger `watch`. A refusal is
+  remembered by fingerprint (`refuseWatchedEdit`) so it is reported once, and the batch runs on
+  the previous script even from a command file. Reverting to the active generation's bytes is
+  no change.
+- **Studio client.** [`studio/trech_studio/engine/live_lab.py`](../../../studio/trech_studio/engine/live_lab.py)
+  (`LiveScenarioLab`) starts `trech lab <scenario> --watch`, sends Options changes as debounced,
+  changed-only `params`, and runs a batch after saving a file the active generation read (the
+  engine's watch does the reload). [`engine/lab.py`](../../../studio/trech_studio/engine/lab.py)
+  strips the `trech-lab> ` prompt that prefixes the first line of each interactive reply and
+  routes `lab_script` and `lab error:` lines.
 - **Tests:** [`tests/test_lab_script_host.cpp`](../../../tests/test_lab_script_host.cpp) (stable
   address, overrides, refused out-of-range/unknown/syntax-error re-evaluations leave the hooks
-  intact, edited-hook reload, null default, onInit once, identity changes);
+  intact, edited-hook reload, null default, onInit once, identity changes, read-time digests,
+  data files, triggers, watch change detection and refused-state suppression);
+  [`tests/test_lab_watch.py`](../../../tests/test_lab_watch.py) (CTest `trech_lab_watch`, real
+  Geant4: watched hook edits, one refusal for a beam edit, revert-is-no-change);
+  [`studio/tests/test_live_lab.py`](../../../studio/tests/test_live_lab.py) (protocol routing,
+  controller diffing, real-engine params/refusal/save loop when a build exists);
   [`tests/test_lab_session.cpp`](../../../tests/test_lab_session.cpp) (actions, rebase order,
   kernel signature); [`tests/test_cli_parse.cpp`](../../../tests/test_cli_parse.cpp).
   Real-kernel example: [`examples/lab/live_hook_tuning.js`](../../../examples/lab/live_hook_tuning.js).

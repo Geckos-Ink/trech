@@ -35,6 +35,7 @@ from ..engine.outputs import RunResult, load_run_result
 from ..engine.parameters import inspect_scenario
 from ..engine.chemistry import read_scene, write_scene, stage_scene_parameters
 from ..engine.runner import EngineRunner
+from ..engine.live_lab import LiveScenarioLab, describe_batch
 from ..engine.quantum import QuantumReferenceJob, geometry_request
 from ..engine.preview import PreviewExport
 from ..engine.spectra import SCENARIO as SPECTRUM_SCENARIO, SpectrumTrainingJob
@@ -77,6 +78,9 @@ class StudioWindow(QMainWindow):
 
         self._engine: EngineLocation = locate_engine(settings.repo_root, settings.engine_bin)
         self._runner = EngineRunner(self._engine, self)
+        # Live scenario lab: Options changes and saved hook edits re-evaluate the running
+        # scenario between batches on one Geant4 kernel (engine/live_lab.py).
+        self._live_lab = LiveScenarioLab(self._engine, self)
         self._preview_export = PreviewExport(settings.repo_root, self)
         self._scene: SceneModel = placeholder_scene()
         self._scene_is_draft = False
@@ -181,6 +185,10 @@ class StudioWindow(QMainWindow):
         run_menu = bar.addMenu("&Run")
         run_menu.addAction("Run scenario ▶", self._run_scenario)
         run_menu.addAction("Stop", self._runner.stop)
+        run_menu.addSeparator()
+        run_menu.addAction("Start live lab ▶", self._start_live_lab)
+        run_menu.addAction("Live lab: run batch", self._live_lab.batch)
+        run_menu.addAction("Stop live lab", self._live_lab.stop)
         preview_menu = bar.addMenu("&Preview")
         preview_menu.addAction("Export image…", lambda: self._export_preview(False))
         preview_menu.addAction("Export animation (GIF + MP4)…", lambda: self._export_preview(True))
@@ -248,6 +256,10 @@ class StudioWindow(QMainWindow):
         self._runner.stderr_line.connect(self.console.log_stderr)
         self._runner.finished.connect(self._on_run_finished)
         self._runner.failed.connect(lambda msg: self.console.log_stderr(f"run failed: {msg}"))
+        self._live_lab.info.connect(self.console.log_info)
+        self._live_lab.error.connect(lambda msg: self.console.log_stderr(f"live lab: {msg}"))
+        self._live_lab.batch_finished.connect(lambda result: self.console.log_info(describe_batch(result)))
+        self.scenario_options.values_changed.connect(self._live_lab.values_changed)
 
     def _announce_engine(self) -> None:
         if self._engine.available:
@@ -843,6 +855,26 @@ class StudioWindow(QMainWindow):
         if saved is not None:
             self.console.log_info(f"saved {saved}")
             self._refresh_scenario_parameters(saved, preserve_values=True)
+            self._live_lab.source_saved(Path(saved))
+
+    def _start_live_lab(self) -> None:
+        """Run the open scenario in a live lab: Options edits become `params`, saves `reload`."""
+        if not self._engine.available:
+            QMessageBox.warning(self, "Engine missing", self._engine.describe())
+            return
+        experiment = self.code_editor.scenario_path()
+        if experiment is None:
+            QMessageBox.information(self, "No scenario", "Open a scenario .js first.")
+            return
+        try:
+            self.code_editor.save()
+        except (OSError, UnicodeError) as exc:
+            self.console.log_stderr(f"Could not save source: {exc}")
+            return
+        if not self._refresh_scenario_parameters(experiment, preserve_values=True):
+            return
+        out_dir = self.settings.output_root / f"studio_lab_{experiment.stem}_{uuid.uuid4().hex[:8]}"
+        self._live_lab.start(experiment, self.scenario_options.values(), out_dir)
 
     def _run_scenario(self) -> None:
         if not self._engine.available:
@@ -887,4 +919,5 @@ class StudioWindow(QMainWindow):
         self._spectrum_job.stop()
         self.models.shutdown()
         self._runner.stop()
+        self._live_lab.stop()
         super().closeEvent(event)

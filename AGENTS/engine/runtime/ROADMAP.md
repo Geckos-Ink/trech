@@ -18,14 +18,43 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R1 · Finish strict multi-thread byte replay for JavaScript hook dispatch and emits. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P2** · R1 · Strict MT output: bound pending event-record memory when an early event delays contiguous output, and extend replay validation across geometries, physics, sources and platforms. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P2** · R1 · Deterministic host math residuals: run the `trech_deterministic_math` goldens on Linux/glibc (GCC) and Windows/MSVC, and record a strict hook run replayed byte for byte across two hosts. ([detail](#deterministic-host-math-2026-11-16))
-- **P2** · R7 · V8 math parity residuals: the `**` operator keeps V8's pow (scripts must use `Math.pow` for cross-engine replay, and nothing yet checks a scenario for `**`); run `trech_dmath_wasm` on x86_64 and Linux V8; an embedded V8 backend must install the module, or link `trech_dmath` natively, before running scripts; per-call cost is about 3.8× V8's builtins (24 vs 6.4 ns). ([detail](#v8-deterministic-math-and-live-lab-scripts-2026-11-21))
-- **P1** · R6 · Scenario-backed lab residuals: kernel-bound `params` (beam, geometry) still need a restart (same reinitialization item below); Studio does not yet drive `reload`/`params` from its Options panel or editor; JS hook state and emits are scheduling-dependent with `run.threads > 1`; no file-watch auto-reload; source hashes are read after evaluation (an edit in between is misattributed). ([detail](#v8-deterministic-math-and-live-lab-scripts-2026-11-21))
+- **P2** · R7 · V8 math parity residuals: the `**` operator keeps V8's pow, so only scripts checked with `scripts/check_js_pow_operator.py` (the repository's are, by CTest) replay bit for bit; a V8 host could rewrite `**` to `Math.pow` at load instead; run `trech_dmath_wasm` on x86_64 and Linux V8; an embedded V8 backend must install the module, or link `trech_dmath` natively, before running scripts; per-call cost is about 3.8× V8's builtins (24 vs 6.4 ns). ([detail](#v8-deterministic-math-and-live-lab-scripts-2026-11-21))
+- **P1** · R6 · Scenario-backed lab residuals: kernel-bound `params` (beam, geometry) still need a restart (same reinitialization item below); JS hook state and emits are scheduling-dependent with `run.threads > 1`; `--watch` checks files only before a batch (no push notification while idle), and a file the scenario reads through another channel (PubChem cache, model artifacts) is not watched or digested; Studio's viewport does not redraw from live batches (Studio authoring queue). ([detail](#live-lab-watch-studio-params-and-the--guard-2026-11-21))
 - **P1** · R6 · Safe `trech lab` reinitialization of geometry/beam/physics/scoring patches (now restart-required), then the restart handshake through Studio. ([detail](#2026-07-15-studio-fidelity-adaptive-lab-rounds-and-liquid-pair-checkpoint))
 - **P2** · R1 · Track hooks: multi-worker dispatch order and per-worker guardrail counts; the track-ledger example is single-threaded only and has no preview media. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P2** · R2 · Widen the liquid-pair/evaporation training domain and close the n-pentane derived-index residual (1.218 vs 1.358) through the generic optics path. ([detail](#2026-07-15-studio-fidelity-adaptive-lab-rounds-and-liquid-pair-checkpoint))
 - **P3** · RX · Atomic stability research Phase A: correlated helium, deuteron interaction, relativistic/QED corrections and NIST benchmarks. ([detail](#atomic-stability-research))
 - **P3** · RX · IASF ledger, physical bases, open channels and validated transition elements; quantitative basis/model uncertainties and held-out predictive gain. ([detail](#atomic-stability-research))
 - **P3** · R7 · Relocatable/Windows research hosting for the Node launcher. ([detail](#atomic-stability-research))
+
+## Live lab watch, Studio params and the `**` guard (2026-11-21)
+
+- [x] Read-time source digests. `JsRuntime::sourceDigests()` hashes each script source and
+  `TRECH_READ_JSON` data file when the evaluation reads it; `lab_script` uses those digests,
+  lists data files under `data`, and records the `trigger` (`start`, `params`, `reload`,
+  `watch`). An edit saved between evaluation and commit is no longer credited to the generation.
+- [x] `trech lab <experiment.js> --watch`. Before each batch the lab re-evaluates the scenario
+  when a file it read has new bytes (size/mtime pre-check, then SHA-256; equal bytes are no
+  edit). A refused watched edit is reported once per on-disk state and the batches continue on
+  the previous script.
+- [x] Studio live lab. **Run ▸ Start live lab** (`studio/trech_studio/engine/live_lab.py`) runs
+  the open scenario with `--watch`, turns Options changes into debounced, changed-only `params`
+  and saves into a batch. `engine/lab.py` now strips the interactive `trech-lab> ` prompt (the
+  first reply line was misrouted before) and routes `lab_script` and `lab error:` lines.
+- [x] `**` guard. QuickJS evaluates `**` and `Math.pow` with the same `js_pow` (0 differences in
+  120 000 sampled pairs), so the five repository uses (`js/trech_euler3d_reference.js`,
+  `glass_from_sand.js`) became `Math.pow`; `trech inspect` of `glass_from_sand`,
+  `aerodynamics_reference` and the Euler accuracy fixture is byte-identical before and after.
+  `scripts/check_js_pow_operator.py` (CTest `trech_js_pow_operator`) keeps it that way.
+- Verification (macOS arm64): Release CTest 74/74 (new `trech_lab_watch`, real Geant4, and
+  `trech_js_pow_operator`; extended `trech_lab_script_host`, `trech_cli_parse`); Debug focused
+  set 10/10; Studio pytest 324 passed, including `test_live_lab.py`'s real-engine session
+  (generations 1/2/2/3, the beam change refused once, a saved hook edit picked up, identical
+  deposits). Driving the Studio window offscreen: Options threshold 0.5 → 0.1 logged generation
+  2 (`params`) and a `deposit_tally` with `"threshold_mev":0.1`.
+- [ ] Residuals queued above: watch is batch-time only and covers script and JSON data files;
+  `**` in user scripts outside the repository is only caught when the checker is run; Studio
+  viewport redraw from live batches.
 
 ## V8 deterministic math and live lab scripts (2026-11-21)
 
@@ -56,8 +85,9 @@ dated record below, and queue its residuals in the same change.
   body reloaded (generation 3, new source digest, `edited: true` in the emit), and adding `onStep`
   was refused while the previous hooks kept their state into the next batch. The config-only lab
   (`realtime_lab_bootstrap.json`) produced the same batches and records without `lab_script`.
-- [ ] Residuals queued above: V8 `**` and other hosts; scenario-lab restart-free kernel edits,
-  Studio wiring, multi-worker hook replay, file watching and source-hash timing.
+- [ ] Residuals queued above: V8 `**` and other hosts; scenario-lab restart-free kernel edits
+  and multi-worker hook replay. Studio wiring, file watching and source-hash timing landed in the
+  next record.
 
 ## Deterministic host math (2026-11-16)
 

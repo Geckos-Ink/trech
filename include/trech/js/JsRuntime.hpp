@@ -98,6 +98,13 @@ struct HookDispatchReport {
   std::size_t scaleMismatchCount = 0;
 };
 
+// One file an evaluation read, with the SHA-256 of the bytes it read at that moment.
+struct JsSourceDigest {
+  std::string path;     // absolute, lexically normal
+  std::string sha256;
+  bool data = false;    // a TRECH_READ_JSON data file rather than a script source
+};
+
 class JsRuntime {
 public:
   JsRuntime();
@@ -119,6 +126,10 @@ public:
   // Absolute paths of every JavaScript source the last evaluation read (the entry file and
   // its TRECH_INCLUDE companions), in load order. The live lab hashes them for provenance.
   std::vector<std::string> sourceFiles() const;
+  // The script sources (load order), then the TRECH_READ_JSON data files (read order), each
+  // with the digest of the bytes the evaluation actually read. A file edited after it was read
+  // keeps the digest of the version that ran.
+  std::vector<JsSourceDigest> sourceDigests() const;
   // Exchange the whole engine state (QuickJS context, hooks, models, pending emits) with
   // `other`. The live lab keeps one JsRuntime address, which the Geant4 actions hold, and
   // swaps a freshly evaluated runtime into it between batches. Never call while either

@@ -34,11 +34,11 @@ settings may change between batches; kernel-bound changes are rejected with a re
 error. `achieved_hz` remains the authoritative measured rate.
 
 A scenario-backed session (`trech lab experiment.js`) also prints one object after the first
-load and after every accepted `reload` or `params` re-evaluation; `snapshot` nests the same
+load and after every accepted `reload`, `params` or `--watch` re-evaluation; `snapshot` nests the same
 object at `lab.script`:
 
 - `phase`: `"lab_script"`.
-- `generation`, `entry`, `sources_sha256`, `sources`, `parameter_overrides`: the
+- `generation`, `trigger`, `entry`, `sources_sha256`, `sources`, `data`, `parameter_overrides`: the
   [script identity](#lab-script-identity) recorded with every later batch.
 - `parameters`: the resolved `TRECH_VALUE` declarations, in the same form as
   `trech inspect`'s `parameters`.
@@ -47,7 +47,9 @@ object at `lab.script`:
   `emit_count`, `emit_dropped_count`, `predict_count`, `predict_out_of_domain_count`).
 
 A refused re-evaluation prints `lab error: re-evaluation refused: <reason>` on stderr and no
-`lab_script` object.
+`lab_script` object. A refused `--watch` re-evaluation prints
+`lab error: watched edit refused, the previous script stays active: <reason>`, once per
+on-disk state, and the batch still runs.
 
 ### Lab script identity
 
@@ -57,15 +59,20 @@ records are unchanged. It names the JavaScript that drove the batch, because hoo
 part of `config_json`: two batches can share a `config_hash` and still run different hooks.
 
 - `generation` (number): 1 for the first load, plus one for each accepted re-evaluation.
+- `trigger` (string): what made this generation: `start` (session start), `params`, `reload`,
+  or `watch` (a `--watch` edit picked up before a batch).
 - `entry` (string): the scenario path as given on the command line.
 - `sources` (array): every evaluated JavaScript file in load order, as `{path, sha256}`; `path`
-  is relative to the entry file's directory.
-- `sources_sha256` (string): SHA-256 over the `(path, sha256)` pairs, so equal values mean the
-  same code on any machine.
+  is relative to the entry file's directory. Each `sha256` is of the bytes the evaluation
+  actually read, so an edit saved after the scenario was read is not credited to it.
+- `data` (array, only when the scenario read any): the `TRECH_READ_JSON` files in read order,
+  as `{path, sha256}`, recorded the same way.
+- `sources_sha256` (string): SHA-256 over the `(path, sha256)` pairs of `sources`, then of
+  `data`, so equal values mean the same code and data on any machine.
 - `parameter_overrides` (object): the `TRECH_VALUE` overrides in effect, from `--param` and
   `params` commands. Values not listed use their declared default.
 
-Example: `{"entry":"examples/lab/live_hook_tuning.js","generation":2,"parameter_overrides":{"edep_threshold_mev":0.1},"sources":[{"path":"live_hook_tuning.js","sha256":"…"}],"sources_sha256":"…"}`.
+Example: `{"entry":"examples/lab/live_hook_tuning.js","generation":2,"trigger":"params","parameter_overrides":{"edep_threshold_mev":0.1},"sources":[{"path":"live_hook_tuning.js","sha256":"…"}],"sources_sha256":"…"}`.
 
 ## trech_provenance.jsonl
 

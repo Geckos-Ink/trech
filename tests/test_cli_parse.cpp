@@ -232,6 +232,17 @@ int main() {
     const auto plain = trech::parseRunOptions(4, const_cast<char**>(labPlain));
     if (expect(plain.valid && plain.experimentPath.empty(),
                "Expected a config-only lab to keep an empty scenario path.")) return 1;
+    const char* labWatch[] = {"trech", "lab", "exp.js", "--watch"};
+    const auto watched = trech::parseRunOptions(4, const_cast<char**>(labWatch));
+    if (expect(watched.valid && watched.labWatch && watched.experimentPath == "exp.js",
+               "Expected a watched scenario-backed lab.")) return 1;
+    if (expect(!plain.labWatch, "Expected --watch to be off by default.")) return 1;
+    const char* labWatchConfig[] = {"trech", "lab", "--config", "lab.json", "--watch"};
+    if (expect(!trech::parseRunOptions(5, const_cast<char**>(labWatchConfig)).valid,
+               "Expected --watch without a lab scenario to fail.")) return 1;
+    const char* runWatch[] = {"trech", "run", "exp.js", "--watch"};
+    if (expect(!trech::parseRunOptions(4, const_cast<char**>(runWatch)).valid,
+               "Expected --watch outside lab mode to fail.")) return 1;
   }
 
   {

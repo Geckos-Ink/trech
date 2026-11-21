@@ -107,6 +107,34 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
     std::cout << script->status().dump() << "\n";
   }
 
+  // Transactional: evaluate beside the active runtime, check the kernel, then swap. Returns
+  // the refusal, or "" once the new generation is active.
+  auto reloadScript = [&](const nlohmann::json& changes, const std::string& trigger) -> std::string {
+    try {
+      auto candidate = script->prepare(changes);
+      auto next = session.rebasedConfig(candidate.config);
+#ifdef TRECH_HAS_GEANT4
+      if (!geantRunner.accepts(next)) {
+        throw std::runtime_error(
+            "the re-evaluated scenario changes initialized Geant4 state (geometry, beam, "
+            "physics, scoring, output, models or the set of registered hooks); restart the "
+            "lab session to use it. The previous script stays active.");
+      }
+#endif
+      warnIgnoredInitPaths(candidate.init);
+      script->commit(std::move(candidate), trigger);
+      session.adoptConfig(std::move(next));
+      warnIgnoredConfigKeys(session.config().unknownKeys);
+      session.setScriptStatus(script->status());
+      std::cout << "Scenario re-evaluated (script generation " << script->generation()
+                << ", " << trigger << ").\n"
+                << script->status().dump() << "\n";
+      return {};
+    } catch (const std::exception& error) {
+      return error.what();
+    }
+  };
+
   std::string line;
   while (true) {
     if (interactive) {
@@ -138,32 +166,28 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
     }
 
     if (result.requestScriptReload) {
-      // Transactional: evaluate beside the active runtime, check the kernel, then swap.
-      try {
-        auto candidate = script->prepare(result.scriptParameterChanges);
-        auto next = session.rebasedConfig(candidate.config);
-#ifdef TRECH_HAS_GEANT4
-        if (!geantRunner.accepts(next)) {
-          throw std::runtime_error(
-              "the re-evaluated scenario changes initialized Geant4 state (geometry, beam, "
-              "physics, scoring, output, models or the set of registered hooks); restart the "
-              "lab session to use it. The previous script stays active.");
-        }
-#endif
-        warnIgnoredInitPaths(candidate.init);
-        script->commit(std::move(candidate));
-        session.adoptConfig(std::move(next));
-        warnIgnoredConfigKeys(session.config().unknownKeys);
-        session.setScriptStatus(script->status());
-        std::cout << "Scenario re-evaluated (script generation " << script->generation()
-                  << ").\n"
-                  << script->status().dump() << "\n";
-      } catch (const std::exception& error) {
-        std::cerr << "lab error: re-evaluation refused: " << error.what() << "\n";
+      const auto trigger = result.scriptParameterChanges.empty() ? "reload" : "params";
+      const auto error = reloadScript(result.scriptParameterChanges, trigger);
+      if (!error.empty()) {
+        std::cerr << "lab error: re-evaluation refused: " << error << "\n";
         if (!interactive) {
           return 1;
         }
         continue;
+      }
+    }
+
+    if (result.requestSimulation && script && options.labWatch) {
+      // A watched edit is picked up before the batch. A refused edit is reported once and the
+      // batch runs on the previous script, in a command file too: nothing asked for it.
+      const auto fingerprint = script->changedSourceFingerprint();
+      if (!fingerprint.empty()) {
+        const auto error = reloadScript(nlohmann::json::object(), "watch");
+        if (!error.empty()) {
+          script->refuseWatchedEdit(fingerprint);
+          std::cerr << "lab error: watched edit refused, the previous script stays active: "
+                    << error << "\n";
+        }
       }
     }
 

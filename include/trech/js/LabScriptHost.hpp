@@ -4,6 +4,8 @@
 #include "trech/core/RunOptions.hpp"
 #include "trech/js/JsRuntime.hpp"
 
+#include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -39,13 +41,23 @@ class LabScriptHost {
   // TRECH_VALUE, config or (strict) override error. Never touches the active runtime.
   LabScriptCandidate prepare(const nlohmann::json& changes = nlohmann::json::object()) const;
   // Swap `candidate` into the stable runtime, advance the generation and keep its onInit
-  // tallies for the next batch.
-  void commit(LabScriptCandidate candidate);
+  // tallies for the next batch. `trigger` records why this generation exists: "start",
+  // "params", "reload" or "watch".
+  void commit(LabScriptCandidate candidate, const std::string& trigger = "start");
+
+  // Watch mode (`trech lab <experiment.js> --watch`). When any file the active generation read
+  // (script sources and TRECH_READ_JSON data) now has other bytes on disk, or is gone, returns a
+  // digest of that on-disk state; otherwise, or when that exact state was already refused,
+  // returns "". A modification time or size change triggers a re-read; equal bytes are no edit.
+  std::string changedSourceFingerprint();
+  // Remember a refused on-disk state so it is reported once, not before every batch.
+  void refuseWatchedEdit(const std::string& fingerprint);
 
   JsRuntime* runtime() { return active_.get(); }
   int generation() const { return generation_; }
   const nlohmann::json& parameters() const { return parameters_; }
-  // {generation, entry, sources_sha256, sources:[{path, sha256}], parameter_overrides}:
+  // {generation, trigger, entry, sources_sha256, sources:[{path, sha256}], data (when the
+  // scenario read TRECH_READ_JSON files), parameter_overrides}:
   // the identity recorded with every batch as provenance/scores `lab_script`.
   const nlohmann::json& identity() const { return identity_; }
   // identity plus phase "lab_script", the resolved TRECH_VALUE declarations, the registered
@@ -67,6 +79,14 @@ class LabScriptHost {
   HookInitTallies init_;
   bool initPending_ = false;
   int generation_ = 0;
+  struct WatchedFile {
+    std::string path;
+    std::string sha256;  // the bytes the active generation evaluated
+    std::filesystem::file_time_type stamp;
+    std::intmax_t size = -1;
+  };
+  std::vector<WatchedFile> watched_;
+  std::string refusedFingerprint_;
 };
 
 }  // namespace trech

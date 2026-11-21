@@ -157,7 +157,7 @@ const CHARGE_HEIGHT_MM = CRUCIBLE_WIDTH_MM;
 
 // Allocate whole stoichiometric batches so refining the mesh preserves both
 // the recipe in each cell and the total material inventory.
-const BALANCED_CELLS = BALANCED_CELLS_PER_SIDE ** 3;
+const BALANCED_CELLS = Math.pow(BALANCED_CELLS_PER_SIDE, 3);
 const batchCount = BALANCED_CELLS * 10;
 const recipe = {sio2: 6, na2co3: 1, caco3: 1};
 const averageBatches = batchCount / CELL_COUNT;

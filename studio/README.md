@@ -227,6 +227,36 @@ to edit; ordinary TRECH runs use each declaration's default.
 The shipped `viz_refraction_demo.js`, `h2o_fluid.js`, and `config_cnt_stub.js` examples expose
 representative sizes/levels, temperatures, source settings, and sampling levels.
 
+### Live lab
+
+**Run ▸ Start live lab ▶** runs the open scenario in a persistent
+[`trech lab <scenario.js> --watch`](../docs/engine/cli.md#scenario-backed-lab-re-tune-hooks-between-batches)
+session instead of a one-off run. Geant4 initializes once, and you personalise the scenario
+while it keeps running:
+
+- **Change a value in Options.** Studio sends only the values that changed, as one `params`
+  command (a dragged slider sends one command after it settles), then runs one batch.
+- **Save an edited hook** (the scenario, an include, or a `TRECH_READ_JSON` data file it read).
+  Studio runs one batch, and the engine first re-evaluates the scenario if those files' bytes
+  changed. Edits saved by another editor are picked up the same way.
+- **Run ▸ Live lab: run batch** runs another batch on the current script; **Stop live lab**
+  ends the session.
+
+The console shows each script generation and why it was made (`start`, `params`, `watch`), and
+one line per batch with its event count, rate and the `onRunEnd` emits it wrote. For example,
+with [`examples/lab/live_hook_tuning.js`](../examples/lab/live_hook_tuning.js), lowering
+**Deposit threshold** from 0.5 to 0.1 MeV logs generation 2 and a `deposit_tally` with
+`"threshold_mev":0.1`.
+
+The engine decides what can change live. A value or edit that only the hooks read is accepted.
+One that changes the beam, geometry, physics, models or the set of hooks is refused, with a
+`live lab:` error in the console, and the previous script keeps running. Restart the live lab
+to use it. In the example, **Beam energy** is refused.
+
+Batches write to `studio_lab_<scenario>_<id>/` under the Studio output root. The viewport does
+not yet redraw from live batches; open that folder with **File ▸ Open run output…** to view it.
+The Precision and resources and Chemistry options apply to normal runs only.
+
 ## Stack
 
 - **PySide6 (Qt 6)** — dockable editor shell (viewport, outliner, inspector, console, code editor)

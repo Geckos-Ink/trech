@@ -3,6 +3,7 @@
 #include "trech/js/DeterministicMath.h"
 
 #include "trech/core/Config.hpp"
+#include "trech/core/Provenance.hpp"
 #include "trech/core/ScalarField.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/DomainDiscovery.hpp"
@@ -53,6 +54,10 @@ struct JsRuntimeState {
   std::string baseDir;
   std::vector<std::string> includeStack;
   std::vector<std::string> sourceFiles;
+  // SHA-256 of the bytes each script source and TRECH_READ_JSON data file had when this
+  // evaluation read them (first read wins), so identities never re-read a later edit.
+  std::map<std::string, std::string> sourceDigests;
+  std::vector<std::string> dataFiles;
   std::string lastConfigJson;
   std::string activeHookName;
   HookRuntimeContext activeHookContext;
@@ -5989,6 +5994,9 @@ static JSValue jsTrechReadJson(JSContext* ctx, JSValueConst /*this_val*/, int ar
   JS_FreeCString(ctx, raw);
   try {
     const auto bytes = readFile(path);
+    const auto absolute = std::filesystem::absolute(path).lexically_normal().string();
+    if (state->sourceDigests.emplace(absolute, sha256Hex(bytes)).second)
+      state->dataFiles.push_back(absolute);
     return JS_ParseJSON(ctx, bytes.c_str(), bytes.size(), path.c_str());
   } catch (const std::exception& error) {
     return JS_ThrowReferenceError(ctx, "TRECH_READ_JSON: %s", error.what());
@@ -6009,6 +6017,7 @@ static JSValue evalScenarioSource(JSContext* ctx, JsRuntimeState* state,
     const auto absolute = std::filesystem::absolute(source).lexically_normal().string();
     if (std::find(state->sourceFiles.begin(), state->sourceFiles.end(), absolute) == state->sourceFiles.end())
       state->sourceFiles.push_back(absolute);
+    state->sourceDigests.emplace(absolute, sha256Hex(code));
     state->includeStack.push_back(source);
     JSValue result = JS_Eval(ctx, code.c_str(), code.size(), source.c_str(), JS_EVAL_TYPE_GLOBAL);
     state->includeStack.pop_back();
@@ -6143,6 +6152,8 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   impl_->state.baseDir = baseDirFromPath(path);
   impl_->state.includeStack.clear();
   impl_->state.sourceFiles = {std::filesystem::absolute(path).lexically_normal().string()};
+  impl_->state.sourceDigests.clear();
+  impl_->state.dataFiles.clear();
   impl_->state.emittedRecords.clear();
   impl_->state.callEmits.clear();
   impl_->state.callDroppedEmits = 0;
@@ -6308,6 +6319,18 @@ std::string JsRuntime::authoringMetadataJson() const {
 std::vector<std::string> JsRuntime::sourceFiles() const {
   std::lock_guard<std::mutex> lock(impl_->mutex);
   return impl_->state.sourceFiles;
+}
+
+std::vector<JsSourceDigest> JsRuntime::sourceDigests() const {
+  std::lock_guard<std::mutex> lock(impl_->mutex);
+  std::vector<JsSourceDigest> out;
+  auto add = [&](const std::string& path, bool data) {
+    const auto found = impl_->state.sourceDigests.find(path);
+    if (found != impl_->state.sourceDigests.end()) out.push_back({path, found->second, data});
+  };
+  for (const auto& path : impl_->state.sourceFiles) add(path, false);
+  for (const auto& path : impl_->state.dataFiles) add(path, true);
+  return out;
 }
 
 void JsRuntime::swap(JsRuntime& other) noexcept {

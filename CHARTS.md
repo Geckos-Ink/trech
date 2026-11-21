@@ -248,6 +248,8 @@ flowchart LR
     INSPECT["trech inspect experiment.js"] --> QMETA["config + typed parameter metadata\n(no Geant4 initialization)"]
     QMETA --> STUDIOOPT["Studio right-sidebar Options\nnative typed controls"]
     STUDIOOPT -->|"validated --param name=json"| CLI
+    STUDIOOPT -->|"live lab: changed values as params"| CMD
+    WATCH["--watch\n(files the script read,\nchecked before each batch)"] -->|"edited bytes: reload"| LABJS
     LABCLI["trech lab ..."] --> LABCFG["Initial JSON config\n(--config optional)"]
     LABCLI -->|"trech lab experiment.js"| LABJS["LabScriptHost\n(transactional re-evaluation,\nstable hook runtime swapped\nbetween batches)"]
     JS --> LABJS

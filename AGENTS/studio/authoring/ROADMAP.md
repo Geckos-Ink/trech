@@ -12,7 +12,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R6 · Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab` and `simulate` streams snapshots back (engine reinitialization is a runtime P1). Start the lab as `trech lab <scenario.js>` so Options-panel changes become `params` and saved hook edits become `reload` (engine side landed 2026-11-21; show `lab_script` generations and refusals). ([detail](#milestone-2--real-time-scenario-editing))
+- **P1** · R6 · Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab`, and live batches redraw the viewport instead of only logging to the console (engine reinitialization is a runtime P1). Options-panel `params`, saved-edit reloads (`--watch`) and generation/refusal logging landed 2026-11-21 in **Run ▸ Start live lab**; a status widget for the active generation and a timed batch loop at `lab.targetHz` are still missing. ([detail](#milestone-2--real-time-scenario-editing))
 - **P1** · R6 · Complete the `SceneModel → scenario .js` round-trip for source dependencies and volume hierarchy. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · All-scenario render parity: moving apparatus meshes, scalar colour bars, chart/text overlays, simultaneous streams and an all-family capture matrix. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P2** · R6 · Transform gizmos (translate/rotate/scale) on the selected volume. ([detail](#milestone-2--real-time-scenario-editing))
@@ -108,7 +108,9 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   The engine-side adaptive round planner is landed: omitted counts learn seconds/round online and
   fit the next batch to `targetHz`; `studio/trech_studio/engine/lab.py` routes `lab_round_plan` telemetry separately.
   Compatible batches now reuse one initialized Geant4 kernel, with per-batch config provenance;
-  event count, seed and planner changes are live. Remaining work is wiring inspector edits and
+  event count, seed and planner changes are live. Since 2026-11-21 **Run ▸ Start live lab**
+  re-tunes a scenario's hooks live (Options → `params`, saves → `--watch` reload) and logs each
+  generation, refusal and batch emit. Remaining work is wiring inspector edits and
   live snapshots/precision into the viewport, plus a restart/reinitialize handshake for
   kernel-bound geometry/beam/physics/scoring edits (currently rejected explicitly).
 - [ ] Transform gizmos (translate/rotate/scale) on the selected volume.

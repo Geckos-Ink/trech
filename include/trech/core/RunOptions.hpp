@@ -88,6 +88,9 @@ struct RunOptions {
   // evaluating a JavaScript scenario. Ordinary runs leave this empty, so each
   // declaration returns its authored default.
   std::vector<std::string> scriptParameterOverrides;
+  // `trech lab <experiment.js> --watch`: before each batch, re-evaluate the scenario when a
+  // file it read changed on disk (same transactional rules as the `reload` command).
+  bool labWatch = false;
   // `trech arch <job.json>`: generator override (evolvo|classic) and
   // Python interpreter for the Evolvo worker; empty keeps the job's values.
   std::string archGenerator;

@@ -26,7 +26,7 @@ Relative paths are normalized at `EngineLocation` construction before subprocess
 Missing/nonexecutable explicit choices report their path without fallback. Tests: `test_engine_locator.py`.
 `runner.py` (`EngineRunner`, `RunResult`) runs `trech run` and returns the output dir.
 
-##### [`studio/trech_studio/engine/outputs.py`](../../../studio/trech_studio/engine/outputs.py) · [`parameters.py`](../../../studio/trech_studio/engine/parameters.py) · [`lab.py`](../../../studio/trech_studio/engine/lab.py)
+##### [`studio/trech_studio/engine/outputs.py`](../../../studio/trech_studio/engine/outputs.py) · [`parameters.py`](../../../studio/trech_studio/engine/parameters.py) · [`lab.py`](../../../studio/trech_studio/engine/lab.py) · [`live_lab.py`](../../../studio/trech_studio/engine/live_lab.py)
 
 `outputs.py` parses an output dir into typed objects (`Trajectory`, `HookEmit`, scores/provenance).
 `RunResult.recorded_config()` parses the latest provenance `config_json` into a detached config
@@ -36,7 +36,16 @@ The authoring writer requires this full snapshot because viz geometry omits sour
 `parameters.py` (`ScenarioInspection`, `ScenarioParameter`) asks `trech inspect` for real
 `TRECH_VALUE` declarations and passes JSON-typed `--param` back on Run — **never** regex-parses
 scenario source or computes physics. `lab.py` (`LabSession`) owns the real-time protocol
-(`patch`/`simulate`/`snapshot`/`quit`, snapshot JSON at `lab.targetHz`, `round_plan` telemetry).
+(`patch`/`simulate`/`snapshot`/`params`/`reload`/`quit`, snapshot JSON at `lab.targetHz`,
+`round_plan` telemetry, `script_status` for `lab_script`, `refused` for `lab error:` lines). It
+strips the interactive `trech-lab> ` prompt first: the engine prints it before reading each
+command, so it prefixes the first line of every reply. `live_lab.py` (`LiveScenarioLab`, menu
+**Run ▸ Start live lab**) runs `trech lab <scenario> --watch` with the Options values, sends
+later Options changes as one debounced `params` with only the changed values, and runs a batch
+after saving a file the active generation read; the engine's watch decides whether to reload.
+Each batch reports its round plan and the new `onRunEnd` emits (read from
+`trech_hook_emits.jsonl` by byte offset). The engine accepts or refuses every change; Studio
+never evaluates the scenario.
 
 ### Output contracts Studio depends on (do not silently break)
 

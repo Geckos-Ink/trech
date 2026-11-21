@@ -10,7 +10,9 @@
 //     batch, on the same initialized Geant4 kernel.
 //   - beam_energy_mev changes the beam, which the initialized kernel is bound to. The lab
 //     refuses that re-evaluation (restart required) and keeps the previous script active.
-// Editing this file and sending {"action":"reload"} swaps in the edited hooks the same way.
+// Editing this file and sending {"action":"reload"} swaps in the edited hooks the same way;
+// with --watch the lab does that itself before the next batch whenever the file's bytes change
+// (Studio's Run > Start live lab uses this mode).
 //
 // Run (the commands file sends simulate / params / reload / simulate):
 //   trech lab examples/lab/live_hook_tuning.js \

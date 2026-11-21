@@ -19,22 +19,28 @@ std::string readBytes(const std::string& path) {
   return buffer.str();
 }
 
-// Per-source SHA-256 and one digest over (path relative to the entry directory, digest)
-// pairs in load order, so the identity is the same on any machine with the same files.
-nlohmann::json sourceIdentity(const std::string& entry, const std::vector<std::string>& sources) {
+// Per-file SHA-256 of the bytes the evaluation read, and one digest over (path relative to
+// the entry directory, digest) pairs in load order, so the identity is the same on any machine
+// with the same files. TRECH_READ_JSON data files are listed apart and join the digest after
+// the script sources.
+nlohmann::json sourceIdentity(const std::string& entry, const std::vector<JsSourceDigest>& files) {
   const auto base = std::filesystem::absolute(entry).lexically_normal().parent_path();
-  nlohmann::json files = nlohmann::json::array();
+  nlohmann::json sources = nlohmann::json::array();
+  nlohmann::json data = nlohmann::json::array();
   std::string combined;
-  for (const auto& source : sources) {
-    const auto relative = std::filesystem::path(source).lexically_relative(base).generic_string();
-    const auto digest = sha256Hex(readBytes(source));
-    files.push_back({{"path", relative}, {"sha256", digest}});
+  for (const auto& file : files) {
+    const auto relative = std::filesystem::path(file.path).lexically_relative(base).generic_string();
+    (file.data ? data : sources).push_back({{"path", relative}, {"sha256", file.sha256}});
+    if (file.data) combined += "data:";
     combined += relative;
     combined.push_back('\0');
-    combined += digest;
+    combined += file.sha256;
     combined.push_back('\n');
   }
-  return {{"entry", entry}, {"sources_sha256", sha256Hex(combined)}, {"sources", files}};
+  nlohmann::json identity = {
+      {"entry", entry}, {"sources_sha256", sha256Hex(combined)}, {"sources", sources}};
+  if (!data.empty()) identity["data"] = data;
+  return identity;
 }
 
 nlohmann::json tallyJson(const HookInitTallies& init) {
@@ -108,9 +114,10 @@ LabScriptCandidate LabScriptHost::prepare(const nlohmann::json& changes) const {
   return candidate;
 }
 
-void LabScriptHost::commit(LabScriptCandidate candidate) {
+void LabScriptHost::commit(LabScriptCandidate candidate, const std::string& trigger) {
   if (!candidate.runtime) throw std::invalid_argument("lab script candidate has no runtime");
-  auto identity = sourceIdentity(experimentPath_, candidate.runtime->sourceFiles());
+  const auto digests = candidate.runtime->sourceDigests();
+  auto identity = sourceIdentity(experimentPath_, digests);
   active_->swap(*candidate.runtime);
   parameters_ = std::move(candidate.parameters);
   registeredHooks_ = candidate.config.hooks.registered;
@@ -118,8 +125,51 @@ void LabScriptHost::commit(LabScriptCandidate candidate) {
   initPending_ = true;
   generation_ += 1;
   identity["generation"] = generation_;
+  identity["trigger"] = trigger;
   identity["parameter_overrides"] = parameters_;
   identity_ = std::move(identity);
+  watched_.clear();
+  for (const auto& file : digests) watched_.push_back({file.path, file.sha256, {}, -1});
+  refusedFingerprint_.clear();
+}
+
+std::string LabScriptHost::changedSourceFingerprint() {
+  bool changed = false;
+  std::string fingerprint;
+  for (auto& file : watched_) {
+    std::error_code error;
+    const auto stamp = std::filesystem::last_write_time(file.path, error);
+    const auto size = error ? -1 : static_cast<std::intmax_t>(std::filesystem::file_size(file.path, error));
+    std::string digest;
+    if (error) {
+      digest = "missing";
+    } else if (file.size == size && file.stamp == stamp) {
+      digest = file.sha256;  // untouched since the last look: skip the read
+    } else {
+      try {
+        digest = sha256Hex(readBytes(file.path));
+      } catch (const std::exception&) {
+        digest = "missing";
+      }
+      // A touch that keeps the bytes is no change; remember the stamp so it is not re-read.
+      if (digest == file.sha256) {
+        file.stamp = stamp;
+        file.size = size;
+      }
+    }
+    if (digest != file.sha256) changed = true;
+    fingerprint += file.path;
+    fingerprint.push_back('\0');
+    fingerprint += digest;
+    fingerprint.push_back('\n');
+  }
+  if (!changed) return {};
+  fingerprint = sha256Hex(fingerprint);
+  return fingerprint == refusedFingerprint_ ? std::string() : fingerprint;
+}
+
+void LabScriptHost::refuseWatchedEdit(const std::string& fingerprint) {
+  refusedFingerprint_ = fingerprint;
 }
 
 nlohmann::json LabScriptHost::status() const {
