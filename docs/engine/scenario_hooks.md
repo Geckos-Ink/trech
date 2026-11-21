@@ -38,6 +38,9 @@ its declared default, so normal TRECH behavior is unchanged and has no UI depend
 repeat `--param name=<json>` on `trech inspect` or `trech run` to select values. The engine rejects
 unknown, duplicate, mistyped, out-of-range, or non-choice overrides before simulation. Studio uses
 this contract to create its right-sidebar Options controls; it does not parse JavaScript source.
+In a live `trech lab experiment.js` session, a `params` command changes these values between
+batches and swaps in the re-evaluated hooks without restarting Geant4, as long as the new config
+still fits the initialized kernel ([live lab](cli.md#scenario-backed-lab-re-tune-hooks-between-batches)).
 
 The optional `TRECH_STUDIO` global supplies a data-only `trech_studio_v1` description with
 title, description, panel booleans and process roles. `authoring.sources` lists the evaluated root

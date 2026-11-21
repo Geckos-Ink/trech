@@ -776,10 +776,19 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   activeSeed_ = cfg_.run.seed;
   activeRunId_ = run ? run->GetRunID() : -1;
   activeConfigJson_ = configToJsonString(cfg_);
+  activeHookInit_ = {options_.hookInitDispatched, options_.hookInitPatchCount,
+                     options_.hookInitIgnoredPatchPaths, options_.hookInitEmitCount,
+                     options_.hookInitEmitDroppedCount, options_.hookInitPredictCount,
+                     options_.hookInitOutOfDomainCount};
+  activeLabScriptJson_.clear();
   if (options_.runtimeMetadata) {
     activeNEvents_ = options_.runtimeMetadata->nEvents;
     activeSeed_ = options_.runtimeMetadata->seed;
     activeConfigJson_ = options_.runtimeMetadata->configJson;
+    if (options_.runtimeMetadata->hasHookInit) {
+      activeHookInit_ = options_.runtimeMetadata->hookInit;
+    }
+    activeLabScriptJson_ = options_.runtimeMetadata->labScriptJson;
   }
   G4AccumulableManager::Instance()->Reset();
   std::fill(volumeEventEdepMeV_.begin(), volumeEventEdepMeV_.end(), 0.0);
@@ -838,16 +847,17 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.hookOnRunEndCount = hookOnRunEndCount_.GetValue();
   fillTrackHookCounters(record);
   record.hookUnknownRegisteredCount = hookUnknownRegisteredCount_;
-  record.hookPatchCount = options_.hookInitPatchCount + hookPatchCount_.GetValue();
-  record.hookEmitCount = options_.hookInitEmitCount + hookEmitCount_.GetValue();
+  record.hookPatchCount = activeHookInit_.patchCount + hookPatchCount_.GetValue();
+  record.hookEmitCount = activeHookInit_.emitCount + hookEmitCount_.GetValue();
   record.hookEmitDroppedCount =
-      options_.hookInitEmitDroppedCount + hookEmitDroppedCount_.GetValue();
+      activeHookInit_.emitDroppedCount + hookEmitDroppedCount_.GetValue();
   record.hookPredictCount =
-      options_.hookInitPredictCount + hookPredictCount_.GetValue();
+      activeHookInit_.predictCount + hookPredictCount_.GetValue();
   record.hookOutOfDomainCount =
-      options_.hookInitOutOfDomainCount + hookOutOfDomainCount_.GetValue();
+      activeHookInit_.outOfDomainCount + hookOutOfDomainCount_.GetValue();
   record.modelsLoaded = options_.modelsLoaded;
   record.modelArtifactsJson = options_.modelArtifactsJson;
+  record.labScriptJson = activeLabScriptJson_;
   record.precisionProfile = cfg_.precision.profile;
   record.precisionAxisCount = static_cast<int>(cfg_.precision.axes.size());
   record.nuclearEnabled = cfg_.nuclear.enable;
@@ -855,7 +865,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.nuclearConsistentCycleCount = 0;
   copyGeometryIssues(options_, record);
   record.configUnknownKeys = cfg_.unknownKeys;
-  record.hookPatchIgnoredPaths = options_.hookInitIgnoredPatchPaths;
+  record.hookPatchIgnoredPaths = activeHookInit_.ignoredPatchPaths;
   provenance_.write(record);
 
   if (cfg_.viz.enable) {
@@ -902,15 +912,15 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   const auto hookOnStepDroppedCount =
       std::max(0, hookOnStepRawCount - hookMaxStepCallbacks_);
   const auto hookPatchCount =
-      options_.hookInitPatchCount + hookPatchCount_.GetValue();
+      activeHookInit_.patchCount + hookPatchCount_.GetValue();
   const auto hookEmitCount =
-      options_.hookInitEmitCount + hookEmitCount_.GetValue();
+      activeHookInit_.emitCount + hookEmitCount_.GetValue();
   const auto hookEmitDroppedCount =
-      options_.hookInitEmitDroppedCount + hookEmitDroppedCount_.GetValue();
+      activeHookInit_.emitDroppedCount + hookEmitDroppedCount_.GetValue();
   const auto hookPredictCount =
-      options_.hookInitPredictCount + hookPredictCount_.GetValue();
+      activeHookInit_.predictCount + hookPredictCount_.GetValue();
   const auto hookOutOfDomainCount =
-      options_.hookInitOutOfDomainCount + hookOutOfDomainCount_.GetValue();
+      activeHookInit_.outOfDomainCount + hookOutOfDomainCount_.GetValue();
   const auto eventCount = eventSummaryCount_.GetValue();
   const auto eventEdepSumMeV = eventEdepSumMeV_.GetValue();
   const auto eventEdepSqSumMeV2 = eventEdepSqSumMeV2_.GetValue();
@@ -1439,6 +1449,9 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   if (!options_.modelArtifactsJson.empty()) {
     scores["model_artifacts"] = nlohmann::json::parse(options_.modelArtifactsJson);
   }
+  if (!activeLabScriptJson_.empty()) {
+    scores["lab_script"] = nlohmann::json::parse(activeLabScriptJson_);
+  }
   // Uniform precision reporting: the profile the scenario resolved plus the
   // axes it mapped onto it, each with its physics-agnostic role and whether it
   // is representation-only. Emitted only when a scenario declares a profile, so
@@ -1825,6 +1838,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.hookOutOfDomainCount = hookOutOfDomainCount;
   record.modelsLoaded = options_.modelsLoaded;
   record.modelArtifactsJson = options_.modelArtifactsJson;
+  record.labScriptJson = activeLabScriptJson_;
   record.precisionProfile = cfg_.precision.profile;
   record.precisionAxisCount = static_cast<int>(cfg_.precision.axes.size());
   record.nuclearEnabled = cfg_.nuclear.enable;
@@ -1848,7 +1862,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.systemEventEdepExcessKurtosis = eventEdepShape.excessKurtosis;
   copyGeometryIssues(options_, record);
   record.configUnknownKeys = cfg_.unknownKeys;
-  record.hookPatchIgnoredPaths = options_.hookInitIgnoredPatchPaths;
+  record.hookPatchIgnoredPaths = activeHookInit_.ignoredPatchPaths;
   provenance_.write(record);
 }
 
@@ -2228,8 +2242,8 @@ void TrechRunAction::AddStratifyResult(const ml::StratifyResult& result) {
 }
 
 void TrechRunAction::RecordHookOnInit() {
-  // onInit runs once, in the CLI, before construction; a lab kernel has no JS.
-  if (hookOnInitEnabled_ && options_.hookInitDispatched) {
+  // onInit runs in the CLI before construction, or once per lab script (re)load.
+  if (hookOnInitEnabled_ && activeHookInit_.dispatched) {
     hookOnInitCount_ += 1;
   }
 }

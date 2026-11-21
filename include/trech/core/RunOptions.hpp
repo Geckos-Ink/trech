@@ -30,6 +30,17 @@ enum class CliCommand {
   Budget,
 };
 
+// onInit tallies one batch reports (patch/emit/predict counts and unapplied override paths).
+struct HookInitTallies {
+  bool dispatched = false;
+  int patchCount = 0;
+  std::vector<std::string> ignoredPatchPaths;
+  int emitCount = 0;
+  int emitDroppedCount = 0;
+  int predictCount = 0;
+  int outOfDomainCount = 0;
+};
+
 // Mutable only between BeamOn calls. A real-time lab keeps one initialized
 // Geant4 kernel alive, while each compatible batch still needs truthful
 // per-batch event counts and canonical configuration provenance.
@@ -37,6 +48,14 @@ struct RuntimeRunMetadata {
   int nEvents = 0;
   std::uint64_t seed = 0;
   std::string configJson;
+  // Scenario-backed lab only (`trech lab <experiment.js>`). When set, this batch reports
+  // `hookInit` instead of the RunOptions tallies copied when the kernel was built: onInit
+  // runs once per script (re)load, so only the first batch after a load counts it.
+  bool hasHookInit = false;
+  HookInitTallies hookInit;
+  // Canonical JSON identity of the hook script generation that drives this batch (provenance
+  // `lab_script`); empty outside a scenario-backed lab.
+  std::string labScriptJson;
 };
 
 struct RunOptions {
@@ -84,8 +103,9 @@ struct RunOptions {
   bool dnaChemistryEnabled = false;
   int dnaChemistryOption = 0;
   JsRuntime* hookRuntime = nullptr;
-  // True once the CLI dispatched onInit through a JS runtime. A lab session
-  // runs no JavaScript, so a registered onInit is not counted there.
+  // True once the CLI dispatched onInit through a JS runtime. A config-only lab
+  // runs no JavaScript, so a registered onInit is not counted there; a scenario-backed
+  // lab reports each load's onInit through RuntimeRunMetadata instead.
   bool hookInitDispatched = false;
   int hookInitPatchCount = 0;
   // Leaf paths of the onInit override that were not applied (HookDispatchReport).

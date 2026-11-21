@@ -102,6 +102,15 @@ Owns the real-time `trech lab` protocol (no Geant4 dependency; the runner calls 
   honor `--strict-config`. Permissive commands return ignored config paths for CLI warnings.
   Invalid patches and invalid explicit `simulate` overrides leave configuration and planner
   telemetry intact.
+- **Scenario-backed sessions** (`LabSession(cfg, strict, /*scriptBacked=*/true)`, 2026-11-21):
+  `reload` and `params` (`{"values":{name:json}}`) only return `requestScriptReload` plus the
+  changes; the CLI evaluates the script through `LabScriptHost` (see the
+  [runtime handbook](../runtime/AGENTS.md#live-lab-script-host--srcjslabscripthostcpp)).
+  Every accepted patch is kept in order, and `rebasedConfig` replays them on a re-evaluated
+  scenario config, keeps the session's `run.nEvents`/`run.seed` and re-enables `lab`;
+  `adoptConfig` commits it. `labKernelSignature` (config minus run count/seed and `lab`) lives
+  here so the Geant4 runner and the CLI share it; `GeantLabRunner::accepts` compares it before a
+  swap. Without a scenario, `reload`/`params` fail with a message naming `trech lab <experiment.js>`.
 - **Tests:** [`tests/test_lab_session.cpp`](../../../tests/test_lab_session.cpp).
 
 #### [`src/core/Provenance.cpp`](../../../src/core/Provenance.cpp) · [`Provenance.hpp`](../../../include/trech/core/Provenance.hpp)
@@ -120,7 +129,8 @@ reduction algorithm identity. It is output metadata and does not enter the confi
 #### [`apps/trech-cli/main.cpp`](../../../apps/trech-cli/main.cpp)
 
 The `trech` executable. `main` parses options, then dispatches: `Lab` → `runLabSession` (JSONL
-loop, `GeantLabRunner`); `Inspect` → prints `{config, parameters}` JSON; `Run` → eval JS,
+loop, `GeantLabRunner`; with a scenario, a `LabScriptHost` whose stable runtime is the
+`hookRuntime` of every batch); `Inspect` → prints `{config, parameters}` JSON; `Run` → eval JS,
 `onInit` hook, `applyRunOverrides`, `runGeant4`. Geant4-free builds parse config and exit OK.
 
 - **Config-hash churn.** Symptom: unrelated scenarios' config hashes change after adding a field.
@@ -131,8 +141,8 @@ loop, `GeantLabRunner`); `Inspect` → prints `{config, parameters}` JSON; `Run`
 
 - **CLI:** `trech run <exp.js> [--macro --ui --output/-o --seed --events --param --viz
   --viz-all --viz-max-trajectories --strict-config]`,
-  `trech inspect <exp.js> [--param n=<json> --strict-config]`, `trech lab [--config --commands
-  --output --seed --events --strict-config]` → [`apps/trech-cli/main.cpp`](../../../apps/trech-cli/main.cpp) + `parseRunOptions`/`runUsage`
+  `trech inspect <exp.js> [--param n=<json> --strict-config]`, `trech lab [<exp.js> --param n=<json> | --config]
+  [--commands --output --seed --events --strict-config]` → [`apps/trech-cli/main.cpp`](../../../apps/trech-cli/main.cpp) + `parseRunOptions`/`runUsage`
   in [`src/core/RunOptions.cpp`](../../../src/core/RunOptions.cpp).
 - **Hook `ctx` surface:** `config`/`runtime`/`event`/`step`/`state`/`rng`/`emit`/`predict`/
   `cascade`/`evolve`/`materials`/`optics` → [`src/js/JsRuntime.cpp`](../../../src/js/JsRuntime.cpp).
@@ -149,7 +159,9 @@ loop, `GeantLabRunner`); `Inspect` → prints `{config, parameters}` JSON; `Run`
 - **Config collections** (single-or-array, plural names): `beams`/`materials`/`geometry.volumes`/
   `hooks.registered`/`models`/`optics.spectrum`/`analytic.checks`/`nuclear.cycles` →
   [`src/core/Config.cpp`](../../../src/core/Config.cpp).
-- **Lab protocol:** `patch`/`simulate`/`snapshot`/`help`/`quit` → [`src/core/LabSession.cpp`](../../../src/core/LabSession.cpp).
+- **Lab protocol:** `patch`/`simulate`/`snapshot`/`help`/`quit`, plus `reload`/`params` in a
+  scenario-backed session → [`src/core/LabSession.cpp`](../../../src/core/LabSession.cpp); script
+  evaluation → [`src/js/LabScriptHost.cpp`](../../../src/js/LabScriptHost.cpp).
 - **Output files** (schemas in [`docs/engine/output_schema.md`](../../../docs/engine/output_schema.md)):
   `trech_scores.jsonl`/`trech_provenance.jsonl` (core writers), `trech_event_scores.jsonl`
   (stratifier), `trech_hook_emits.jsonl` (hook emits), `trech_viz_scene.json` +

@@ -17,13 +17,47 @@ dated record below, and queue its residuals in the same change.
 
 - **P1** · R1 · Finish strict multi-thread byte replay for JavaScript hook dispatch and emits. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P2** · R1 · Strict MT output: bound pending event-record memory when an early event delays contiguous output, and extend replay validation across geometries, physics, sources and platforms. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
-- **P2** · R1 · Deterministic host math residuals: run the `trech_deterministic_math` goldens on Linux/glibc (GCC) and Windows/MSVC, and record a strict hook run replayed byte for byte across two hosts; V8 parity needs the same `trech_dmath` installed as the V8 backend's Math (V8's own fdlibm build fuses FMA on arm64 and Node defaults to platform `pow`). ([detail](#deterministic-host-math-2026-11-16))
+- **P2** · R1 · Deterministic host math residuals: run the `trech_deterministic_math` goldens on Linux/glibc (GCC) and Windows/MSVC, and record a strict hook run replayed byte for byte across two hosts. ([detail](#deterministic-host-math-2026-11-16))
+- **P2** · R7 · V8 math parity residuals: the `**` operator keeps V8's pow (scripts must use `Math.pow` for cross-engine replay, and nothing yet checks a scenario for `**`); run `trech_dmath_wasm` on x86_64 and Linux V8; an embedded V8 backend must install the module, or link `trech_dmath` natively, before running scripts; per-call cost is about 3.8× V8's builtins (24 vs 6.4 ns). ([detail](#v8-deterministic-math-and-live-lab-scripts-2026-11-21))
+- **P1** · R6 · Scenario-backed lab residuals: kernel-bound `params` (beam, geometry) still need a restart (same reinitialization item below); Studio does not yet drive `reload`/`params` from its Options panel or editor; JS hook state and emits are scheduling-dependent with `run.threads > 1`; no file-watch auto-reload; source hashes are read after evaluation (an edit in between is misattributed). ([detail](#v8-deterministic-math-and-live-lab-scripts-2026-11-21))
 - **P1** · R6 · Safe `trech lab` reinitialization of geometry/beam/physics/scoring patches (now restart-required), then the restart handshake through Studio. ([detail](#2026-07-15-studio-fidelity-adaptive-lab-rounds-and-liquid-pair-checkpoint))
 - **P2** · R1 · Track hooks: multi-worker dispatch order and per-worker guardrail counts; the track-ledger example is single-threaded only and has no preview media. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P2** · R2 · Widen the liquid-pair/evaporation training domain and close the n-pentane derived-index residual (1.218 vs 1.358) through the generic optics path. ([detail](#2026-07-15-studio-fidelity-adaptive-lab-rounds-and-liquid-pair-checkpoint))
 - **P3** · RX · Atomic stability research Phase A: correlated helium, deuteron interaction, relativistic/QED corrections and NIST benchmarks. ([detail](#atomic-stability-research))
 - **P3** · RX · IASF ledger, physical bases, open channels and validated transition elements; quantitative basis/model uncertainties and held-out predictive gain. ([detail](#atomic-stability-research))
 - **P3** · R7 · Relocatable/Windows research hosting for the Node launcher. ([detail](#atomic-stability-research))
+
+## V8 deterministic math and live lab scripts (2026-11-21)
+
+- [x] V8 Math parity through WebAssembly. `scripts/build_dmath_wasm.py` compiles
+  `src/js/DeterministicMath.c` with Emscripten 6.0.13 (20 036-byte import-free module,
+  byte-reproducible: `--check` passes). `js/trech_dmath_v8.js` installs it as `Math.*` with
+  QuickJS's JavaScript wrappers. Verification on macOS arm64, Node 24.21.0 / V8 13.6.233.17:
+  CTest `trech_dmath_wasm` reproduces all 22 C golden digests (4096 inputs each), the special
+  cases and the wrapper semantics. `scripts/js_engine_differential.py --dmath` is now
+  **bit-identical** on the whole probe: 20/20 builtins (previously `hypot` 16 and `pow` 7
+  differences), 32/32 gaussians, and all 288 coordinates and 96 CHILL+ phases after the 40 mW
+  steps. Before, three coordinates differed by 1 ulp. New CTest `trech_js_engine_differential_dmath` gates that
+  identity. Timing (same host, 4×10^7 calls of exp/sin/log/pow in a JIT-compiled loop): V8
+  builtins 6.4 ns/call, V8 + `trech_dmath` 24 ns/call, QuickJS host 51 ns/call.
+- [x] Scenario-backed live lab. `trech lab <experiment.js> [--param n=<json>]` runs the
+  scenario's hooks in every batch on the persistent kernel. `params` / `reload` re-evaluate it
+  transactionally (`LabScriptHost`) and swap the hooks in between batches. Kernel-bound results
+  are refused with the previous script kept; provenance and scores carry `lab_script`. Each
+  load's `onInit` is counted once. See the [handbook](AGENTS.md#live-lab-script-host--srcjslabscripthostcpp)
+  and the [CLI guide](../../../docs/engine/cli.md#scenario-backed-lab-re-tune-hooks-between-batches).
+  Verification: Release CTest 72/72 (new `trech_lab_script_host`, `trech_dmath_wasm`,
+  `trech_js_engine_differential_dmath`; extended `trech_lab_session`, `trech_cli_parse`). The real
+  Geant4 example `examples/lab/live_hook_tuning.js` with its command file runs three 200-event
+  batches on one kernel. Identical seeds give identical mean deposit (0.2181 MeV) and the live
+  threshold gives 44 / 58 / 44 events above 0.5 / 0.1 / 0.5 MeV. Provenance generations are
+  1/2/3 with the matching overrides and one config hash. Over stdin, a
+  `beam_energy_mev` change and an unknown value were refused with the session kept. An edited hook
+  body reloaded (generation 3, new source digest, `edited: true` in the emit), and adding `onStep`
+  was refused while the previous hooks kept their state into the next batch. The config-only lab
+  (`realtime_lab_bootstrap.json`) produced the same batches and records without `lab_script`.
+- [ ] Residuals queued above: V8 `**` and other hosts; scenario-lab restart-free kernel edits,
+  Studio wiring, multi-worker hook replay, file watching and source-hash timing.
 
 ## Deterministic host math (2026-11-16)
 
@@ -42,8 +76,9 @@ dated record below, and queue its residuals in the same change.
   has been replayed across two hosts. Hook outputs on this host changed by up to an ulp versus
   runs recorded before this change (platform libm → fdlibm); older strict artifacts with hook
   math do not replay byte for byte against new builds.
-- [ ] Residual: V8 backend parity — install `trech_dmath` as the V8 backend's Math (and `**`),
-  since V8's built-in fdlibm is FMA-contracted on arm64 Node and Node defaults to `std::pow`.
+- [x] ~~Residual: V8 backend parity — install `trech_dmath` as the V8 backend's Math~~ (Node/V8
+  via WebAssembly, 2026-11-21, [record](#v8-deterministic-math-and-live-lab-scripts-2026-11-21));
+  `**` and an embedded backend remain queued.
 
 ## Atomic stability research
 

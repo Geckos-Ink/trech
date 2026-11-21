@@ -36,7 +36,7 @@ std::string runUsage() {
   out << "Usage:\n"
       << "  trech run <experiment.js> [options]\n"
       << "  trech inspect <experiment.js> [--param <name>=<json>]\n"
-      << "  trech lab [options]\n"
+      << "  trech lab [<experiment.js>] [options]   (live session; a scenario's hooks run)\n"
       << "  trech arch <job.json> [--output <dir>] [--generator evolvo|classic] [--python <exe>]\n"
       << "  trech budget [--features <n>] [--targets <n>]   (compute budget and model capacity, JSON)\n"
       << "Options:\n"
@@ -49,7 +49,7 @@ std::string runUsage() {
       << "  --events <n>      Override event count\n"
       << "  --refinement <x>  Continuous scenario precision factor (run/inspect)\n"
       << "  --time-budget <s> Soft simulation wall-time budget (predictive run only)\n"
-      << "  --param <n>=<json> Override a typed TRECH_VALUE (run/inspect; repeatable)\n"
+      << "  --param <n>=<json> Override a typed TRECH_VALUE (run/inspect/lab scenario; repeatable)\n"
       << "  --viz             Capture trajectories + scene manifest for 3D replay (run only)\n"
       << "  --viz-all         As --viz, also recording non-optical particles (run only)\n"
       << "  --viz-max-trajectories <n> Trajectory cap for a --viz capture (run only)\n"
@@ -101,6 +101,11 @@ RunOptions parseRunOptions(int argc, char** argv) {
     argStart = 3;
   } else if (command == "lab") {
     options.command = CliCommand::Lab;
+    // Optional scenario: `trech lab <experiment.js>` hosts its hooks live.
+    if (argc >= 3 && argv[2][0] != '-') {
+      options.experimentPath = argv[2];
+      argStart = 3;
+    }
   } else if (command == "budget") {
     // Probe the computational context; no scenario runs.
     options.command = CliCommand::Budget;
@@ -229,9 +234,9 @@ RunOptions parseRunOptions(int argc, char** argv) {
       continue;
     }
     if (arg == "--param") {
-      if (options.command == CliCommand::Lab) {
+      if (options.command == CliCommand::Lab && options.experimentPath.empty()) {
         options.valid = false;
-        options.error = "--param is only supported in run/inspect mode.";
+        options.error = "--param in lab mode needs a scenario: trech lab <experiment.js> --param ...";
         return options;
       }
       if (i + 1 >= argc) {
@@ -361,6 +366,12 @@ RunOptions parseRunOptions(int argc, char** argv) {
   if (options.command != CliCommand::Lab && options.experimentPath.empty()) {
     options.valid = false;
     options.error = "Missing experiment path.";
+    return options;
+  }
+  if (options.command == CliCommand::Lab && !options.experimentPath.empty() &&
+      !options.configPath.empty()) {
+    options.valid = false;
+    options.error = "trech lab takes a scenario or --config, not both.";
     return options;
   }
 

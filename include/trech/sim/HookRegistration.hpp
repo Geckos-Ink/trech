@@ -78,7 +78,7 @@ inline HookRegistration classifyRegisteredHooks(const std::vector<std::string>& 
 
 // Hook fields of a provenance record written before any event runs (the
 // geometry_refused phase). onInit was already dispatched by the CLI before
-// Geant4 construction (never in a lab session), so its count, patch, emit and
+// Geant4 construction (in a lab, only when it is scenario-backed), so its count, patch, emit and
 // predict tallies are real; every per-run/per-event callback count stays 0 because none ran.
 // Guardrails are the clamped config values RunAction would have applied.
 inline void fillPreRunHookProvenance(ProvenanceRecord& record, const TrechConfig& cfg,
@@ -94,7 +94,7 @@ inline void fillPreRunHookProvenance(ProvenanceRecord& record, const TrechConfig
   if (record.hookTrackCallbacksActive) {
     record.hooksGuardrailMaxTrackCallbacks = std::max(0, cfg.hooks.maxTrackCallbacks);
   }
-  // A lab session runs no JavaScript: a registered onInit did not run there.
+  // A config-only lab runs no JavaScript: a registered onInit did not run there.
   record.hookOnInitCount = hooks.onInit && options.hookInitDispatched ? 1 : 0;
   record.hookPatchCount = options.hookInitPatchCount;
   record.hookPatchIgnoredPaths = options.hookInitIgnoredPatchPaths;

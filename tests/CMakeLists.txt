@@ -30,6 +30,11 @@ target_link_libraries(test_js_runtime PRIVATE trech_js)
 target_compile_definitions(test_js_runtime PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_js_runtime COMMAND test_js_runtime)
 
+# Scenario-backed live lab: transactional script re-evaluation (Geant4-free).
+add_executable(test_lab_script_host test_lab_script_host.cpp)
+target_link_libraries(test_lab_script_host PRIVATE trech_js)
+add_test(NAME trech_lab_script_host COMMAND test_lab_script_host)
+
 # Deterministic host math: golden cross-host digests, IEEE special cases and QuickJS routing.
 # Contraction off so the test's own input generation is the same on every host.
 add_executable(test_deterministic_math test_deterministic_math.cpp)
@@ -333,6 +338,12 @@ if (TRECH_SPECTRA_NODE_EXECUTABLE)
     COMMAND "${TRECH_SPECTRA_NODE_EXECUTABLE}" --test ${TRECH_SPECTRA_JS_TESTS})
   set_tests_properties(trech_spectrum_prediction_js PROPERTIES TIMEOUT 300)
 endif()
+# trech_dmath compiled to WebAssembly for V8 hosts (js/trech_dmath_v8.js): the C golden
+# digests, staleness against the C source, and the QuickJS-compatible Math wrappers.
+if (TRECH_SPECTRA_NODE_EXECUTABLE)
+  add_test(NAME trech_dmath_wasm
+    COMMAND "${TRECH_SPECTRA_NODE_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/test_dmath_wasm.cjs")
+endif()
 # JS model definitions / structure searches / checkpoint store (tools/ml, js/trech_ml.js).
 # Node-only; training is exercised with a fake trainer, so no Python/torch is needed.
 if (TRECH_SPECTRA_NODE_EXECUTABLE)
@@ -356,6 +367,13 @@ if (TARGET trech AND TRECH_SPECTRA_NODE_EXECUTABLE AND Python3_Interpreter_FOUND
     COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/js_engine_differential.py"
       --trech "$<TARGET_FILE:trech>" --node "${TRECH_SPECTRA_NODE_EXECUTABLE}" --check)
   set_tests_properties(trech_js_engine_differential PROPERTIES TIMEOUT 120)
+  # With trech_dmath installed as V8's Math (WebAssembly), the whole probe -- builtins, RNG
+  # and the 40-step water trajectory -- must be bit-identical across the two engines.
+  add_test(NAME trech_js_engine_differential_dmath
+    COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/js_engine_differential.py"
+      --trech "$<TARGET_FILE:trech>" --node "${TRECH_SPECTRA_NODE_EXECUTABLE}"
+      --dmath --check --require-identical)
+  set_tests_properties(trech_js_engine_differential_dmath PROPERTIES TIMEOUT 120)
 endif()
 # Lab-mode geometry refusal through a real Geant4 kernel: refused batches, one
 # geometry_refused record, an interactive session that survives, no onInit count.

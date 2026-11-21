@@ -135,5 +135,79 @@ int main() {
   if (expect(permissive.ok && permissive.ignoredConfigKeys == std::vector<std::string>{"run.nEventsTypo"},
              "Permissive patches should report ignored keys")) return 1;
 
+  // Scenario re-evaluation actions need a scenario-backed session.
+  const auto noScript = session.applyCommandJson(R"({"action":"reload"})");
+  if (expect(!noScript.ok && noScript.message.find("scenario-backed") != std::string::npos,
+             "reload without a scenario must fail and say why")) return 1;
+
+  trech::TrechConfig scenario;
+  scenario.run.nEvents = 10;
+  scenario.run.seed = 7;
+  scenario.beam.particle = "e-";
+  scenario.beam.energyMeV = 1.0;
+  trech::LabSession live(scenario, false, true);
+  if (expect(live.scriptBacked(), "scriptBacked flag")) return 1;
+  const auto reload = live.applyCommandJson(R"({"action":"reload"})");
+  if (expect(reload.ok && reload.requestScriptReload && reload.scriptParameterChanges.empty() &&
+                 !reload.requestSimulation,
+             "reload requests a re-evaluation with no parameter changes")) return 1;
+  const auto params = live.applyCommandJson(
+      R"({"action":"params","values":{"threshold":0.5,"label":null}})");
+  if (expect(params.ok && params.requestScriptReload &&
+                 params.scriptParameterChanges.at("threshold") == 0.5 &&
+                 params.scriptParameterChanges.at("label").is_null(),
+             "params carries the TRECH_VALUE changes, null included")) return 1;
+  for (const char* bad : {R"({"action":"params"})", R"({"action":"params","values":3})"}) {
+    const auto result = live.applyCommandJson(bad);
+    if (expect(!result.ok && !result.requestScriptReload, "params needs an object")) return 1;
+  }
+  const auto help = live.applyCommandJson(R"({"action":"help"})");
+  if (expect(help.message.find("reload") != std::string::npos, "help lists reload")) return 1;
+
+  // Rebasing a re-evaluated scenario replays every accepted patch in order (including a
+  // null deletion) and keeps the session's batch event count and seed.
+  if (expect(live.applyCommandJson(R"({"action":"patch","patch":{"beam":{"energyMeV":2.0}}})").ok &&
+                 live.applyCommandJson(R"({"action":"patch","patch":{"beam":{"energyMeV":3.0},"hooks":{"inputs":{"a":1,"b":2}}}})").ok &&
+                 live.applyCommandJson(R"({"action":"patch","patch":{"hooks":{"inputs":{"b":null}}}})").ok &&
+                 live.applyCommandJson(R"({"action":"patch","patch":{"bogus":{"x":1}}})").ok == true,
+             "patches apply")) return 1;
+  if (expect(!live.applyCommandJson(R"({"action":"patch","patch":{"run":5}})").ok,
+             "an invalid patch is rejected and not recorded")) return 1;
+  if (expect(live.applyCommandJson(R"({"action":"simulate","events":3,"seed":99})").ok,
+             "simulate sets the batch")) return 1;
+  trech::TrechConfig reevaluated = scenario;
+  reevaluated.beam.particle = "gamma";
+  reevaluated.beam.energyMeV = 5.0;
+  reevaluated.run.nEvents = 1000;
+  reevaluated.run.seed = 1;
+  const auto rebased = live.rebasedConfig(reevaluated);
+  if (expect(rebased.beam.particle == "gamma" && rebased.beam.energyMeV == 3.0,
+             "scenario values change, patched values are replayed")) return 1;
+  if (expect(rebased.run.nEvents == 3 && rebased.run.seed == 99 && rebased.lab.enable,
+             "batch count, seed and lab mode are session state")) return 1;
+  const auto rebasedJson = nlohmann::json::parse(trech::configToJsonString(rebased));
+  if (expect(rebasedJson.at("hooks").at("inputs") == nlohmann::json({{"a", 1}}),
+             "null deletions replay in order")) return 1;
+  if (expect(live.config().beam.particle == "e-", "rebasedConfig does not change the session"))
+    return 1;
+  live.adoptConfig(rebased);
+  live.setScriptStatus({{"generation", 2}});
+  const auto snapshot = nlohmann::json::parse(live.snapshotJson());
+  if (expect(live.config().beam.particle == "gamma" &&
+                 snapshot.at("lab").at("script").at("generation") == 2,
+             "adoptConfig and the snapshot script status")) return 1;
+
+  // Kernel signature: batch count, seed and lab planner are free; anything else binds.
+  trech::TrechConfig a = scenario;
+  trech::TrechConfig b = scenario;
+  b.run.nEvents = 77;
+  b.run.seed = 5;
+  b.lab.targetHz = 120;
+  if (expect(trech::labKernelSignature(a) == trech::labKernelSignature(b),
+             "batch/planner changes keep the kernel signature")) return 1;
+  b.beam.energyMeV = 9.0;
+  if (expect(trech::labKernelSignature(a) != trech::labKernelSignature(b),
+             "a beam change binds the kernel")) return 1;
+
   return 0;
 }

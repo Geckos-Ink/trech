@@ -10,10 +10,12 @@ Use paths relative to the repository root in the examples below.
 | `trech inspect experiment.js` | Evaluate JS authoring and report its config, typed parameters and sources. |
 | `trech run experiment.js --output dir` | Run an experiment and write its records. |
 | `trech lab --config config.json` | Keep a session open and issue JSON Lines commands. |
+| `trech lab experiment.js` | The same live session driven by a JavaScript scenario, whose hooks can be re-tuned between batches. |
 | `trech budget` | Report host compute budget and model capacity. |
 | `trech arch job.json` | Run the [architecture search workflow](../inference/evolvo_architectures.md). |
 
-Use `--param name=<json>` repeatedly for declared values in `run` or `inspect`.
+Use `--param name=<json>` repeatedly for declared values in `run`, `inspect` or a
+scenario-backed `lab`.
 Quote JSON strings for your shell, for example `--param 'material="urea"'`.
 `--strict-config` refuses unknown keys. `--events` and `--seed` override the
 requested event count and random seed in `run`. `--viz` captures optical trajectories
@@ -60,5 +62,49 @@ The first batch initializes Geant4. Compatible batches reuse its kernel. Live
 changes to event count, seed and planner settings are allowed. Changes to
 kernel-bound geometry, beam, physics, scoring or output state require a new
 session. Use `achieved_hz` when describing actual batch rate.
+
+### Scenario-backed lab: re-tune hooks between batches
+
+Start the lab with a scenario instead of `--config` and its JavaScript hooks run in every
+batch. Two more actions then re-evaluate the scenario between batches, on the same
+initialized Geant4 kernel:
+
+| Action | Use |
+| --- | --- |
+| `{"action":"params","values":{"name":<json>}}` | Change declared [`TRECH_VALUE`](scenario_hooks.md#typed-authoring-values)s and re-evaluate the scenario. `null` restores a value's default. Values accumulate across commands. |
+| `{"action":"reload"}` | Re-read the scenario and its includes from disk, for example after editing a hook. |
+
+Try the bundled [live tuning scenario](../../examples/lab/live_hook_tuning.js) with its
+[command stream](../../examples/lab/live_hook_tuning_commands.jsonl):
+
+```sh
+./build/dev/trech lab examples/lab/live_hook_tuning.js \
+  --commands examples/lab/live_hook_tuning_commands.jsonl --output build/dev/out_live_lab
+```
+
+It runs three 200-event batches with the same seed. Geant4 therefore transports the same
+events each time, and only the hook-layer threshold changes: the `deposit_tally` emits report
+44, 58 and 44 events above 0.5, 0.1 and 0.5 MeV.
+
+A re-evaluation is all or nothing. The lab evaluates the scenario in a separate JavaScript
+runtime, runs its `onInit`, replays your accepted `patch` commands on the new config and keeps
+the session's event count and seed. It swaps the new hooks in only if all of that succeeds and
+the result still fits the initialized kernel. Otherwise it prints
+`lab error: re-evaluation refused: …` and the previous hooks, their JavaScript state and the
+config stay active. A command file stops with exit code 1 on a refusal; an interactive session
+continues. The kernel refuses a re-evaluation that changes geometry, beam, physics, scoring,
+output, models or the set of registered hook names. Changing a hook's body or a value only
+the hooks read is always accepted. In the example, `beam_energy_mev` is refused and
+`edep_threshold_mev` is accepted.
+
+Hook state, such as module variables and `ctx.state`, persists from batch to batch and starts
+afresh after each accepted re-evaluation. After every (re)load the lab prints one
+`{"phase":"lab_script",…}` line with the script generation, the source digest, the overrides
+and the resolved declarations; `snapshot` repeats it as `lab.script`. Each batch's provenance
+and scores record which script generation drove it as
+[`lab_script`](output_schema.md#lab-script-identity), and `onInit` is counted once, in the
+first batch after each load. Use `run.threads: 1` when hooks accumulate state, as for
+`trech run`.
+
 [Lab output and planner fields](output_schema.md#trech-lab-stdout) ·
 [Runtime roadmap](../../AGENTS/engine/runtime/ROADMAP.md#priority-queue)

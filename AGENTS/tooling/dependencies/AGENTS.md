@@ -47,6 +47,12 @@ Read the root principles and the parent handbook first; then open only the subca
 - **QuickJS vs Node/V8 differential:** `scripts/js_engine_differential.py` (+ the Node host
   `scripts/js_engine_differential_node.js`) compares a scenario's top-level JS results bit for
   bit; CTest `trech_js_engine_differential` (needs `trech`, Node and Python, builds nothing).
+  `--dmath` installs [`js/trech_dmath_v8.js`](../../../js/trech_dmath_v8.js) first and
+  `trech_js_engine_differential_dmath` requires full bit identity.
+- **`trech_dmath` WebAssembly module:** `js/trech_dmath_wasm_data.js` is generated and committed.
+  Regenerate it with `scripts/build_dmath_wasm.py`, which needs an installed Emscripten `emcc`
+  (optional, never fetched; Homebrew 6.0.13 recorded). CMake does not build it. CTest
+  `trech_dmath_wasm` needs only Node and fails on a stale module (C source/header SHA-256).
 - **Optional V8 foundation:** official `thirds/v8` submodule `06637ec79e4` (15.9.0 candidate),
   not built and not the hook backend. `TRECH_ENABLE_V8_PROBE` defaults OFF; its standalone C++
   compile/code-cache probe is syntax-checked against pinned headers, not linked/run. Normal

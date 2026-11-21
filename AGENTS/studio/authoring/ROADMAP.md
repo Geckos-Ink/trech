@@ -12,7 +12,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R6 · Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab` and `simulate` streams snapshots back (engine reinitialization is a runtime P1). ([detail](#milestone-2--real-time-scenario-editing))
+- **P1** · R6 · Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab` and `simulate` streams snapshots back (engine reinitialization is a runtime P1). Start the lab as `trech lab <scenario.js>` so Options-panel changes become `params` and saved hook edits become `reload` (engine side landed 2026-11-21; show `lab_script` generations and refusals). ([detail](#milestone-2--real-time-scenario-editing))
 - **P1** · R6 · Complete the `SceneModel → scenario .js` round-trip for source dependencies and volume hierarchy. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · All-scenario render parity: moving apparatus meshes, scalar colour bars, chart/text overlays, simultaneous streams and an all-family capture matrix. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P2** · R6 · Transform gizmos (translate/rotate/scale) on the selected volume. ([detail](#milestone-2--real-time-scenario-editing))

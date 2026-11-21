@@ -102,6 +102,8 @@ class JsRuntime {
 public:
   JsRuntime();
   ~JsRuntime();
+  JsRuntime(const JsRuntime&) = delete;
+  JsRuntime& operator=(const JsRuntime&) = delete;
 
   std::string evalExperimentAndGetConfigJson(const std::string& path);
   // Set repeatable `name=<json>` overrides before evaluating an experiment.
@@ -114,6 +116,14 @@ public:
   // Inspection-only source inventory, optional TRECH_STUDIO UI and bundle validation metadata.
   // Kept outside the simulation config so UI edits do not change physics hashes.
   std::string authoringMetadataJson() const;
+  // Absolute paths of every JavaScript source the last evaluation read (the entry file and
+  // its TRECH_INCLUDE companions), in load order. The live lab hashes them for provenance.
+  std::vector<std::string> sourceFiles() const;
+  // Exchange the whole engine state (QuickJS context, hooks, models, pending emits) with
+  // `other`. The live lab keeps one JsRuntime address, which the Geant4 actions hold, and
+  // swaps a freshly evaluated runtime into it between batches. Never call while either
+  // runtime is evaluating or dispatching.
+  void swap(JsRuntime& other) noexcept;
   HookDispatchReport dispatchHook(const std::string& hookName,
                                   const HookRuntimeContext& context,
                                   TrechConfig* cfgForPatch,

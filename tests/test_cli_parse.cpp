@@ -214,6 +214,27 @@ int main() {
   }
 
   {
+    // Scenario-backed lab: `trech lab <experiment.js> [--param n=<json>]`.
+    const char* labScenario[] = {"trech", "lab", "exp.js", "--param", "threshold=0.5",
+                                 "--commands", "cmds.jsonl"};
+    const auto parsed = trech::parseRunOptions(7, const_cast<char**>(labScenario));
+    if (expect(parsed.valid && parsed.command == trech::CliCommand::Lab &&
+                   parsed.experimentPath == "exp.js" && parsed.commandsPath == "cmds.jsonl" &&
+                   parsed.scriptParameterOverrides.size() == 1,
+               "Expected a scenario-backed lab with a TRECH_VALUE override.")) return 1;
+    const char* labParamNoScenario[] = {"trech", "lab", "--param", "threshold=0.5"};
+    if (expect(!trech::parseRunOptions(4, const_cast<char**>(labParamNoScenario)).valid,
+               "Expected lab --param without a scenario to fail.")) return 1;
+    const char* labBoth[] = {"trech", "lab", "exp.js", "--config", "lab.json"};
+    if (expect(!trech::parseRunOptions(5, const_cast<char**>(labBoth)).valid,
+               "Expected a lab scenario plus --config to fail.")) return 1;
+    const char* labPlain[] = {"trech", "lab", "--config", "lab.json"};
+    const auto plain = trech::parseRunOptions(4, const_cast<char**>(labPlain));
+    if (expect(plain.valid && plain.experimentPath.empty(),
+               "Expected a config-only lab to keep an empty scenario path.")) return 1;
+  }
+
+  {
     const char* args[] = {"trech", "run", "exp.js", "--refinement", "3.125", "--time-budget", "0.25"};
     const auto opts = trech::parseRunOptions(7, const_cast<char**>(args));
     if (expect(opts.valid && opts.refinement == 3.125 && opts.timeBudgetSeconds == 0.25,

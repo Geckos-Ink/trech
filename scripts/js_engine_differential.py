@@ -14,7 +14,13 @@ the integer mulberry32 stream, Math.sqrt (correctly rounded by IEEE-754) and the
 labels are identical, and no Math builtin differs by more than 1 ulp. Trajectory divergence is
 reported, never gated.
 
+`--dmath` installs TRECH's deterministic host math in the Node context first
+(js/trech_dmath_v8.js: the QuickJS host's trech_dmath compiled to WebAssembly), so both
+engines evaluate Math.* with the same code; `--require-identical` then also fails unless every
+section, the water trajectory included, is bit-identical.
+
     python3 scripts/js_engine_differential.py --trech build/dev/trech [--json report.json] [--check]
+    python3 scripts/js_engine_differential.py --trech build/dev/trech --dmath --check --require-identical
 """
 from __future__ import annotations
 
@@ -68,8 +74,9 @@ def run_quickjs(trech: Path, scenario: Path) -> Dict[str, Any]:
     return json.loads(proc.stdout)
 
 
-def run_v8(node: str, scenario: Path) -> Dict[str, Any]:
-    proc = subprocess.run([node, str(NODE_HOST), str(scenario)], capture_output=True, text=True, cwd=ROOT)
+def run_v8(node: str, scenario: Path, dmath: bool = False) -> Dict[str, Any]:
+    cmd = [node, str(NODE_HOST)] + (["--dmath"] if dmath else []) + [str(scenario)]
+    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
     if proc.returncode != 0:
         raise SystemExit(f"v8: node host failed: {proc.stderr.strip()[-800:]}")
     return json.loads(proc.stdout)
@@ -108,7 +115,8 @@ def gate_failures(report: Dict[str, Any]) -> List[str]:
 
 def format_report(report: Dict[str, Any]) -> str:
     engine = report["engines"]["v8"]
-    lines = [f"QuickJS (trech inspect) vs V8 {engine.get('v8', '?')} (Node {engine.get('node', '?')})",
+    lines = [f"QuickJS (trech inspect) vs V8 {engine.get('v8', '?')} (Node {engine.get('node', '?')}), "
+             f"V8 Math: {engine.get('math', 'v8 builtin')}",
              f"{'section':24s} {'identical':>9s} {'different':>9s} {'max ulp':>8s}"]
     for name, s in report["sections"].items():
         lines.append(f"{name:24s} {s['identical']:9d} {s['different']:9d} {str(s['max_ulp']):>8s}")
@@ -125,16 +133,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--scenario", type=Path, default=PROBE)
     parser.add_argument("--json", type=Path, help="write the report here")
     parser.add_argument("--check", action="store_true", help="fail when a portability gate fails")
+    parser.add_argument("--dmath", action="store_true",
+                        help="install trech_dmath (WebAssembly) as Math in the V8 context")
+    parser.add_argument("--require-identical", action="store_true",
+                        help="with --check, also fail unless every section is bit-identical")
     args = parser.parse_args(argv)
     if not args.node:
         print("node was not found; set --node", file=sys.stderr)
         return 2
-    report = differential(run_quickjs(args.trech, args.scenario), run_v8(args.node, args.scenario))
+    report = differential(run_quickjs(args.trech, args.scenario),
+                          run_v8(args.node, args.scenario, args.dmath))
     print(format_report(report))
     if args.json:
         args.json.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if args.check:
         failures = gate_failures(report)
+        if args.require_identical and not report["bit_identical"]:
+            different = [name for name, s in report["sections"].items() if s["different"]]
+            failures.append("not bit-identical: " + ", ".join(different or ["water_mw.phases"]))
         for failure in failures:
             print("GATE FAIL: " + failure, file=sys.stderr)
         return 1 if failures else 0

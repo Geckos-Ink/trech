@@ -19,8 +19,15 @@ class GeantLabRunner {
   GeantLabRunner(const GeantLabRunner&) = delete;
   GeantLabRunner& operator=(const GeantLabRunner&) = delete;
 
+  // Sets the batch event count, seed and config in batchMetadata(); a scenario-backed lab
+  // sets that metadata's onInit tallies and script identity before calling this.
   int run(const TrechConfig& cfg);
   bool initialized() const;
+  // True when `cfg` can run on this kernel without a restart: nothing is initialized yet, or
+  // its labKernelSignature matches the initialized one.
+  bool accepts(const TrechConfig& cfg) const;
+  // Per-batch metadata shared with the run actions (batch counts, onInit tallies, script).
+  RuntimeRunMetadata& batchMetadata();
 
  private:
   struct Impl;

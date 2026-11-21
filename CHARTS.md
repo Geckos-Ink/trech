@@ -241,7 +241,7 @@ flowchart LR
     VALUES -->|"ordinary TRECH: default"| SCEN
     SCEN -->|writes| CFG["TRECH_CONFIG object/JSON/function"]
     SCEN --> HOOKS["TRECH_HOOKS (optional)"]
-    CMD["JSON command stream\n(patch/simulate/snapshot)"]
+    CMD["JSON command stream\n(patch/simulate/snapshot\n+ reload/params with a scenario)"]
   end
   subgraph Runtime
     CLI["trech run ..."] --> OV["CLI overrides\nseed/events/output + --param"]
@@ -249,6 +249,10 @@ flowchart LR
     QMETA --> STUDIOOPT["Studio right-sidebar Options\nnative typed controls"]
     STUDIOOPT -->|"validated --param name=json"| CLI
     LABCLI["trech lab ..."] --> LABCFG["Initial JSON config\n(--config optional)"]
+    LABCLI -->|"trech lab experiment.js"| LABJS["LabScriptHost\n(transactional re-evaluation,\nstable hook runtime swapped\nbetween batches)"]
+    JS --> LABJS
+    LABJS -->|"scenario config"| LABSESS
+    LABJS -->|"hooks + lab_script identity"| HOOKDISP
     CMD --> LABSESS["Lab session state\n(live patch merge)"]
     LABCFG --> LABSESS
     CFG --> PARSE["Config parser"]

@@ -33,6 +33,40 @@ initialized kernel, so the EWMA adapts toward steady-state cost. Event count, se
 settings may change between batches; kernel-bound changes are rejected with a restart-required
 error. `achieved_hz` remains the authoritative measured rate.
 
+A scenario-backed session (`trech lab experiment.js`) also prints one object after the first
+load and after every accepted `reload` or `params` re-evaluation; `snapshot` nests the same
+object at `lab.script`:
+
+- `phase`: `"lab_script"`.
+- `generation`, `entry`, `sources_sha256`, `sources`, `parameter_overrides`: the
+  [script identity](#lab-script-identity) recorded with every later batch.
+- `parameters`: the resolved `TRECH_VALUE` declarations, in the same form as
+  `trech inspect`'s `parameters`.
+- `hooks_registered`: the registered hook names (fixed for the life of the kernel).
+- `on_init`: what that load's `onInit` did (`dispatched`, `patch_count`, `ignored_patch_paths`,
+  `emit_count`, `emit_dropped_count`, `predict_count`, `predict_out_of_domain_count`).
+
+A refused re-evaluation prints `lab error: re-evaluation refused: <reason>` on stderr and no
+`lab_script` object.
+
+### Lab script identity
+
+`lab_script` (object) appears on `run_start` and `run_end` provenance records and in
+`trech_scores.jsonl` only for batches of a scenario-backed lab. Other runs omit the key, so their
+records are unchanged. It names the JavaScript that drove the batch, because hook code is not
+part of `config_json`: two batches can share a `config_hash` and still run different hooks.
+
+- `generation` (number): 1 for the first load, plus one for each accepted re-evaluation.
+- `entry` (string): the scenario path as given on the command line.
+- `sources` (array): every evaluated JavaScript file in load order, as `{path, sha256}`; `path`
+  is relative to the entry file's directory.
+- `sources_sha256` (string): SHA-256 over the `(path, sha256)` pairs, so equal values mean the
+  same code on any machine.
+- `parameter_overrides` (object): the `TRECH_VALUE` overrides in effect, from `--param` and
+  `params` commands. Values not listed use their declared default.
+
+Example: `{"entry":"examples/lab/live_hook_tuning.js","generation":2,"parameter_overrides":{"edep_threshold_mev":0.1},"sources":[{"path":"live_hook_tuning.js","sha256":"…"}],"sources_sha256":"…"}`.
+
 ## trech_provenance.jsonl
 
 Each run emits at least two records (`run_start`, `run_end`). Fields:
@@ -43,7 +77,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   counters are zero, `hooks_enabled` / `hook_unknown_registered_count` / the guardrails follow the
   same recognised-hook test as `run_start`, the `onInit` tallies (`hook_on_init_count`,
   `hook_patch_count`, `hook_emit_count`, ...) are real because `onInit` runs before construction
-  (a `trech lab` session runs no JavaScript, so its records count no `onInit` call),
+  (a config-only `trech lab` session runs no JavaScript, so its records count no `onInit`
+  call; a scenario-backed session counts each load's `onInit` in the first batch after it),
   and `stratify_model_hash`, `precision_*`, `nuclear_*` and `time_budget_seconds` match `run_start`; it
   carries `geometry_resolution`, `geometry_overlap_check` when the check ran, and
   `geometry_refusal`; no scores file is written).
@@ -88,8 +123,10 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `hooks_guardrail_max_step_callbacks` (number): configured `hooks.maxStepCallbacks` guardrail.
 - `hooks_guardrail_max_emits_per_callback` (number): configured `hooks.maxEmitsPerCallback` guardrail.
 - `hooks_guardrail_max_emit_payload_bytes` (number): configured `hooks.maxEmitPayloadBytes` guardrail.
-- `hook_on_init_count` (number): run-level count for `onInit` dispatch points (0 in a `trech lab`
-  session, which runs no JavaScript even when the config registers `onInit`).
+- `hook_on_init_count` (number): run-level count for `onInit` dispatch points (0 in a config-only
+  `trech lab` session, which runs no JavaScript even when the config registers `onInit`). A
+  scenario-backed lab runs `onInit` once per (re)load and reports it, with its patch, emit and
+  predict tallies, only in the first batch after that load; later batches report 0.
 - `hook_on_run_start_count` (number): run-level count for `onRunStart` dispatch points.
 - `hook_on_event_start_count` (number): run-level count for `onEventStart` dispatch points.
 - `hook_on_step_count` (number): guardrail-clamped count for `onStep` dispatch points.
@@ -171,6 +208,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `models_loaded` (array[string]): names of successfully loaded scenario-registry models, sorted.
 - `model_artifacts` (object, optional): the model loader snapshots described below.
   Present on both provenance phases when a registry or separate loader is configured.
+- `lab_script` (object, optional): the [hook script identity](#lab-script-identity) of a
+  scenario-backed `trech lab` batch; absent otherwise.
 
 Example:
 
@@ -289,6 +328,8 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `models_loaded` (array[string]): successfully loaded scenario-registry model names, sorted.
 - `model_artifacts` (object, optional): the same [model loader snapshots](#scenario-model-artifact-manifest)
   recorded in provenance; omitted when neither registry nor separate loader is configured.
+- `lab_script` (object, optional): the [hook script identity](#lab-script-identity) of a
+  scenario-backed `trech lab` batch; absent otherwise.
 - `system_enabled` (boolean): whether system-level aggregation is enabled.
 - `system_mode` (string): system aggregation mode label (config).
 - `system_frame` (string): system frame label (config, point-agnostic by default).

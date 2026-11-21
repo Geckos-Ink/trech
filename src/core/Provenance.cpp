@@ -128,6 +128,9 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   if (!record.modelArtifactsJson.empty()) {
     j["model_artifacts"] = nlohmann::json::parse(record.modelArtifactsJson);
   }
+  if (!record.labScriptJson.empty()) {
+    j["lab_script"] = nlohmann::json::parse(record.labScriptJson);
+  }
   j["nuclear_enabled"] = record.nuclearEnabled;
   j["nuclear_cycle_count"] = record.nuclearCycleCount;
   j["nuclear_consistent_cycle_count"] = record.nuclearConsistentCycleCount;

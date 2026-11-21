@@ -60,23 +60,42 @@ LabCommandResult failureResult(const std::string& message) {
   return result;
 }
 
-std::string helpText() {
+std::string helpText(bool scriptBacked) {
   std::ostringstream out;
   out << "Lab actions: "
       << "patch({\"patch\":{...}}), simulate() [adaptive], "
-      << "simulate({\"events\":N,\"seed\":S}) [override], "
-      << "snapshot, help, quit";
+      << "simulate({\"events\":N,\"seed\":S}) [override], ";
+  if (scriptBacked) {
+    out << "reload [re-read the scenario], params({\"values\":{name:json}}) [TRECH_VALUE], ";
+  }
+  out << "snapshot, help, quit";
   return out.str();
+}
+
+void enableLab(TrechConfig& cfg) {
+  cfg.lab.enable = true;
+  if (cfg.lab.mode.empty() || cfg.lab.mode == "scenario") {
+    cfg.lab.mode = "realtime";
+  }
 }
 
 } // namespace
 
-LabSession::LabSession(TrechConfig initialConfig, bool strictConfig)
-    : cfg_(std::move(initialConfig)), strictConfig_(strictConfig) {
-  cfg_.lab.enable = true;
-  if (cfg_.lab.mode.empty() || cfg_.lab.mode == "scenario") {
-    cfg_.lab.mode = "realtime";
+std::string labKernelSignature(const TrechConfig& cfg) {
+  auto config = nlohmann::json::parse(configToJsonString(cfg));
+  if (config.contains("run") && config.at("run").is_object()) {
+    config["run"].erase("nEvents");
+    config["run"].erase("seed");
   }
+  // Planner settings affect batch selection, not the initialized Geant4
+  // detector/physics/action graph.
+  config.erase("lab");
+  return config.dump();
+}
+
+LabSession::LabSession(TrechConfig initialConfig, bool strictConfig, bool scriptBacked)
+    : cfg_(std::move(initialConfig)), strictConfig_(strictConfig), scriptBacked_(scriptBacked) {
+  enableLab(cfg_);
   roundTelemetry_.targetSeconds = 1.0 / std::max(1, cfg_.lab.targetHz);
 }
 
@@ -125,7 +144,32 @@ std::string LabSession::roundTelemetryJson() const {
 std::string LabSession::snapshotJson() const {
   nlohmann::json snapshot = nlohmann::json::parse(configToJsonString(cfg_));
   snapshot["lab"]["roundPlanner"] = nlohmann::json::parse(roundTelemetryJson());
+  if (scriptStatus_.is_object()) {
+    snapshot["lab"]["script"] = scriptStatus_;
+  }
   return snapshot.dump();
+}
+
+TrechConfig LabSession::rebasedConfig(const TrechConfig& scenarioConfig) const {
+  auto merged = nlohmann::json::parse(configToJsonString(scenarioConfig));
+  for (const auto& patch : patches_) {
+    merged.merge_patch(patch);
+  }
+  auto candidate = configFromJsonString(merged.dump());
+  candidate.run.nEvents = cfg_.run.nEvents;
+  candidate.run.seed = cfg_.run.seed;
+  enableLab(candidate);
+  if (strictConfig_) requireNoUnknownConfigKeys(candidate);
+  return candidate;
+}
+
+void LabSession::adoptConfig(TrechConfig cfg) {
+  cfg_ = std::move(cfg);
+  roundTelemetry_.targetSeconds = 1.0 / std::max(1, cfg_.lab.targetHz);
+}
+
+void LabSession::setScriptStatus(nlohmann::json status) {
+  scriptStatus_ = std::move(status);
 }
 
 void LabSession::observeSimulation(double wallSeconds) {
@@ -173,7 +217,7 @@ LabCommandResult LabSession::applyCommandJson(const std::string& commandJson) {
 
   if (action == "help") {
     LabCommandResult result;
-    result.message = helpText();
+    result.message = helpText(scriptBacked_);
     return result;
   }
 
@@ -272,6 +316,7 @@ LabCommandResult LabSession::applyCommandJson(const std::string& commandJson) {
       if (strictConfig_) requireNoUnknownConfigKeys(candidate);
       const bool changed = configToJsonString(candidate) != before;
       cfg_ = std::move(candidate);
+      patches_.push_back(patch);
       roundTelemetry_.targetSeconds = 1.0 / std::max(1, cfg_.lab.targetHz);
       LabCommandResult result;
       result.ignoredConfigKeys = cfg_.unknownKeys;
@@ -280,6 +325,24 @@ LabCommandResult LabSession::applyCommandJson(const std::string& commandJson) {
     } catch (const std::exception& ex) {
       return failureResult(std::string("Patch failed: ") + ex.what());
     }
+  }
+
+  if (action == "reload" || action == "params" || action == "values") {
+    if (!scriptBacked_) {
+      return failureResult(action + " needs a scenario-backed lab: start it with "
+                           "`trech lab <experiment.js>`.");
+    }
+    LabCommandResult result;
+    result.requestScriptReload = true;
+    if (action != "reload") {
+      const char* key = command.contains("values") ? "values" : "params";
+      if (!command.contains(key) || !command.at(key).is_object()) {
+        return failureResult(action + " requires an object of TRECH_VALUE values "
+                             "({\"values\":{\"name\":<json>}}).");
+      }
+      result.scriptParameterChanges = command.at(key);
+    }
+    return result;
   }
 
   return failureResult("Unknown lab action: " + action);

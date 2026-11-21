@@ -140,10 +140,54 @@ It uses integer bit access and IEEE add/sub/mul/div/sqrt only, returns one canon
   60-digit decimal references). `Math.hypot` uses fdlibm `hypot` pairwise (QuickJS
   semantics); V8's own scaled-sum algorithm differs.
 
+- **V8 hosts (2026-11-21).** [`scripts/build_dmath_wasm.py`](../../../scripts/build_dmath_wasm.py)
+  compiles this same C file with Emscripten (`-O2 -ffp-contract=off -fno-fast-math`, standalone,
+  no imports) into [`js/trech_dmath_wasm_data.js`](../../../js/trech_dmath_wasm_data.js) (base64
+  module + source/header SHA-256 + compiler). [`js/trech_dmath_v8.js`](../../../js/trech_dmath_v8.js)
+  instantiates it synchronously and `install(math)` replaces the 22 functions with QuickJS-equivalent
+  wrappers (ToNumber in order, `pow` NaN for |x| = 1 with non-finite y, pairwise variadic
+  `hypot`); exact functions and `Math.random` stay. WebAssembly f64 arithmetic never fuses, so the
+  result is host-independent. CTest `trech_dmath_wasm` recomputes the 22 C goldens (parsed from
+  `tests/test_deterministic_math.cpp`) in V8 and fails when the C source/header hash differs from
+  the committed module (regenerate; `--check` verifies byte-reproducible output). The `**`
+  operator cannot be replaced from JavaScript: V8 keeps its own pow there. Regenerating needs
+  `emcc`; running needs only Node/V8.
+
 - **Emit guardrails silently truncate observer frames.** Symptom: a GIF ends early (MRI stage 3
   lost its reconstruction act). Cause: a callback emitting more than `hooks.maxEmitsPerCallback`
   frames — the excess is dropped and only counted in `hook_emit_dropped_count`. Fix: size the cap
   to the frames emitted per callback and check that counter is 0 after changing an emitter.
+
+#### Live lab script host — [`src/js/LabScriptHost.cpp`](../../../src/js/LabScriptHost.cpp)
+
+`trech lab <experiment.js>` (2026-11-21) hosts a scenario's hooks in the persistent Geant4
+session and re-evaluates the scenario between batches (`reload`, `params`). Header:
+[`LabScriptHost.hpp`](../../../include/trech/js/LabScriptHost.hpp).
+
+- **Stable runtime address.** The Geant4 actions copy `RunOptions::hookRuntime` when the
+  kernel is built, so `LabScriptHost` owns one `JsRuntime` for the session and `commit` swaps
+  a re-evaluated runtime's `Impl` into it (`JsRuntime::swap`; the QuickJS context opaque is
+  `&Impl::state`, so it moves with the `Impl`). Never swap during a batch.
+- **Transactional.** `prepare(changes)` evaluates in a fresh runtime with the merged
+  `TRECH_VALUE` overrides (null removes one), then dispatches `onInit` on the candidate config.
+  The CLI then rebases the session (replaying accepted patches) and asks
+  `GeantLabRunner::accepts` (same `labKernelSignature`). Only then does it call `commit`.
+  Any throw leaves the active hooks, JS state, models and config intact. Hook-set changes alter
+  `hooks.registered` and are refused, because action initialization decides which Geant4
+  callbacks exist; hook bodies and hook-only values are accepted.
+- **Per-batch accounting.** `prepareBatch` sets `RuntimeRunMetadata::{hasHookInit, hookInit,
+  labScriptJson}`; RunAction reads them at `BeginOfRunAction` into `activeHookInit_` /
+  `activeLabScriptJson_` instead of the construction-time `RunOptions` copy. A load's `onInit`
+  tallies go to the first completed batch after it (`batchCompleted`), and later batches report 0.
+  `lab_script` = generation, entry, per-source SHA-256 relative to the entry directory, a combined
+  digest and the overrides. It is written to provenance and scores only in this mode, so other
+  outputs are byte-unchanged. Hook code is not in `config_json`, which is why the identity is needed.
+- **Tests:** [`tests/test_lab_script_host.cpp`](../../../tests/test_lab_script_host.cpp) (stable
+  address, overrides, refused out-of-range/unknown/syntax-error re-evaluations leave the hooks
+  intact, edited-hook reload, null default, onInit once, identity changes);
+  [`tests/test_lab_session.cpp`](../../../tests/test_lab_session.cpp) (actions, rebase order,
+  kernel signature); [`tests/test_cli_parse.cpp`](../../../tests/test_cli_parse.cpp).
+  Real-kernel example: [`examples/lab/live_hook_tuning.js`](../../../examples/lab/live_hook_tuning.js).
 
 ## Lab command validation
 

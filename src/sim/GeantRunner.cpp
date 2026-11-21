@@ -1,4 +1,5 @@
 #include "trech/sim/GeantRunner.hpp"
+#include "trech/core/LabSession.hpp"
 #include "trech/core/SimulationBudget.hpp"
 #include "trech/core/Provenance.hpp"
 #include "trech/chem/DnaChemistry.hpp"
@@ -128,18 +129,6 @@ std::string dnaChemistryTag(int option) {
 } // namespace
 
 namespace {
-
-std::string labKernelSignature(const TrechConfig& cfg) {
-  auto config = nlohmann::json::parse(configToJsonString(cfg));
-  if (config.contains("run") && config.at("run").is_object()) {
-    config["run"].erase("nEvents");
-    config["run"].erase("seed");
-  }
-  // Planner settings affect batch selection, not the initialized Geant4
-  // detector/physics/action graph.
-  config.erase("lab");
-  return config.dump();
-}
 
 nlohmann::json loaderArtifact(const std::string& loader, const std::string& path,
                               const std::string& status, const std::string& note,
@@ -689,9 +678,21 @@ int GeantLabRunner::run(const TrechConfig& cfg) {
   if (impl_->kernelSignature.empty()) {
     impl_->kernelSignature = signature;
   }
-  impl_->options.runtimeMetadata->nEvents = cfg.run.nEvents;
-  impl_->options.runtimeMetadata->seed = cfg.run.seed;
-  impl_->options.runtimeMetadata->configJson = configToJsonString(cfg);
+  auto& metadata = *impl_->options.runtimeMetadata;
+  metadata.nEvents = cfg.run.nEvents;
+  metadata.seed = cfg.run.seed;
+  metadata.configJson = configToJsonString(cfg);
+  if (!impl_->runManager && metadata.hasHookInit) {
+    // The first construction copies these into its actions (and a geometry refusal record).
+    const auto& init = metadata.hookInit;
+    impl_->options.hookInitDispatched = init.dispatched;
+    impl_->options.hookInitPatchCount = init.patchCount;
+    impl_->options.hookInitIgnoredPatchPaths = init.ignoredPatchPaths;
+    impl_->options.hookInitEmitCount = init.emitCount;
+    impl_->options.hookInitEmitDroppedCount = init.emitDroppedCount;
+    impl_->options.hookInitPredictCount = init.predictCount;
+    impl_->options.hookInitOutOfDomainCount = init.outOfDomainCount;
+  }
   if (!impl_->geometryRefusal.empty()) {
     throw std::runtime_error(impl_->geometryRefusal +
                              "\nRestart the lab session with a corrected geometry.");
@@ -707,6 +708,14 @@ int GeantLabRunner::run(const TrechConfig& cfg) {
 
 bool GeantLabRunner::initialized() const {
   return impl_ && impl_->runManager != nullptr;
+}
+
+bool GeantLabRunner::accepts(const TrechConfig& cfg) const {
+  return impl_->kernelSignature.empty() || labKernelSignature(cfg) == impl_->kernelSignature;
+}
+
+RuntimeRunMetadata& GeantLabRunner::batchMetadata() {
+  return *impl_->options.runtimeMetadata;
 }
 
 } // namespace trech

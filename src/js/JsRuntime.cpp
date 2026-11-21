@@ -16,6 +16,7 @@
 #include "trech/ml/StateEvolution.hpp"
 
 #include <algorithm>
+#include <utility>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -6302,6 +6303,16 @@ std::string JsRuntime::authoringMetadataJson() const {
   }
   JS_FreeValue(impl_->ctx, encodedValidation);
   return metadata.dump();
+}
+
+std::vector<std::string> JsRuntime::sourceFiles() const {
+  std::lock_guard<std::mutex> lock(impl_->mutex);
+  return impl_->state.sourceFiles;
+}
+
+void JsRuntime::swap(JsRuntime& other) noexcept {
+  // The QuickJS context opaque points at Impl::state, so the state moves with its Impl.
+  std::swap(impl_, other.impl_);
 }
 
 void JsRuntime::setScriptParameterOverrides(

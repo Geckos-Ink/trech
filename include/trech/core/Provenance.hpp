@@ -74,6 +74,9 @@ struct ProvenanceRecord {
   // Snapshot of scenario models and configured separate loaders. Empty when
   // neither is configured; never reconstructed by reopening files.
   std::string modelArtifactsJson;
+  // Scenario-backed lab: canonical JSON naming the hook script generation, its source hash
+  // and TRECH_VALUE overrides for this batch (`lab_script`). Empty (and absent) otherwise.
+  std::string labScriptJson;
   // Precision profile the scenario resolved for this run ("" when it declares
   // none). `precisionAxisCount` is how many axes it mapped; the axes themselves
   // travel in config_json and in trech_scores.jsonl.

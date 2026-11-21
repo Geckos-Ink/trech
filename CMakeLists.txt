@@ -77,6 +77,7 @@ endif()
 
 add_library(trech_js
   src/js/JsRuntime.cpp
+  src/js/LabScriptHost.cpp
 )
 target_include_directories(trech_js PUBLIC ${PROJECT_SOURCE_DIR}/include)
 # trech_ml provides GenericSurrogate for the hook layer's ctx.predict.

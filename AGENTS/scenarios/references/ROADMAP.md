@@ -14,7 +14,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P2** · R1 · Deterministic host math residuals: cross-host golden runs and installing `trech_dmath` as a V8 backend's Math. (owned by the [engine/runtime queue](../../engine/runtime/ROADMAP.md#priority-queue))
+- **P2** · R1 · Deterministic host math residuals: cross-host golden runs; V8's `**` operator and an embedded backend's Math installation (Node/V8 `Math.*` parity landed 2026-11-21 through WebAssembly). (owned by the [engine/runtime queue](../../engine/runtime/ROADMAP.md#priority-queue))
 - **P2** · R6 · JS workflow execution: engine-neutral host boundary, editable training/harvest/inference jobs with provenance, progress/cancellation and safe model activation. ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
 - **P2** · R6 · Studio render parity across every scenario and the authoring residuals. (owned by the [studio/authoring queue](../../studio/authoring/ROADMAP.md#priority-queue))
 - **P3** · RX · Metals heat treatment as a separate family (composition, histories, microstructure, strength anchors). ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))

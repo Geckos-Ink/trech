@@ -1,0 +1,7 @@
+{"action":"simulate","events":200}
+{"action":"params","values":{"edep_threshold_mev":0.1}}
+{"action":"simulate","events":200}
+{"action":"params","values":{"edep_threshold_mev":null}}
+{"action":"simulate","events":200}
+{"action":"snapshot"}
+{"action":"quit"}

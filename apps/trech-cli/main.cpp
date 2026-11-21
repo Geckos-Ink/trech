@@ -2,6 +2,7 @@
 #include "trech/core/LabSession.hpp"
 #include "trech/core/RunOptions.hpp"
 #include "trech/js/JsRuntime.hpp"
+#include "trech/js/LabScriptHost.hpp"
 #include "trech/ml/ArchitectureGenerator.hpp"
 #include "trech/ml/ComputeBudget.hpp"
 
@@ -12,6 +13,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -47,9 +49,27 @@ void warnUnknownConfigKeys(const trech::TrechConfig& cfg, const trech::RunOption
   warnIgnoredConfigKeys(cfg.unknownKeys);
 }
 
+void warnIgnoredInitPaths(const trech::HookInitTallies& init) {
+  for (const auto& path : init.ignoredPatchPaths) {
+    std::cerr << "TRECH hooks: onInit override '" << path
+              << "' was not applied (not a patchable field, or wrong type)\n";
+  }
+}
+
 int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
   trech::TrechConfig cfg;
-  if (!options.configPath.empty()) {
+  // Scenario-backed lab: the scenario's hooks drive every batch, and `reload` / `params`
+  // re-evaluate it between batches on the same Geant4 kernel.
+  std::unique_ptr<trech::LabScriptHost> script;
+  if (!options.experimentPath.empty()) {
+    script = std::make_unique<trech::LabScriptHost>(
+        options.experimentPath, options.scriptParameterOverrides, options.strictConfig);
+    auto candidate = script->prepare();
+    warnIgnoredInitPaths(candidate.init);
+    cfg = candidate.config;
+    script->commit(std::move(candidate));
+    warnUnknownConfigKeys(cfg, options);
+  } else if (!options.configPath.empty()) {
     cfg = trech::configFromJsonString(readFileContents(options.configPath));
     warnUnknownConfigKeys(cfg, options);
   }
@@ -59,10 +79,12 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
   }
   trech::applyRunOverrides(cfg, options);
 
-  trech::LabSession session(cfg, options.strictConfig);
+  trech::LabSession session(cfg, options.strictConfig, script != nullptr);
+  if (script) session.setScriptStatus(script->status());
 #ifdef TRECH_HAS_GEANT4
   trech::RunOptions labRunOptions = options;
-  labRunOptions.hookRuntime = nullptr;
+  // A stable address: reloads swap a re-evaluated runtime into it between batches.
+  labRunOptions.hookRuntime = script ? script->runtime() : nullptr;
   labRunOptions.experimentPath.clear();
   trech::GeantLabRunner geantRunner(std::move(labRunOptions), argc, argv);
 #endif
@@ -80,6 +102,9 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
   } else {
     std::cout << "TRECH lab session started. Enter JSON commands or use "
                  "{\"action\":\"help\"}.\n";
+  }
+  if (script) {
+    std::cout << script->status().dump() << "\n";
   }
 
   std::string line;
@@ -112,12 +137,44 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
       std::cout << result.snapshotJson << "\n";
     }
 
+    if (result.requestScriptReload) {
+      // Transactional: evaluate beside the active runtime, check the kernel, then swap.
+      try {
+        auto candidate = script->prepare(result.scriptParameterChanges);
+        auto next = session.rebasedConfig(candidate.config);
+#ifdef TRECH_HAS_GEANT4
+        if (!geantRunner.accepts(next)) {
+          throw std::runtime_error(
+              "the re-evaluated scenario changes initialized Geant4 state (geometry, beam, "
+              "physics, scoring, output, models or the set of registered hooks); restart the "
+              "lab session to use it. The previous script stays active.");
+        }
+#endif
+        warnIgnoredInitPaths(candidate.init);
+        script->commit(std::move(candidate));
+        session.adoptConfig(std::move(next));
+        warnIgnoredConfigKeys(session.config().unknownKeys);
+        session.setScriptStatus(script->status());
+        std::cout << "Scenario re-evaluated (script generation " << script->generation()
+                  << ").\n"
+                  << script->status().dump() << "\n";
+      } catch (const std::exception& error) {
+        std::cerr << "lab error: re-evaluation refused: " << error.what() << "\n";
+        if (!interactive) {
+          return 1;
+        }
+        continue;
+      }
+    }
+
     if (result.requestSimulation) {
 #ifdef TRECH_HAS_GEANT4
       const auto started = std::chrono::steady_clock::now();
       int code = 0;
       try {
+        if (script) script->prepareBatch(geantRunner.batchMetadata());
         code = geantRunner.run(session.config());
+        if (script) script->batchCompleted();
       } catch (const std::exception& error) {
         // A refused geometry (geometry.refuseOn) or a restart-required patch
         // fails this batch only: an interactive session (Studio) stays up and

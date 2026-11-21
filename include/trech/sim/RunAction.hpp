@@ -354,6 +354,10 @@ private:
   HookInferenceCounts dispatchHookContext(const std::string& hookName,
                                           HookRuntimeContext& context);
   std::string activeConfigJson_;
+  // onInit tallies this run reports: the RunOptions copy, or the lab script host's per-batch
+  // values (RuntimeRunMetadata::hasHookInit). Fixed at BeginOfRunAction.
+  HookInitTallies activeHookInit_;
+  std::string activeLabScriptJson_;
   G4Accumulable<G4int> hookOnInitCount_;
   G4Accumulable<G4int> hookOnRunStartCount_;
   G4Accumulable<G4int> hookOnEventStartCount_;
