@@ -257,6 +257,11 @@ Batches write to `studio_lab_<scenario>_<id>/` under the Studio output root. The
 not yet redraw from live batches; open that folder with **File ▸ Open run output…** to view it.
 The Precision and resources and Chemistry options apply to normal runs only.
 
+To run the scenario's JavaScript on V8 instead of QuickJS, use an engine built with
+`-DTRECH_ENABLE_V8=ON` and start Studio with `TRECH_JS_ENGINE=v8` in its environment. Studio's
+runs and live lab inherit it; there is no engine selector in Studio yet. Hooks that compute a
+lot per batch then finish sooner ([V8 guide](../docs/engine/v8.md)).
+
 ## Stack
 
 - **PySide6 (Qt 6)** — dockable editor shell (viewport, outliner, inspector, console, code editor)

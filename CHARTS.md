@@ -19,7 +19,7 @@ flowchart LR
 ```
 
 This [research reference](docs/research/atomic_stability.md) has no Geant4 or learned-cascade input.
-The simulation hook runtime remains QuickJS; nuclear/QED matrix construction and cascade
+The simulation hook runtime is TRECH's own QuickJS/V8 host, not this Node process; nuclear/QED matrix construction and cascade
 integration are unfinished research work.
 
 ```mermaid
@@ -113,7 +113,7 @@ comparison clocks/values and display choices visible; rendering does not validat
 
 ```mermaid
 flowchart LR
-  E["Studio editor: root + included JS modules"] --> I["C++ / QuickJS trech inspect"]
+  E["Studio editor: root + included JS modules"] --> I["C++ / QuickJS or V8 trech inspect"]
   E --> Guard["Dirty source drafts: Save / Discard / Cancel before replacement or close"]
   Guard -->|"Cancel / save failure"| E
   I --> S["Source inventory + TRECH_VALUE controls + TRECH_STUDIO description"]
@@ -486,7 +486,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
   participant CLI as trech CLI
-  participant QJS as QuickJS
+  participant QJS as QuickJS or V8
   participant HOOK as TRECH_HOOKS (registered)
   participant CFG as Config loader
   participant RM as G4RunManager

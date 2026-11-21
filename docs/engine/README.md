@@ -14,4 +14,4 @@ Configuration, hook APIs, runtime backends, precision and the Geant4 base of tru
 | [Adaptive precision](adaptive_precision.md) | Commands, budgets, refinement and limits. |
 | [Output schema](output_schema.md) | JSON/JSONL contracts consumed by Studio and analysis tools. |
 | [Scenario hook API](scenario_hooks.md) | Hook context, allowed operations and inference/provenance contracts. |
-| [V8 embedding foundation](v8.md) | Optional backend foundation, QuickJS-identical `Math.*` for V8 and current limitations. |
+| [V8 JavaScript backend](v8.md) | Run scenarios and hooks on V8 instead of QuickJS: build, select, verify identical results, measure speed, limits. |

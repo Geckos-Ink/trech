@@ -91,6 +91,9 @@ struct RunOptions {
   // `trech lab <experiment.js> --watch`: before each batch, re-evaluate the scenario when a
   // file it read changed on disk (same transactional rules as the `reload` command).
   bool labWatch = false;
+  // `--js-engine quickjs|v8`: the JavaScript engine for every runtime this command creates
+  // (empty keeps TRECH_JS_ENGINE or the build default). Validated here, applied by the CLI.
+  std::string jsEngine;
   // `trech arch <job.json>`: generator override (evolvo|classic) and
   // Python interpreter for the Evolvo worker; empty keeps the job's values.
   std::string archGenerator;

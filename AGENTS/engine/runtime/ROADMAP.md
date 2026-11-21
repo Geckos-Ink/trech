@@ -18,7 +18,8 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R1 · Finish strict multi-thread byte replay for JavaScript hook dispatch and emits. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P2** · R1 · Strict MT output: bound pending event-record memory when an early event delays contiguous output, and extend replay validation across geometries, physics, sources and platforms. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P2** · R1 · Deterministic host math residuals: run the `trech_deterministic_math` goldens on Linux/glibc (GCC) and Windows/MSVC, and record a strict hook run replayed byte for byte across two hosts. ([detail](#deterministic-host-math-2026-11-16))
-- **P2** · R7 · V8 math parity residuals: the `**` operator keeps V8's pow, so only scripts checked with `scripts/check_js_pow_operator.py` (the repository's are, by CTest) replay bit for bit; a V8 host could rewrite `**` to `Math.pow` at load instead; run `trech_dmath_wasm` on x86_64 and Linux V8; an embedded V8 backend must install the module, or link `trech_dmath` natively, before running scripts; per-call cost is about 3.8× V8's builtins (24 vs 6.4 ns). ([detail](#v8-deterministic-math-and-live-lab-scripts-2026-11-21))
+- **P2** · R7 · V8 backend residuals: validated only with Homebrew V8 15.9.128.11 on macOS arm64; build the pinned submodule with `scripts/build_v8.sh` (written, never run) and validate the monolith path, Linux/x86_64 and Windows; decide when V8 becomes the default engine (`TRECH_DEFAULT_JS_ENGINE`) after that matrix; per-dispatch fixed cost is higher on V8 (6.3 vs 4.7 µs for an empty hook: the config is re-parsed and ~25 `ctx` properties set per dispatch); `**` stays refused rather than rewritten to `Math.pow` at load; V8 code cache for lab re-evaluations; Studio has no engine selector (only the inherited `TRECH_JS_ENGINE`); run `trech_dmath_wasm` on x86_64/Linux Node. ([detail](#v8-javascript-backend-2026-11-21))
+- **P2** · R1 · Engine run parity coverage: `scripts/js_engine_run_parity.py` covers 8 scenarios (5 in CTest); extend to the remaining hook scenarios and to predictive runs with model inference, and to multi-threaded runs once their emit order replays (item above). Learning scenarios replay only under a pinned `TRECH_COMPUTE_BUDGET` ([lattice queue](../lattice/ROADMAP.md#priority-queue)). ([detail](#v8-javascript-backend-2026-11-21))
 - **P1** · R6 · Scenario-backed lab residuals: kernel-bound `params` (beam, geometry) still need a restart (same reinitialization item below); JS hook state and emits are scheduling-dependent with `run.threads > 1`; `--watch` checks files only before a batch (no push notification while idle), and a file the scenario reads through another channel (PubChem cache, model artifacts) is not watched or digested; Studio's viewport does not redraw from live batches (Studio authoring queue). ([detail](#live-lab-watch-studio-params-and-the--guard-2026-11-21))
 - **P1** · R6 · Safe `trech lab` reinitialization of geometry/beam/physics/scoring patches (now restart-required), then the restart handshake through Studio. ([detail](#2026-07-15-studio-fidelity-adaptive-lab-rounds-and-liquid-pair-checkpoint))
 - **P2** · R1 · Track hooks: multi-worker dispatch order and per-worker guardrail counts; the track-ledger example is single-threaded only and has no preview media. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
@@ -26,6 +27,34 @@ dated record below, and queue its residuals in the same change.
 - **P3** · RX · Atomic stability research Phase A: correlated helium, deuteron interaction, relativistic/QED corrections and NIST benchmarks. ([detail](#atomic-stability-research))
 - **P3** · RX · IASF ledger, physical bases, open channels and validated transition elements; quantitative basis/model uncertainties and held-out predictive gain. ([detail](#atomic-stability-research))
 - **P3** · R7 · Relocatable/Windows research hosting for the Node launcher. ([detail](#atomic-stability-research))
+
+## V8 JavaScript backend (2026-11-21)
+
+- [x] V8 as a full TRECH JavaScript engine. `JsRuntime.cpp` compiles a second time against
+  `src/js/V8QuickJsApi.hpp` (a V8 implementation of the 62 QuickJS functions the host uses), so
+  every global, the hook `ctx`, `ctx.rng` and all inference APIs run on V8 from one source.
+  `trech::JsRuntime` is a facade (`JsEngine::QuickJs|V8`), selected by `--js-engine`,
+  `TRECH_JS_ENGINE` or `TRECH_DEFAULT_JS_ENGINE`. `Math.*` is native `trech_dmath` with QuickJS's
+  wrappers (fast API); `**` is refused with its location in scripts, `eval` and `new Function`.
+  Provenance and `lab_script` record `js_engine` only for V8.
+- [x] Build: `TRECH_ENABLE_V8` + `cmake/TrechV8.cmake` (installed prefix, Homebrew auto-detected,
+  or `TRECH_V8_BUILD_DIR` monolith; ABI definitions probed at configure time).
+  `scripts/build_v8.sh` builds the pinned submodule from source (not run here).
+  `trech-v8-probe` now links and runs (Homebrew V8 15.9.128.11, code-cache round trip passes).
+- [x] Verification (macOS arm64, Homebrew V8 15.9.128.11, Release): `trech inspect` of all 71
+  repository scenarios byte-identical on both engines; whole runs identical for `hello_world`,
+  `hooks_track_ledger`, `cascade_multiscale_demo`, `surrogate_generic_demo`, `h2o_bulk_water`,
+  `briggs_rauscher_oscillator` and `lava_lamp` (pinned compute budget); `config_hook_dispatch`
+  is multi-threaded and does not replay on QuickJS either. CTest 84/84 on the default engine and
+  84/84 with `TRECH_JS_ENGINE=v8` for every test (after converting the Euler fixture's five `**`
+  to `Math.pow`; the checker now also scans `tests/fixtures`). New tests:
+  `trech_js_engine_parity`, `trech_pow_operator_scan`, `trech_js_engine_run_parity` and six
+  `_v8` suite twins.
+- [x] Speed (`trech run` wall time, QuickJS → V8): `h2o_bulk_water` 70.2 → 6.1 s,
+  `briggs_rauscher_oscillator` 4.3 → 1.7 s, `lava_lamp` 102 → 77 s. `trech-js-bench`: a
+  96-particle LJ hook step 745 → 61–94 µs; an empty hook 4.7 → 6.3 µs.
+- [ ] Residuals queued above (other platforms and the monolith path, the default switch,
+  per-dispatch cost, `**`, code cache, Studio selector, wider run parity).
 
 ## Live lab watch, Studio params and the `**` guard (2026-11-21)
 

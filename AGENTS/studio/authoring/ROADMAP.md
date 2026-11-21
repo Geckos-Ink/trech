@@ -18,6 +18,7 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R6 · Transform gizmos (translate/rotate/scale) on the selected volume. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics, undo/redo. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Code editor: inline error markers, dynamic aliases/computed properties, template interpolation and complete config-schema completion (from Milestone 0). ([detail](../ROADMAP.md#milestone-0--the-basis-this-scaffold-landed-2026-07-11))
+- **P3** · R6 · JavaScript engine selector in Run settings: pass `--js-engine quickjs|v8` to runs and the live lab when the engine binary has V8 (today only an inherited `TRECH_JS_ENGINE` selects it). ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P3** · R6 · Live authoring extensions: asynchronous inspection, draft persistence, crash recovery, atomic multi-file saves, source-content provenance, widget layout, workflow jobs, validated model/kernel hot swap. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 
 ## JS process editing and comparison scenarios (2026-10-30)
@@ -45,9 +46,10 @@ dated record below, and queue its residuals in the same change.
   layout, workflow job execution with
   progress/cancellation and validated model/kernel hot swap. Current Save affects the next run;
   active Geant4/model workers are unchanged. Offline trainers remain outside the UI process.
-- [ ] V8 is a pinned optional source/standalone probe foundation, not Studio's or TRECH's host
-  backend. Upstream build, runtime/API/replay parity and performance validation remain engine work in this
-  roadmap. No training or Geant4 logic moves into Studio's viewer/render layer.
+- [ ] V8 is an optional TRECH engine (2026-11-21, `--js-engine v8` / `TRECH_JS_ENGINE`), not
+  part of Studio. Studio runs and its live lab inherit `TRECH_JS_ENGINE`; an engine selector in
+  Run settings (passing `--js-engine`) is not built. No training or Geant4 logic moves into
+  Studio's viewer/render layer.
 
 Contracts: `docs/studio/studio_authoring.md`, `docs/scenarios/process_references.md`, `docs/engine/v8.md`.
 Behavioural tests: `studio/tests/test_authoring.py` (real-engine reinspection plus Qt editor/stream checks).

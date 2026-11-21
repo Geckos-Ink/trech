@@ -29,14 +29,14 @@ function verifyEuler3D() {
     const q=[x,y,z].map((v,a)=>2*Math.PI*(v-velocity[a]*t));
     const filter=sinc(Math.PI/n), phase=q.reduce((a,b)=>a+b,0);
     let density=1, v=velocity.slice(), kinetic;
-    if(kind==='oblique_entropy') density+=.2*filter**3*Math.sin(phase);
-    if(kind==='triaxial_entropy') density+=.2*filter**3*q.reduce((a,b)=>a*Math.sin(b),1);
+    if(kind==='oblique_entropy') density+=.2*Math.pow(filter,3)*Math.sin(phase);
+    if(kind==='triaxial_entropy') density+=.2*Math.pow(filter,3)*q.reduce((a,b)=>a*Math.sin(b),1);
     if(kind==='oblique_shear') {
-      const sine=filter**3*Math.sin(phase);
-      const sineSquare=.5*(1-sinc(2*Math.PI/n)**3*Math.cos(2*phase));
+      const sine=Math.pow(filter,3)*Math.sin(phase);
+      const sineSquare=.5*(1-Math.pow(sinc(2*Math.PI/n),3)*Math.cos(2*phase));
       v=v.map((value,a)=>value+shear[a]*sine);
       kinetic=.5*velocity.reduce((s,value,a)=>s+value*value+
-        2*value*shear[a]*sine+shear[a]**2*sineSquare,0);
+        2*value*shear[a]*sine+Math.pow(shear[a],2)*sineSquare,0);
     } else kinetic=.5*density*velocity.reduce((s,value)=>s+value*value,0);
     return [density,...v.map(value=>density*value),1/(gamma-1)+kinetic];
   }

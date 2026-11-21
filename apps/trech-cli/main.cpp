@@ -246,6 +246,9 @@ int main(int argc, char** argv) {
   }
 
   try {
+    if (!options.jsEngine.empty()) {
+      trech::JsRuntime::setDefaultEngine(trech::parseJsEngine(options.jsEngine));
+    }
     if (options.command == trech::CliCommand::Lab) {
       return runLabSession(options, argc, argv);
     }

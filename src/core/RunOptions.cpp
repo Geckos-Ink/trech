@@ -55,6 +55,8 @@ std::string runUsage() {
       << "  --viz-all         As --viz, also recording non-optical particles (run only)\n"
       << "  --viz-max-trajectories <n> Trajectory cap for a --viz capture (run only)\n"
       << "  --strict-config   Refuse a config with keys the engine never reads\n"
+      << "  --js-engine <e>   JavaScript engine: quickjs or v8 (v8 needs a TRECH_ENABLE_V8 build;\n"
+      << "                    default: $TRECH_JS_ENGINE, else the build default)\n"
       << "  -h, --help        Show this help\n"
       << "Config notes:\n"
       << "  The apparatus block may be authored as environment, medium or detector\n"
@@ -241,6 +243,20 @@ RunOptions parseRunOptions(int argc, char** argv) {
         return options;
       }
       options.labWatch = true;
+      continue;
+    }
+    if (arg == "--js-engine") {
+      if (i + 1 >= argc) {
+        options.valid = false;
+        options.error = "Missing value for --js-engine.";
+        return options;
+      }
+      options.jsEngine = argv[++i];
+      if (options.jsEngine != "quickjs" && options.jsEngine != "v8") {
+        options.valid = false;
+        options.error = "Invalid --js-engine value; expected quickjs or v8.";
+        return options;
+      }
       continue;
     }
     if (arg == "--param") {

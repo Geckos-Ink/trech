@@ -4,6 +4,7 @@ project(TRECH LANGUAGES C CXX)
 include(cmake/TrechOptions.cmake)
 include(cmake/TrechWarnings.cmake)
 include(cmake/TrechFindOrFetch.cmake)
+include(cmake/TrechV8.cmake)
 
 trech_require_nlohmann_json()
 trech_require_quickjs()
@@ -18,6 +19,7 @@ add_library(trech_core
   src/core/Provenance.cpp
   src/core/Sha256.cpp
   src/core/RunOptions.cpp
+  src/js/PowOperatorScan.cpp
 )
 target_include_directories(trech_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_core PUBLIC nlohmann_json::nlohmann_json)
@@ -77,6 +79,7 @@ endif()
 
 add_library(trech_js
   src/js/JsRuntime.cpp
+  src/js/JsRuntimeFacade.cpp
   src/js/LabScriptHost.cpp
 )
 target_include_directories(trech_js PUBLIC ${PROJECT_SOURCE_DIR}/include)
@@ -85,6 +88,48 @@ target_link_libraries(trech_js PUBLIC quickjs nlohmann_json::nlohmann_json trech
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
   # Host-side hook numerics (ctx.rng.normal) must not fuse multiply-add either.
   set_source_files_properties(src/js/JsRuntime.cpp PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+endif()
+if (EXISTS "${_trech_qjs_dir}/quickjs/VERSION")
+  file(STRINGS "${_trech_qjs_dir}/quickjs/VERSION" _trech_qjs_version LIMIT_COUNT 1)
+elseif (EXISTS "${_trech_qjs_dir}/VERSION")
+  file(STRINGS "${_trech_qjs_dir}/VERSION" _trech_qjs_version LIMIT_COUNT 1)
+else()
+  set(_trech_qjs_version "unknown")
+endif()
+set_property(SOURCE src/js/JsRuntimeFacade.cpp APPEND PROPERTY COMPILE_DEFINITIONS
+  TRECH_QUICKJS_VERSION="${_trech_qjs_version}")
+
+# V8 JavaScript backend: the same host source (JsRuntime.cpp) compiled against the V8
+# implementation of the QuickJS API it uses. Needs an already-built V8; never builds one.
+if (NOT TRECH_DEFAULT_JS_ENGINE MATCHES "^(quickjs|v8)$")
+  message(FATAL_ERROR "TRECH_DEFAULT_JS_ENGINE must be quickjs or v8, not '${TRECH_DEFAULT_JS_ENGINE}'")
+endif()
+if (TRECH_DEFAULT_JS_ENGINE STREQUAL "v8" AND NOT TRECH_ENABLE_V8)
+  message(FATAL_ERROR "TRECH_DEFAULT_JS_ENGINE=v8 requires -DTRECH_ENABLE_V8=ON")
+endif()
+if (TRECH_ENABLE_V8 OR TRECH_ENABLE_V8_PROBE)
+  trech_find_v8()
+endif()
+if (TRECH_ENABLE_V8)
+  add_library(trech_js_v8 STATIC
+    src/js/JsRuntimeV8.cpp
+    src/js/V8QuickJsApi.cpp
+  )
+  target_compile_features(trech_js_v8 PRIVATE cxx_std_20)
+  target_include_directories(trech_js_v8 PRIVATE ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src/js)
+  target_compile_definitions(trech_js_v8 PUBLIC TRECH_HAS_V8=1)
+  target_link_libraries(trech_js_v8 PUBLIC trech_v8 nlohmann_json::nlohmann_json trech_ml trech_dmath trech_core)
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
+    target_compile_options(trech_js_v8 PRIVATE -ffp-contract=off)
+  endif()
+  trech_apply_warnings(trech_js_v8)
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(trech_js_v8 PRIVATE -Wno-unused-parameter)
+  endif()
+  target_link_libraries(trech_js PUBLIC trech_js_v8)
+  if (TRECH_DEFAULT_JS_ENGINE STREQUAL "v8")
+    set_property(SOURCE src/js/JsRuntimeFacade.cpp APPEND PROPERTY COMPILE_DEFINITIONS TRECH_DEFAULT_JS_ENGINE_V8=1)
+  endif()
 endif()
 if (TRECH_QUICKJS_INCLUDE_DIR)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
@@ -261,18 +306,16 @@ else()
 endif()
 trech_apply_warnings(trech)
 
-# V8 uses its own GN/Ninja build. Never trigger that heavy build or change the
-# deterministic QuickJS hook backend as a side effect of configuring TRECH.
+# Engine timing tool: scenario evaluation and per-dispatch hook cost, QuickJS vs V8.
+add_executable(trech-js-bench apps/trech-js-bench/main.cpp)
+target_link_libraries(trech-js-bench PRIVATE trech_js)
+trech_apply_warnings(trech-js-bench)
+
+# V8 uses its own GN/Ninja build (scripts/build_v8.sh). Configuring TRECH never triggers it.
 if (TRECH_ENABLE_V8_PROBE)
-  set(TRECH_V8_BUILD_DIR "${PROJECT_SOURCE_DIR}/thirds/v8/out.gn/trech" CACHE PATH "Prebuilt V8 monolith directory")
-  set(TRECH_V8_DEFINITIONS "" CACHE STRING "ABI definitions matching the V8 build (semicolon-separated)")
-  find_library(TRECH_V8_MONOLITH NAMES v8_monolith PATHS "${TRECH_V8_BUILD_DIR}/obj" NO_DEFAULT_PATH REQUIRED)
-  find_package(Threads REQUIRED)
   add_executable(trech-v8-probe src/js/V8Probe.cpp)
   target_compile_features(trech-v8-probe PRIVATE cxx_std_20)
-  target_include_directories(trech-v8-probe SYSTEM PRIVATE "${PROJECT_SOURCE_DIR}/thirds/v8/include")
-  target_compile_definitions(trech-v8-probe PRIVATE ${TRECH_V8_DEFINITIONS})
-  target_link_libraries(trech-v8-probe PRIVATE nlohmann_json::nlohmann_json "${TRECH_V8_MONOLITH}" Threads::Threads ${CMAKE_DL_LIBS})
+  target_link_libraries(trech-v8-probe PRIVATE nlohmann_json::nlohmann_json trech_v8)
   trech_apply_warnings(trech-v8-probe)
 endif()
 

@@ -15,7 +15,11 @@ if (DEFINED TRECH_ENABLE_TORCH)
 endif()
 option(TRECH_ENABLE_DNA_CHEM "Enable Geant4-DNA chemistry wiring (when available)" OFF)
 option(TRECH_FETCH_DEPS "Allow CMake to fetch third-party dependencies" OFF)
-option(TRECH_ENABLE_V8_PROBE "Build the optional standalone V8 compile/code-cache probe (not the hook runtime)" OFF)
+option(TRECH_ENABLE_V8 "Build the V8 JavaScript backend (needs an already-built V8; see docs/engine/v8.md)" OFF)
+# Engine a JsRuntime uses when neither --js-engine nor TRECH_JS_ENGINE selects one.
+set(TRECH_DEFAULT_JS_ENGINE "quickjs" CACHE STRING "Default JavaScript engine (quickjs or v8; v8 needs TRECH_ENABLE_V8)")
+set_property(CACHE TRECH_DEFAULT_JS_ENGINE PROPERTY STRINGS quickjs v8)
+option(TRECH_ENABLE_V8_PROBE "Build the optional standalone V8 compile/code-cache probe" OFF)
 option(TRECH_ENABLE_ATOMIC_RESEARCH "Build the standalone atomic research JS launcher using an installed Node/V8 runtime" OFF)
 
 set(CMAKE_CXX_STANDARD 17)

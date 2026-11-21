@@ -396,6 +396,7 @@ endif()
 if (Python3_Interpreter_FOUND)
   add_test(NAME trech_js_pow_operator
     COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/check_js_pow_operator.py"
+      js examples projects tests/fixtures
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 endif()
 # Engine-level check of the scenario against the committed JS-trained models.
@@ -404,4 +405,38 @@ if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
     COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/validate_spectrum_prediction.py"
       --trech "$<TARGET_FILE:trech>" --out "${CMAKE_CURRENT_BINARY_DIR}/spectrum_prediction_validation")
   set_tests_properties(trech_spectrum_prediction_scenario PROPERTIES TIMEOUT 300)
+endif()
+
+# JavaScript exponent-operator scan (the V8 backend refuses `**`; scripts/check_js_pow_operator.py
+# is its Python twin).
+add_executable(test_pow_operator_scan test_pow_operator_scan.cpp)
+target_link_libraries(test_pow_operator_scan PRIVATE trech_core)
+add_test(NAME trech_pow_operator_scan COMMAND test_pow_operator_scan)
+
+if (TRECH_ENABLE_V8)
+  # QuickJS vs V8 on the same scenarios and hook calls, byte for byte.
+  add_executable(test_js_engine_parity test_js_engine_parity.cpp)
+  target_link_libraries(test_js_engine_parity PRIVATE trech_js)
+  target_compile_definitions(test_js_engine_parity PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+  add_test(NAME trech_js_engine_parity COMMAND test_js_engine_parity)
+  # The engine-neutral JavaScript suites again, on V8 (TRECH_JS_ENGINE selects the engine of
+  # every default-constructed JsRuntime).
+  foreach(_trech_js_suite IN ITEMS js_runtime lab_script_host deterministic_math scenario_bundle
+          scenario_helpers geometry_generators)
+    add_test(NAME trech_${_trech_js_suite}_v8 COMMAND test_${_trech_js_suite})
+    set_tests_properties(trech_${_trech_js_suite}_v8 PROPERTIES ENVIRONMENT "TRECH_JS_ENGINE=v8")
+  endforeach()
+  if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
+    # Whole `trech run`s on both engines with every output compared (scripts/js_engine_run_parity.py).
+    add_test(NAME trech_js_engine_run_parity
+      COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/js_engine_run_parity.py"
+        --trech "$<TARGET_FILE:trech>"
+        examples/scenarios/hello_world/hello_world.js
+        examples/scenarios/hooks_track_ledger/hooks_track_ledger.js
+        examples/scenarios/cascade_multiscale_demo/cascade_multiscale_demo.js
+        examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js
+        examples/scenarios/briggs_rauscher_oscillator/briggs_rauscher_oscillator.js
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+    set_tests_properties(trech_js_engine_run_parity PROPERTIES TIMEOUT 600)
+  endif()
 endif()

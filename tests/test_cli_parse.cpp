@@ -243,6 +243,20 @@ int main() {
     const char* runWatch[] = {"trech", "run", "exp.js", "--watch"};
     if (expect(!trech::parseRunOptions(4, const_cast<char**>(runWatch)).valid,
                "Expected --watch outside lab mode to fail.")) return 1;
+    // --js-engine: validated here, applied by the CLI (empty keeps TRECH_JS_ENGINE / build default).
+    if (expect(plain.jsEngine.empty(), "Expected no --js-engine by default.")) return 1;
+    const char* runV8[] = {"trech", "run", "exp.js", "--js-engine", "v8"};
+    const auto v8 = trech::parseRunOptions(5, const_cast<char**>(runV8));
+    if (expect(v8.valid && v8.jsEngine == "v8", "Expected --js-engine v8 to parse.")) return 1;
+    const char* labQuickJs[] = {"trech", "lab", "exp.js", "--js-engine", "quickjs", "--watch"};
+    const auto lab = trech::parseRunOptions(6, const_cast<char**>(labQuickJs));
+    if (expect(lab.valid && lab.jsEngine == "quickjs" && lab.labWatch, "Expected a QuickJS lab.")) return 1;
+    const char* badEngine[] = {"trech", "inspect", "exp.js", "--js-engine", "spidermonkey"};
+    if (expect(!trech::parseRunOptions(5, const_cast<char**>(badEngine)).valid,
+               "Expected an unknown --js-engine to fail.")) return 1;
+    const char* missingEngine[] = {"trech", "run", "exp.js", "--js-engine"};
+    if (expect(!trech::parseRunOptions(4, const_cast<char**>(missingEngine)).valid,
+               "Expected --js-engine without a value to fail.")) return 1;
   }
 
   {

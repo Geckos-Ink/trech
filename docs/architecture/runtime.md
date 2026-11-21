@@ -10,7 +10,7 @@ contracts give model features their physical meaning.
 
 ```mermaid
 flowchart TD
-    JS["Scenario and companions · QuickJS"]
+    JS["Scenario and companions · QuickJS or V8"]
     Config["Typed configuration · TRECH C++"]
     G4["Geometry, physics and transport · Geant4"]
     Facts["Material probes, steps, tracks and event tallies"]
@@ -28,7 +28,8 @@ flowchart TD
 
 ## Before transport
 
-1. The CLI evaluates JavaScript and its includes in QuickJS. `TRECH_CONFIG` produces
+1. The CLI evaluates JavaScript and its includes in QuickJS, or in V8 with `--js-engine v8`
+   (both run the same host code; see the [V8 guide](../engine/v8.md)). `TRECH_CONFIG` produces
    JSON, and callbacks registered in `TRECH_HOOKS` stay in the host. `trech inspect`
    evaluates authoring and typed inputs without creating a Geant4 kernel.
 2. TRECH parses and normalizes the authored config into C++ `TrechConfig`, applies

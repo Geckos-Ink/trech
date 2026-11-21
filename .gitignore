@@ -48,3 +48,7 @@ __pycache__/
 /data/pubchem/*.json
 /data/pubchem/*.png
 /data/pubchem
+/thirds/.gclient
+/thirds/.gclient_entries
+/thirds/.gclient_previous_sync_commits
+/build/depot_tools

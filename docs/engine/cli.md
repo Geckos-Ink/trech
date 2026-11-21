@@ -23,6 +23,18 @@ and `--viz-all` also captures non-optical trajectories. `run` also supports a Ge
 `--macro` or interactive `--ui` when the corresponding Geant4 support is available.
 Use a separate `--output` directory per run to make comparisons easy.
 
+`--js-engine quickjs|v8` picks the JavaScript engine for every command (`run`, `inspect`, `lab`).
+Without it, the `TRECH_JS_ENGINE` environment variable decides, then the build default (QuickJS).
+V8 is available only in a binary built with `-DTRECH_ENABLE_V8=ON`; asking for it elsewhere fails
+with a message naming that option. Both engines run the same host code and the same
+deterministic `Math`, so a scenario writes the same files on either; V8 compiles hot hook
+JavaScript to machine code and runs JavaScript-heavy hooks several times faster. See the
+[V8 backend guide](v8.md) for building, the one script restriction (`**`) and measurements.
+
+```sh
+./build/v8/trech run examples/scenarios/h2o_bulk_water/h2o_bulk_water.js --js-engine v8 --output build/v8/out_water
+```
+
 ## Strict and predictive runs
 
 Set `determinism.mode` in the JavaScript configuration or the lab JSON. Some bundles
@@ -125,6 +137,13 @@ and scores record which script generation drove it as
 [`lab_script`](output_schema.md#lab-script-identity), and `onInit` is counted once, in the
 first batch after each load. Use `run.threads: 1` when hooks accumulate state, as for
 `trech run`.
+
+A live lab can run its hooks on V8 too: `trech lab examples/lab/live_hook_tuning.js --watch
+--js-engine v8`. Every re-evaluation then uses V8, and each `lab_script` record names the engine
+as `js_engine`. This matters when the hooks do real computation per batch, such as a
+JavaScript particle model: on V8 a batch finishes sooner, so the lab reaches its target rate
+with more events or a finer model. Measure your own hooks with `trech-js-bench` (see the
+[V8 guide](v8.md#measure-your-hooks)).
 
 [Lab output and planner fields](output_schema.md#trech-lab-stdout) ·
 [Runtime roadmap](../../AGENTS/engine/runtime/ROADMAP.md#priority-queue)

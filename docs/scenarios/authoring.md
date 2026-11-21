@@ -63,8 +63,11 @@ random helpers and observer clocks. Geometric generators and placement audits ar
 in [`trech_geometry.js`](../../js/trech_geometry.js). `TRECH_FLOW` supports fluent
 transforms such as `defaults`, `derive` and `finalize`, and read-only checks such as
 `flow.check` and `flow.validate`. The environment preset can report conflicting
-apparatus aliases. See [the QuickJS host implementation](../../src/js/JsRuntime.cpp) and
+apparatus aliases. See [the JavaScript host implementation](../../src/js/JsRuntime.cpp) and
 [the example auditor](../../scripts/audit_flow_presets.py).
+Write `Math.pow(a, b)`, never `a ** b`: the [V8 engine](../engine/v8.md) refuses the `**`
+operator, because its result could differ from QuickJS's in the last bit. Both engines give
+`Math.pow` the same bits. `python3 scripts/check_js_pow_operator.py <your files>` finds every use.
 The [include error fixture](../../tests/fixtures/js/include_error_demo.js) illustrates
 how source files appear in stack traces.
 

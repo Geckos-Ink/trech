@@ -12,7 +12,7 @@ template literal text (but scans `${...}` expressions) and regular-expression li
 real operators are reported.
 
 Usage:
-  scripts/check_js_pow_operator.py [PATH ...]   # default: js examples projects
+  scripts/check_js_pow_operator.py [PATH ...]   # default: js examples projects tests/fixtures
 Exit status 1 lists every `file:line:column` that uses the operator.
 """
 
@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 from typing import Iterator, List, Tuple
 
-DEFAULT_ROOTS = ("js", "examples", "projects")
+DEFAULT_ROOTS = ("js", "examples", "projects", "tests/fixtures")
 SKIP_DIRS = {"node_modules", ".git"}
 # After one of these characters (or a keyword below) a `/` starts a regular expression.
 REGEX_AFTER = set("(,=:[!&|?{};+-*%<>~^")
@@ -152,7 +152,7 @@ def iter_scripts(paths: List[Path]) -> Iterator[Path]:
 def main(argv: List[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("paths", nargs="*", type=Path,
-                        help="files or directories (default: js examples projects)")
+                        help="files or directories (default: js examples projects tests/fixtures)")
     args = parser.parse_args(argv)
     paths = args.paths or [Path(root) for root in DEFAULT_ROOTS if Path(root).exists()]
     found = 0

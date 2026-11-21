@@ -18,7 +18,7 @@
   using an interpreter other than the repository default in `build/render-venv`.
   The [Torch tooling](../tools/torch/README.md) documents training and backend checks.
 - QuickJS and nlohmann/json. The development and release presets allow CMake to
-  fetch these if local sources are unavailable.
+  fetch these if local sources are unavailable. V8 is optional (see below).
 
 See the [dependency handbook](../AGENTS/tooling/dependencies/AGENTS.md) for checkout
 guidance and [its roadmap](../AGENTS/tooling/dependencies/ROADMAP.md#priority-queue)
@@ -41,6 +41,27 @@ and build with `--preset rel` and use the binary under `build/rel`.
 Use `-DTRECH_ENABLE_DNA_CHEM=ON` at configure time to include the optional
 Geant4-DNA chemistry wiring. See the [Geant4 capability map](engine/GEANT4_features_and_limits.md#3-what-trech-can-count-on-geant4-capability-map)
 for applicable models and materials.
+
+## Optional: the V8 JavaScript engine
+
+TRECH always builds QuickJS. Add `-DTRECH_ENABLE_V8=ON` to also build the V8 backend, which
+runs the same scenarios and hooks several times faster when they do heavy JavaScript work.
+CMake never builds V8 itself; point it at one that is already built:
+
+- macOS: `brew install v8` (a prebuilt download). CMake finds Homebrew's prefix by itself.
+- Any platform: build the pinned `thirds/v8` submodule from source with
+  [`scripts/build_v8.sh`](../scripts/build_v8.sh), then pass `-DTRECH_V8_BUILD_DIR=<its out dir>`.
+  This downloads several GB and compiles for a long time.
+- Another installed V8: `-DTRECH_V8_ROOT=<prefix>` with `include/v8.h` and `lib/libv8*`.
+
+```sh
+cmake --preset rel -DCMAKE_PREFIX_PATH=/path/to/geant4-install -DTRECH_ENABLE_V8=ON
+cmake --build --preset rel
+./build/rel/trech inspect examples/scenarios/hello_world/hello_world.js --js-engine v8
+```
+
+Add `-DTRECH_DEFAULT_JS_ENGINE=v8` to make V8 the default of that binary. The
+[V8 backend guide](engine/v8.md) explains selection, results and limits.
 
 Continue with the [first experiment](first_run.md) or
 [install the Studio client](../studio/README.md).

@@ -105,10 +105,37 @@ struct JsSourceDigest {
   bool data = false;    // a TRECH_READ_JSON data file rather than a script source
 };
 
+// The JavaScript engine a JsRuntime evaluates scenarios and hooks with. Both run the same host
+// (TRECH_INCLUDE, TRECH_VALUE, the hook ctx and every inference API) from one source file and
+// the same deterministic Math (trech_dmath). QuickJS is always built; V8 only with
+// TRECH_ENABLE_V8 (docs/engine/v8.md).
+enum class JsEngine { QuickJs, V8 };
+
+// "quickjs" / "v8"; parseJsEngine accepts the same names and throws std::invalid_argument.
+const char* jsEngineName(JsEngine engine);
+JsEngine parseJsEngine(const std::string& name);
+
 class JsRuntime {
 public:
+  // Uses JsRuntime::defaultEngine().
   JsRuntime();
+  explicit JsRuntime(JsEngine engine);
   ~JsRuntime();
+
+  // True when this binary was built with the engine (QuickJS always; V8 with TRECH_ENABLE_V8).
+  static bool engineAvailable(JsEngine engine);
+  // The engine a default-constructed JsRuntime uses: the last setDefaultEngine() call, else
+  // the TRECH_JS_ENGINE environment variable ("quickjs" or "v8"), else the build default
+  // (TRECH_DEFAULT_JS_ENGINE, QuickJS unless configured otherwise). Throws
+  // std::runtime_error when the selected engine is not built into this binary.
+  static JsEngine defaultEngine();
+  // Process-wide choice, e.g. from `trech --js-engine`. Every later default-constructed
+  // runtime (the CLI, the live lab's re-evaluations) uses it.
+  static void setDefaultEngine(JsEngine engine);
+
+  JsEngine engine() const;
+  // "quickjs 2025-09-13" or "v8 15.9.128.11": engine and version, for provenance.
+  std::string engineIdentity() const;
   JsRuntime(const JsRuntime&) = delete;
   JsRuntime& operator=(const JsRuntime&) = delete;
 
@@ -130,7 +157,7 @@ public:
   // with the digest of the bytes the evaluation actually read. A file edited after it was read
   // keeps the digest of the version that ran.
   std::vector<JsSourceDigest> sourceDigests() const;
-  // Exchange the whole engine state (QuickJS context, hooks, models, pending emits) with
+  // Exchange the whole engine state (engine context, hooks, models, pending emits) with
   // `other`. The live lab keeps one JsRuntime address, which the Geant4 actions hold, and
   // swaps a freshly evaluated runtime into it between batches. Never call while either
   // runtime is evaluating or dispatching.

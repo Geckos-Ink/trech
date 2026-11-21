@@ -1,4 +1,5 @@
 #include "trech/js/JsRuntime.hpp"
+#include "JsEngineBackend.hpp"
 
 #include "trech/js/DeterministicMath.h"
 
@@ -37,11 +38,54 @@
 
 #include <nlohmann/json.hpp>
 
+// This file is the JavaScript host, written once against the QuickJS C API. The default build
+// compiles it with QuickJS; src/js/JsRuntimeV8.cpp defines TRECH_JS_BACKEND_V8 and compiles it
+// again against the V8 implementation of the same API (src/js/V8QuickJsApi.hpp). Each build
+// lives in its own namespace and is reached through the trech::JsRuntime facade.
+#ifdef TRECH_JS_BACKEND_V8
+#include "V8QuickJsApi.hpp"
+#define TRECH_JS_BACKEND_NS v8engine
+#define TRECH_JS_ENTER(context) ::trech::v8engine::JsEnter trechJsEnter_(context)
+#else
 extern "C" {
 #include "quickjs.h"
 }
+#define TRECH_JS_BACKEND_NS quickjs
+#define TRECH_JS_ENTER(context) ((void)0)
+#endif
 
 namespace trech {
+namespace TRECH_JS_BACKEND_NS {
+
+// The engine-specific host behind trech::JsRuntime (see JsEngineBackend.hpp).
+class JsRuntime final : public JsEngineBackend {
+public:
+  JsRuntime();
+  ~JsRuntime() override;
+  JsRuntime(const JsRuntime&) = delete;
+  JsRuntime& operator=(const JsRuntime&) = delete;
+
+  std::string evalExperimentAndGetConfigJson(const std::string& path) override;
+  void setScriptParameterOverrides(const std::vector<std::string>& overrides) override;
+  void setPrecisionRefinement(double factor) override;
+  std::string scriptParametersJson() const override;
+  std::string authoringMetadataJson() const override;
+  std::vector<std::string> sourceFiles() const override;
+  std::vector<JsSourceDigest> sourceDigests() const override;
+  void swap(JsRuntime& other) noexcept;
+  HookDispatchReport dispatchHook(const std::string& hookName, const HookRuntimeContext& context,
+                                  TrechConfig* cfgForPatch, bool allowPatch) override;
+  std::vector<HookEmitRecord> takeEmittedRecords() override;
+  void loadDeclaredModels() override;
+  std::vector<std::string> loadedModelNames() const override;
+  std::string modelArtifactsJson() const override;
+  int totalPredictCount() const override;
+  int totalOutOfDomainCount() const override;
+
+private:
+  struct Impl;
+  Impl* impl_ = nullptr;
+};
 
 struct ModelOperatorMetadata {
   std::string declaredPath;
@@ -6108,9 +6152,10 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
   impl_->rt = JS_NewRuntime();
   impl_->ctx = JS_NewContext(impl_->rt);
   if (!impl_->rt || !impl_->ctx) {
-    throw std::runtime_error("QuickJS init failed");
+    throw std::runtime_error("JavaScript engine init failed");
   }
   JS_SetContextOpaque(impl_->ctx, &impl_->state);
+  TRECH_JS_ENTER(impl_->ctx);
   JSValue global = JS_GetGlobalObject(impl_->ctx);
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_INCLUDE",
                     JS_NewCFunction(impl_->ctx, jsTrechInclude, "TRECH_INCLUDE", 1));
@@ -6146,6 +6191,7 @@ JsRuntime::~JsRuntime() {
 
 std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   std::lock_guard<std::mutex> lock(impl_->mutex);
+  TRECH_JS_ENTER(impl_->ctx);
   JSValue refinementGlobal = JS_GetGlobalObject(impl_->ctx);
   JS_SetPropertyStr(impl_->ctx, refinementGlobal, "__TRECH_REFINEMENT_USED", JS_FALSE);
   JS_FreeValue(impl_->ctx, refinementGlobal);
@@ -6271,6 +6317,7 @@ void JsRuntime::setPrecisionRefinement(double factor) {
     throw std::runtime_error("Precision refinement must be finite and positive");
   }
   std::lock_guard<std::mutex> lock(impl_->mutex);
+  TRECH_JS_ENTER(impl_->ctx);
   JSValue global = JS_GetGlobalObject(impl_->ctx);
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_REFINEMENT", JS_NewFloat64(impl_->ctx, factor));
   JS_FreeValue(impl_->ctx, global);
@@ -6278,6 +6325,7 @@ void JsRuntime::setPrecisionRefinement(double factor) {
 
 std::string JsRuntime::authoringMetadataJson() const {
   std::lock_guard<std::mutex> lock(impl_->mutex);
+  TRECH_JS_ENTER(impl_->ctx);
   nlohmann::json metadata = {{"sources", impl_->state.sourceFiles}};
   JSValue global = JS_GetGlobalObject(impl_->ctx);
   JSValue studio = JS_GetPropertyStr(impl_->ctx, global, "TRECH_STUDIO");
@@ -6455,6 +6503,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
                                            TrechConfig* cfgForPatch,
                                            bool allowPatch) {
   std::lock_guard<std::mutex> lock(impl_->mutex);
+  TRECH_JS_ENTER(impl_->ctx);
   HookDispatchReport report;
   if (!impl_->state.experimentLoaded) {
     return report;
@@ -6778,5 +6827,14 @@ std::vector<HookEmitRecord> JsRuntime::takeEmittedRecords() {
   impl_->state.emittedRecords.clear();
   return out;
 }
+
+} // namespace TRECH_JS_BACKEND_NS
+
+#ifdef TRECH_JS_BACKEND_V8
+std::unique_ptr<JsEngineBackend> makeV8Backend() { return std::make_unique<v8engine::JsRuntime>(); }
+std::string v8EngineVersion() { return v8engine::engineVersion(); }
+#else
+std::unique_ptr<JsEngineBackend> makeQuickJsBackend() { return std::make_unique<quickjs::JsRuntime>(); }
+#endif
 
 } // namespace trech

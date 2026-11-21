@@ -53,11 +53,19 @@ Read the root principles and the parent handbook first; then open only the subca
   Regenerate it with `scripts/build_dmath_wasm.py`, which needs an installed Emscripten `emcc`
   (optional, never fetched; Homebrew 6.0.13 recorded). CMake does not build it. CTest
   `trech_dmath_wasm` needs only Node and fails on a stale module (C source/header SHA-256).
-- **Optional V8 foundation:** official `thirds/v8` submodule `06637ec79e4` (15.9.0 candidate),
-  not built and not the hook backend. `TRECH_ENABLE_V8_PROBE` defaults OFF; its standalone C++
-  compile/code-cache probe is syntax-checked against pinned headers, not linked/run. Normal
-  builds retain QuickJS; full host parity and performance are unvalidated. See
-  [`docs/engine/v8.md`](../../../docs/engine/v8.md); never trigger a heavy upstream build implicitly.
+- **V8 JavaScript backend:** `TRECH_ENABLE_V8` (default OFF) needs an already-built V8 and never
+  builds one. [`cmake/TrechV8.cmake`](../../../cmake/TrechV8.cmake) accepts an installed prefix
+  (`TRECH_V8_ROOT`; Homebrew's `brew --prefix v8` is tried automatically) or a from-source
+  monolith (`TRECH_V8_BUILD_DIR/obj/libv8_monolith.a` with `thirds/v8/include`), and probes the
+  ABI definitions (`TRECH_V8_DEFINITIONS=AUTO`). Validated source: Homebrew V8 15.9.128.11 on
+  macOS arm64 (installed 2026-11-21; component build, pointer compression on, sandbox off, ICU
+  data in `libexec/icudtl.dat`). The official `thirds/v8` submodule `06637ec79e4` (15.9.0
+  candidate) is the from-source pin: [`scripts/build_v8.sh`](../../../scripts/build_v8.sh)
+  fetches depot_tools into `build/depot_tools`, syncs with `thirds/.gclient` (both ignored) and
+  builds `v8_monolith` without pointer compression, sandbox or ICU. That script is heavy and has
+  not been run; never run it implicitly. `TRECH_ENABLE_V8_PROBE` reuses the same V8 target.
+  Engine contract: [runtime handbook](../../engine/runtime/AGENTS.md#engine-backends--quickjs-and-v8-2026-11-21),
+  [`docs/engine/v8.md`](../../../docs/engine/v8.md).
 - **Atomic research V8 host:** `TRECH_ENABLE_ATOMIC_RESEARCH` defaults OFF and requires an
   already-installed Node.js >=18 with V8. It builds only the `trech-atomic` C++ process launcher,
   never upstream V8; numerical research lives in JS. This is separate from the optional native

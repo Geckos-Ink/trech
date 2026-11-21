@@ -14,12 +14,12 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P2** · R1 · Deterministic host math residuals: cross-host golden runs; V8's `**` operator and an embedded backend's Math installation (Node/V8 `Math.*` parity landed 2026-11-21 through WebAssembly). (owned by the [engine/runtime queue](../../engine/runtime/ROADMAP.md#priority-queue))
-- **P2** · R6 · JS workflow execution: engine-neutral host boundary, editable training/harvest/inference jobs with provenance, progress/cancellation and safe model activation. ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
+- **P2** · R1 · Deterministic host math residuals: cross-host golden runs (the embedded V8 backend installs `trech_dmath` natively and refuses `**`, 2026-11-21). (owned by the [engine/runtime queue](../../engine/runtime/ROADMAP.md#priority-queue))
+- **P2** · R6 · JS workflow execution: editable training/harvest/inference jobs with provenance, progress/cancellation and safe model activation. ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
 - **P2** · R6 · Studio render parity across every scenario and the authoring residuals. (owned by the [studio/authoring queue](../../studio/authoring/ROADMAP.md#priority-queue))
 - **P3** · RX · Metals heat treatment as a separate family (composition, histories, microstructure, strength anchors). ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
 - **gated** · R5 · NaCl and aerodynamics quantitative validation need independent external anchors (concentration/evaporation data; shock/flow data) before any learned phase/continuum lift. ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
-- **gated** · R7 · V8: heavy upstream GN build, probe link/run, host API/RNG/emit parity and benchmarks (needs an explicit decision to build). ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
+- **P2** · R7 · V8 backend residuals (other platforms, the from-source monolith, the default-engine decision, per-dispatch cost, code cache). (owned by the [engine/runtime queue](../../engine/runtime/ROADMAP.md#priority-queue))
 
 ## Author-notes foundations: phase change, airflow and JS authoring (2026-10-30)
 
@@ -65,10 +65,11 @@ dated record below, and queue its residuals in the same change.
   through one fdlibm-derived library compiled without contraction (`trech_dmath`); see the
   [runtime record](../../engine/runtime/ROADMAP.md#deterministic-host-math-2026-11-16). A V8
   backend reaches replay parity only by installing the same library as its Math.
-- [ ] V8: heavy upstream GN/dependency build, probe link/run, host API/Geant4/operator/RNG/emit/
-  exception/reset parity, same-input differential tests and reproducible performance benchmarks.
-  Persisted caches need source/build/flags identities and rejection handling; cache bytes are not
-  portable bytecode. Keep QuickJS until strict replay/provenance parity is demonstrated.
+- [x] V8 (2026-11-21): a full JavaScript backend built from the same host source, probe linked
+  and run, host API/RNG/emit/exception/swap parity tested, whole-run outputs compared and timed
+  ([runtime record](../../engine/runtime/ROADMAP.md#v8-javascript-backend-2026-11-21)). QuickJS
+  stays the default until other platforms are validated. Persisted code caches still need
+  source/build/flags identities and rejection handling before use (runtime queue).
 - [x] Unsaved JS source protection: root and included drafts show dirty markers and receive
   Save/Discard/Cancel before scenario replacement or close. Cancel/failed Save preserves the
   workspace and running jobs; browser/Chemistry switch paths respect rejection. File conflicts

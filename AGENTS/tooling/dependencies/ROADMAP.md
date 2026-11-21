@@ -16,7 +16,18 @@ dated record below, and queue its residuals in the same change.
 - **P3** · R7 · Torch cross-platform/accelerator validation and production-model parity/performance. ([detail](#dependency-checkout-refresh--2026-10-27))
 - **P3** · R7 · Node research host installation/relocation and Windows execution. ([detail](#installed-nodev8-atomic-research-host))
 - **gated** · R5 · Rebuild/install Geant4 11.5 and rebuild TRECH, then CTest and physics regression; then a real `TRECH_ENABLE_DNA_CHEM` build, G4EMLOW 9.0 and the revalidation list (heavy build: needs an explicit go-ahead). ([detail](#dependency-checkout-refresh--2026-10-27))
-- **gated** · R7 · Upstream V8 build for the embedding probe. (owned by the [scenarios/references queue](../../scenarios/references/ROADMAP.md#priority-queue))
+- **gated** · R7 · From-source V8: run `scripts/build_v8.sh` for the pinned `thirds/v8` (heavy: several GB of dependencies and a long compile; needs an explicit go-ahead), then configure with `TRECH_V8_BUILD_DIR` and rerun the V8 CTest set. Only Homebrew V8 15.9.128.11 is validated. ([detail](#v8-for-the-javascript-backend--2026-11-21))
+
+## V8 for the JavaScript backend — 2026-11-21
+
+- [x] `brew install v8` (bottle 15.9.128.11, no compile) on macOS arm64; `cmake/TrechV8.cmake`
+  finds it, probes `V8_COMPRESS_POINTERS;V8_31BIT_SMIS_ON_64BIT_ARCH` and adds rpaths for
+  `lib` and `libexec`. `trech-v8-probe` links and passes its code-cache check.
+- [x] `scripts/build_v8.sh` for the pinned submodule (depot_tools, gclient sync at the
+  submodule's revision, `gn gen` with the documented arguments, `autoninja v8_monolith`).
+- [ ] The script has not been run; the monolith link path (Threads/dl only) is unvalidated, as
+  are Linux and Windows V8 builds. Queued above and in the
+  [runtime queue](../../engine/runtime/ROADMAP.md#priority-queue).
 
 ## Installed Node/V8 atomic research host
 

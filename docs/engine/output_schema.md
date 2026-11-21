@@ -71,6 +71,9 @@ part of `config_json`: two batches can share a `config_hash` and still run diffe
   `data`, so equal values mean the same code and data on any machine.
 - `parameter_overrides` (object): the `TRECH_VALUE` overrides in effect, from `--param` and
   `params` commands. Values not listed use their declared default.
+- `js_engine` (string, only when the lab runs on an engine other than QuickJS, e.g.
+  `trech lab … --js-engine v8`): the engine and version that evaluated this generation, such as
+  `"v8 15.9.128.11"`.
 
 Example: `{"entry":"examples/lab/live_hook_tuning.js","generation":2,"trigger":"params","parameter_overrides":{"edep_threshold_mev":0.1},"sources":[{"path":"live_hook_tuning.js","sha256":"…"}],"sources_sha256":"…"}`.
 
@@ -126,6 +129,10 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   math that hook-layer `Math.*`, `**` and `ctx.rng.normal` evaluate with (currently
   `"trech-dmath-fdlibm-5.3/1"`). Hook numerics replay byte for byte only between runs with the
   same value; it changes whenever any function result changes.
+- `js_engine` (string, present only when `hooks_enabled` and the hooks ran on an engine other
+  than QuickJS): the JavaScript engine and its version, for example `"v8 15.9.128.11"`. QuickJS
+  runs omit the key, so their records keep their historical shape. Hook results are
+  engine-independent ([V8 guide](v8.md)); the field says which engine produced them.
 - `hooks_registered` (array[string]): registered hook names captured from config/runtime.
 - `hooks_guardrail_max_step_callbacks` (number): configured `hooks.maxStepCallbacks` guardrail.
 - `hooks_guardrail_max_emits_per_callback` (number): configured `hooks.maxEmitsPerCallback` guardrail.

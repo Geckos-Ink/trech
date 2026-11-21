@@ -41,6 +41,9 @@ struct ProvenanceRecord {
   // and ctx.rng.normal evaluate with. Written as `hooks_math` only when hooks are enabled, so
   // runs without hooks keep their historical record shape.
   std::string hooksMath;
+  // JavaScript engine that ran the hooks ("v8 15.9.128.11"), written as `js_engine` only when it
+  // is not QuickJS (the historical engine), so QuickJS records keep their shape.
+  std::string jsEngine;
   bool exactScoreReduction = false;
   std::vector<std::string> hooksRegistered;
   int hooksGuardrailMaxStepCallbacks = 0;

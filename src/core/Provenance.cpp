@@ -94,6 +94,9 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   if (record.hooksEnabled && !record.hooksMath.empty()) {
     j["hooks_math"] = record.hooksMath;
   }
+  if (record.hooksEnabled && !record.jsEngine.empty()) {
+    j["js_engine"] = record.jsEngine;
+  }
   if (record.exactScoreReduction) {
     j["score_reduction"] = "exact_binary64_sum_v1";
   }

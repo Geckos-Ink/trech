@@ -42,9 +42,44 @@ Read the root principles and the parent handbook first; then open only the subca
 
 ### C++ engine — `trech_js` ([`src/js/`](../../../src/js), [`include/trech/js/`](../../../include/trech/js))
 
+#### Engine backends — QuickJS and V8 (2026-11-21)
+
+`trech::JsRuntime` ([`JsRuntime.hpp`](../../../include/trech/js/JsRuntime.hpp),
+[`src/js/JsRuntimeFacade.cpp`](../../../src/js/JsRuntimeFacade.cpp)) is a facade over a
+[`JsEngineBackend`](../../../src/js/JsEngineBackend.hpp). Both backends are the **same host source**:
+`JsRuntime.cpp` is written against the QuickJS C API and compiled twice, once with `quickjs.h`
+(namespace `trech::quickjs`) and once, in [`src/js/JsRuntimeV8.cpp`](../../../src/js/JsRuntimeV8.cpp)
+(`TRECH_JS_BACKEND_V8`), against [`src/js/V8QuickJsApi.hpp`](../../../src/js/V8QuickJsApi.hpp)
+(namespace `trech::v8engine`), a V8 implementation of the 62 QuickJS functions the host uses.
+
+- **Never add a host feature to one engine.** Write it in `JsRuntime.cpp` with QuickJS calls. If it
+  needs a QuickJS function the V8 layer lacks, implement that function in `V8QuickJsApi.cpp` with
+  QuickJS semantics; the V8 build fails to compile until you do. Public entry points that touch the
+  engine open with `TRECH_JS_ENTER(impl_->ctx)` (V8: `v8::Locker`, isolate, `HandleScope`, context;
+  QuickJS: nothing).
+- **Semantics the layer must keep:** argv padded to the declared length; `JS_ToInt64` is QuickJS's
+  float→int64 rule (the `ctx.rng` `__seed` round trip depends on it); exceptions caught into a pending
+  slot and rethrown from the host trampoline; `Math.*` transcendentals are `trech_dmath` with
+  QuickJS's wrappers (fast-API entries for optimized code); `**` refused in `JS_Eval` and, through
+  the code-generation callback, in `eval`/`new Function` ([`PowOperatorScan`](../../../include/trech/js/PowOperatorScan.hpp),
+  C++ twin of `scripts/check_js_pow_operator.py`); microtasks never run; host function objects are
+  cached per context (one `v8::Function` per C function); stacks formatted QuickJS-style by the
+  prepare-stack-trace callback.
+- **Selection:** `JsRuntime(JsEngine)`; default = `setDefaultEngine` (CLI `--js-engine`) >
+  `TRECH_JS_ENGINE` > `TRECH_DEFAULT_JS_ENGINE`. Unavailable engine → `std::runtime_error`.
+  `engineIdentity()` → `js_engine` in provenance/`lab_script`, written only for non-QuickJS.
+- **Build:** `TRECH_ENABLE_V8` (default OFF) → static lib `trech_js_v8` (C++20, `-ffp-contract=off`),
+  V8 from [`cmake/TrechV8.cmake`](../../../cmake/TrechV8.cmake) (monolith or installed prefix; ABI
+  definitions auto-probed). Details and measurements: [`docs/engine/v8.md`](../../../docs/engine/v8.md).
+- **Tests:** `trech_js_engine_parity` (both engines, byte for byte), `trech_pow_operator_scan`, the
+  `_v8` CTest twins of the JS suites (`TRECH_JS_ENGINE=v8`), `trech_js_engine_run_parity`
+  ([`scripts/js_engine_run_parity.py`](../../../scripts/js_engine_run_parity.py), whole runs, pinned
+  `TRECH_COMPUTE_BUDGET`, QuickJS control run). `TRECH_JS_ENGINE=v8 ctest` runs everything on V8.
+- **Timing:** `trech-js-bench` (create/evaluate/per-dispatch, both engines, no Geant4).
+
 #### [`src/js/JsRuntime.cpp`](../../../src/js/JsRuntime.cpp) · [`JsRuntime.hpp`](../../../include/trech/js/JsRuntime.hpp)
 
-The QuickJS host: evaluates experiments, dispatches hooks, and owns the `ctx.*` surface and the
+The shared host (QuickJS API; compiled for both engines): evaluates experiments, dispatches hooks, and owns the `ctx.*` surface and the
 `GenericSurrogate` model registry. **This is where the cascade/predict hook-layer entry points
 live.** Change here for the authoring runtime and the JS → JSON boundary.
 
@@ -153,8 +188,9 @@ It uses integer bit access and IEEE add/sub/mul/div/sqrt only, returns one canon
   operator cannot be replaced from JavaScript: V8 keeps its own pow there. QuickJS evaluates
   `**` and `Math.pow` through the same `js_pow`, so repository scripts use `Math.pow` only;
   [`scripts/check_js_pow_operator.py`](../../../scripts/check_js_pow_operator.py) (CTest
-  `trech_js_pow_operator`) tokenizes `js/`, `examples/` and `projects/` and fails on any `**`.
-  Regenerating needs `emcc`; running needs only Node/V8.
+  `trech_js_pow_operator`) tokenizes `js/`, `examples/`, `projects/` and `tests/fixtures/` and
+  fails on any `**`. Regenerating needs `emcc`; running needs only Node/V8. The embedded V8
+  backend links `trech_dmath` natively instead (see *Engine backends* above).
 
 - **Emit guardrails silently truncate observer frames.** Symptom: a GIF ends early (MRI stage 3
   lost its reconstruction act). Cause: a callback emitting more than `hooks.maxEmitsPerCallback`

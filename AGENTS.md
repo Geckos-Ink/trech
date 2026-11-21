@@ -34,7 +34,7 @@ Cross-component tasks follow each affected branch. [The full tree index](AGENTS/
 - `thirds/evolvo` is first-party, lightweight Python and the exception to that rule. Every time a task uses it (for Torch, V8 or Geant4 work alike), first fast-forward it with `git -C thirds/evolvo pull --ff-only`. When the task needs a general-purpose Evolvo change, implement or fix it in `thirds/evolvo` itself, following its own `AGENTS.md`. Commit it on Evolvo's `main` with no co-author trailer, then commit the new submodule pointer in TRECH (see the [Evolvo workflow](AGENTS/tooling/dependencies/AGENTS.md)).
 
 TRECH is a **C++/Geant4 simulation and learning toolkit**: experiments are authored in
-**JavaScript** (QuickJS), which computes and composes a config that is handed as JSON to a
+**JavaScript** (QuickJS, or V8 in a `TRECH_ENABLE_V8` build), which computes and composes a config that is handed as JSON to a
 **deterministic-by-default C++ runtime** that drives Geant4 and writes a provenance-first data
 trail. Its reason to exist is the **multi-scale inference cascade** — take a precise Geant4
 particle/nano base and lift its behaviour, via statistical/ML inference, *scale by scale up the

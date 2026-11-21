@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -238,8 +239,12 @@ void checkSpecialCases() {
 }
 
 #ifndef TRECH_DMATH_STANDALONE
-// QuickJS evaluates Math.* and `**` through trech_dmath, bit for bit.
-void checkQuickJsRouting() {
+// QuickJS evaluates Math.* and `**` through trech_dmath, bit for bit. The V8 backend installs the
+// same functions as its Math.* and refuses `**` (V8 keeps its own pow for the operator), so
+// its run omits the `**` rows.
+void checkEngineRouting(trech::JsEngine engine) {
+  const bool powOperator = engine == trech::JsEngine::QuickJs;
+  const std::string label = trech::jsEngineName(engine);
   const trech::test::TemporaryDirectory fixture("trech_deterministic_math");
   const auto script = fixture.path() / "math_routing.js";
   {
@@ -265,14 +270,24 @@ for (let i = 0; i < 64; i++) {
   }
   const base = Math.abs(x) + 1.0e-3, e = (((i * 5) % 64) * 0.7919 % 11 - 5.5) / 2;
   rows.push(["pow", bits(base), bits(e), bits(Math.pow(base, e))]);
-  rows.push(["**", bits(base), bits(e), bits(base ** e)]);
+  if (POW_OPERATOR) rows.push(["**", bits(base), bits(e), bits(eval("base ** e"))]);
   rows.push(["atan2", bits(x), bits(e), bits(Math.atan2(x, e))]);
   rows.push(["hypot", bits(x), bits(e), bits(Math.hypot(x, e))]);
 }
 globalThis.TRECH_CONFIG = {run: {nEvents: 1}, hooks: {inputs: {dmath: rows}}};
 )JS";
   }
-  trech::JsRuntime js;
+  {
+    // Declared before the body so the V8 run never contains the operator in its source.
+    std::string body;
+    {
+      std::ifstream in(script);
+      body.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    std::ofstream out(script);
+    out << "const POW_OPERATOR = " << (powOperator ? "true" : "false") << ";\n" << body;
+  }
+  trech::JsRuntime js(engine);
   const auto config = nlohmann::json::parse(js.evalExperimentAndGetConfigJson(script.string()));
   const auto& rows = config.at("hooks").at("inputs").at("dmath");
   const auto parse = [](const std::string& h) { return fromBits(std::stoull(h, nullptr, 16)); };
@@ -305,13 +320,13 @@ globalThis.TRECH_CONFIG = {run: {nEvents: 1}, hooks: {inputs: {dmath: rows}}};
     ++checked;
     if (got != bitsOf(want)) {
       if (mismatched++ < 5) {
-        std::cerr << "QuickJS " << name << "(" << row.at(1).get<std::string>() << ") = "
+        std::cerr << label << " " << name << "(" << row.at(1).get<std::string>() << ") = "
                   << hex(got) << ", trech_dmath = " << hex(bitsOf(want)) << "\n";
       }
     }
   }
-  expect(checked == 64 * 23, "Expected every QuickJS routing row.");
-  expect(mismatched == 0, "QuickJS Math.* / ** must evaluate through trech_dmath bit for bit (" +
+  expect(checked == 64 * (powOperator ? 23 : 22), "Expected every " + label + " routing row.");
+  expect(mismatched == 0, label + " Math.* (and QuickJS's **) must evaluate through trech_dmath bit for bit (" +
                               std::to_string(mismatched) + " mismatches).");
 }
 #endif
@@ -371,10 +386,13 @@ int main() {
   for (const auto& f : binary) checkBinary(f);
   checkSpecialCases();
 #ifndef TRECH_DMATH_STANDALONE
-  try {
-    checkQuickJsRouting();
-  } catch (const std::exception& ex) {
-    expect(false, std::string("QuickJS routing check threw: ") + ex.what());
+  for (const auto engine : {trech::JsEngine::QuickJs, trech::JsEngine::V8}) {
+    if (!trech::JsRuntime::engineAvailable(engine)) continue;
+    try {
+      checkEngineRouting(engine);
+    } catch (const std::exception& ex) {
+      expect(false, std::string(trech::jsEngineName(engine)) + " routing check threw: " + ex.what());
+    }
   }
 #endif
   if (failures != 0) {

@@ -831,6 +831,11 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.stratifyModelHashAvailable = !record.stratifyModelHash.empty();
   record.hooksEnabled = hooksEnabled_;
   record.hooksMath = hooksEnabled_ ? trech_dmath_id() : "";
+  // Written only for a non-QuickJS engine, so QuickJS runs keep their historical record shape.
+  record.jsEngine = hooksEnabled_ && options_.hookRuntime &&
+                            options_.hookRuntime->engine() != JsEngine::QuickJs
+                        ? options_.hookRuntime->engineIdentity()
+                        : "";
   record.exactScoreReduction = orderedOutput_;
   record.hooksRegistered = cfg_.hooks.registered;
   record.hooksGuardrailMaxStepCallbacks = hookMaxStepCallbacks_;
@@ -1816,6 +1821,11 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.stratifySourceUnknownCount = stratifyUnknown;
   record.hooksEnabled = hooksEnabled_;
   record.hooksMath = hooksEnabled_ ? trech_dmath_id() : "";
+  // Written only for a non-QuickJS engine, so QuickJS runs keep their historical record shape.
+  record.jsEngine = hooksEnabled_ && options_.hookRuntime &&
+                            options_.hookRuntime->engine() != JsEngine::QuickJs
+                        ? options_.hookRuntime->engineIdentity()
+                        : "";
   record.exactScoreReduction = orderedOutput_;
   record.hooksRegistered = cfg_.hooks.registered;
   record.hooksGuardrailMaxStepCallbacks = hookMaxStepCallbacks_;

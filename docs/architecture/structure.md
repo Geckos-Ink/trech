@@ -259,6 +259,10 @@ This keeps **JS → JSON** as the stable interface boundary (early on, you avoid
 
 ## 6) Embedded JS runtime wrapper (QuickJS)
 
+> Current code: `trech::JsRuntime` is now a facade over two engines built from one host
+> source, QuickJS and (with `TRECH_ENABLE_V8`) V8. See the [V8 backend guide](../engine/v8.md).
+> The sketch below is the original QuickJS skeleton.
+
 ### `include/trech/js/JsRuntime.hpp`
 
 ```cpp

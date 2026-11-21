@@ -127,6 +127,8 @@ void LabScriptHost::commit(LabScriptCandidate candidate, const std::string& trig
   identity["generation"] = generation_;
   identity["trigger"] = trigger;
   identity["parameter_overrides"] = parameters_;
+  // Named only for a non-QuickJS engine, so QuickJS lab records keep their shape.
+  if (active_->engine() != JsEngine::QuickJs) identity["js_engine"] = active_->engineIdentity();
   identity_ = std::move(identity);
   watched_.clear();
   for (const auto& file : digests) watched_.push_back({file.path, file.sha256, {}, -1});
