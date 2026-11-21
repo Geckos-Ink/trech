@@ -5,6 +5,9 @@ to effects you can observe, from light bending in water to heated wax circulatin
 lava lamp. Describe an experiment in JavaScript, run it with the TRECH engine and watch
 the recorded result in [TRECH Studio](studio/README.md).
 
+> Currently, TRECH is in alpha stage in order to achieve best code architecture possible.
+> For testing, have a little help of your AI agent friend.
+
 [Quick start](#quick-start) · [Featured experiments](#featured-experiments) · [Studio previews](#trech-studio) · [Documentation](docs/README.md)
 
 ![Recorded Geant4 optical photon tracks showing white light refracting through glass and water](tools/viz/demos/glass_of_water_beam.gif)
