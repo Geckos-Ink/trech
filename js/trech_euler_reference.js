@@ -2,9 +2,19 @@
 // flux, CFL steps, reflective stair-step walls and open reservoir boundaries.
 // No viscosity, chemistry, heat transfer, structural failure or learned physics.
 (function() {
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("euler_reference");
+  // Values from this module come from an authored law (physics for comparison), not from the
+  // engine: each public step is reported so the run summary can count it (ctx.authored).
+  const authored = (globalThis.TRECH_TRACE && globalThis.TRECH_TRACE.authored) || function () {};
   if (globalThis.TRECH_EULER_REFERENCE) return;
   function create(o) {
     const {nx, ny, dx, gamma, gasConstant, rho, pressure, mach} = o;
+    trace.info("authored 2D Euler reference created (physics for comparison)", {nx, ny, dx, mach});
     if (!Number.isInteger(nx) || !Number.isInteger(ny) || nx < 4 || ny < 4 || nx * ny > 20000 ||
         ![dx, gamma - 1, gasConstant, rho, pressure].every(v => Number.isFinite(v) && v > 0) ||
         !Number.isFinite(mach) || mach < 0 || mach > 3)
@@ -41,6 +51,7 @@
     }
     const initial = totals();
     function advance() {
+      authored("euler_reference.advance");
       let frequency = 0;
       state.forEach((u, i) => {if (!solid[i]) {
         const p = primitive(u); frequency = Math.max(frequency, (Math.abs(p.vx) + Math.abs(p.vy) + 2 * p.c) / dx);

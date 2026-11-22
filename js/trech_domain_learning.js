@@ -3,6 +3,12 @@
 // accumulation of prequential errors, and applying a frozen learner's rates.
 // The engine owns every statistical decision; nothing here learns.
 (function () {
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("domain_learning");
   function agreement(domains, labels) {
     const table = new Map();
     const rows = new Map(), columns = new Map();
@@ -187,6 +193,11 @@
       }
       applied += 1;
     }
+    // Rates come from the engine's learned domains (ctx.learnDomains); untouched elements had
+    // no finite prediction and keep their value.
+    trace.count("rates_applied", applied);
+    trace.count("rates_untouched", untouched);
+    if (trace.enabled("debug")) trace.debug("learned rates applied", {applied, untouched, dt, fields: fields.map(f => f.rate)});
     return { applied, untouched };
   }
 

@@ -1,6 +1,12 @@
 // Multi-entity authoring and supplied-field validation. Geometry operations only;
 // no forces, orbital templates, molecular boundary/rate laws or nuclear dynamics.
 globalThis.TRECH_CHEMISTRY_SCENE = (function () {
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("chemistry_scene");
   const chem = globalThis.TRECH_CHEMISTRY;
   function vector(v, label) {
     if (!Array.isArray(v) || v.length !== 3 || v.some(x => !Number.isFinite(x) || Math.abs(x) > 1e6))
@@ -235,6 +241,8 @@ globalThis.TRECH_CHEMISTRY_SCENE = (function () {
         molecules: entitiesAtFrame, links: frameLinks, structure, fields: recordedFields,
         ...(electronicStructure ? {electronic_structure: electronicStructure} : {})};
     });
+    trace.debug("chemistry scene declared", {molecules: entities.length, links: links.length,
+      frames: frames.length, time_kind});
     return {schema: raw.schema, length_unit: "angstrom", molecules: entities, links,
       time_kind, frames, note: typeof raw.note === "string" ? raw.note : "Authored molecular placements/connectivity"};
   }

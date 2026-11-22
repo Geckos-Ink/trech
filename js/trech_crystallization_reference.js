@@ -1,9 +1,19 @@
 // Independent, illustrative lattice-growth comparison. No Geant4-trained kinetics.
 // Sites represent NaCl formula-unit PARCELS; their pitch is a display choice.
 (function() {
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("crystallization_reference");
+  // Values from this module come from an authored law (physics for comparison), not from the
+  // engine: each public step is reported so the run summary can count it (ctx.authored).
+  const authored = (globalThis.TRECH_TRACE && globalThis.TRECH_TRACE.authored) || function () {};
   if (globalThis.TRECH_CRYSTALLIZATION_REFERENCE) return;
   function create(o) {
     const side = o.side, total = side * side * side;
+    trace.info("authored crystallization reference created (physics for comparison)", {side, water: o.water});
     if (!Number.isInteger(side) || side < 2 || side > 12 ||
         !Number.isInteger(o.water) || o.water < 1 || !Number.isFinite(o.solubility) || o.solubility <= 0 ||
         !Number.isFinite(o.attachmentProbability) || o.attachmentProbability < 0 || o.attachmentProbability > 1)
@@ -13,6 +23,7 @@
     const index = p => p[0] + side * (p[1] + side * p[2]);
     let water = o.water;
     function step(removed, rng) {
+      authored("crystallization_reference.step");
       if (!Number.isInteger(removed) || removed < o.water - water || removed > o.water)
         throw new Error("Dehydration must be monotone and conserve solvent inventory");
       water = o.water - removed;

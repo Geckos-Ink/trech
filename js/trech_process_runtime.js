@@ -1,6 +1,12 @@
 // Generic process sequencing. State laws remain engine operators; no fallback kinetics.
 (function() {
   if (globalThis.TRECH_PROCESS_RUNTIME) return;
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("process_runtime");
   const copy = value => JSON.parse(JSON.stringify(value));
   function create({initial, stages, validate}) {
     let state = copy(initial), cursor = 0, elapsed = 0, calls = 0;
@@ -9,6 +15,19 @@
       active_process: stages[cursor] ? stages[cursor].id : null,
       completed: cursor === stages.length, elapsed_s: elapsed, calls}; }
     function step(ctx, dt) {
+      const before = cursor;
+      const result = stepOnce(ctx, dt);
+      trace.count(result.status);
+      if (cursor !== before)
+        trace.info("process stage advanced", {from: stages[before] ? stages[before].id : null,
+          to: stages[cursor] ? stages[cursor].id : null, completed: cursor === stages.length, elapsed_s: elapsed});
+      if (result.status === "blocked" || result.status === "rejected")
+        trace.info("process step " + result.status, {process: result.process, reason: result.reason});
+      else if (trace.enabled("debug"))
+        trace.debug("process step " + result.status, {process: result.process || null, stage: cursor, elapsed_s: elapsed});
+      return result;
+    }
+    function stepOnce(ctx, dt) {
       if (!Number.isFinite(dt) || dt <= 0) throw new Error("Process dt must be positive seconds");
       if (!ctx.runtime || ctx.runtime.mode !== "predictive")
         return {...snapshot(), status: "strict_disabled", report: null};

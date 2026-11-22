@@ -102,7 +102,8 @@ void spanEnd(std::uint64_t id, nlohmann::json data = nullptr);
 void countCall(std::string_view call, std::string_view outcome);
 void countHook(std::string_view hook, std::size_t emits, std::size_t engineBackedCalls,
                std::size_t engineCalls);
-void countAuthored(std::string_view law);
+// Returns the law's running count, so callers can thin repeated records (1, 2, 4, 8, ...).
+std::size_t countAuthored(std::string_view law);
 void countModel(std::string_view name, bool loaded);
 
 // Compact copy of a JSON value: scalars kept, strings/arrays/objects truncated, depth-limited,

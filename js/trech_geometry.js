@@ -16,6 +16,12 @@
 // pair is reported as `possible` without necessarily intersecting.
 (function () {
   "use strict";
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("geometry");
 
   if (globalThis.TRECH_GEOMETRY) {
     return;
@@ -455,6 +461,9 @@
 
     const hard = overlaps.some((o) => o.kind === "overlap") ||
       outside.some((o) => o.kind === "outside");
+    trace[hard || duplicates.length || unknownParents.length ? "info" : "debug"]("geometry audit", {volumes: list.length,
+      duplicates: duplicates.length, unknown_parents: unknownParents.length,
+      overlaps: overlaps.length, outside: outside.length, ok: !hard && !duplicates.length && !unknownParents.length});
     return {
       ok: duplicates.length === 0 && unknownParents.length === 0 && !hard,
       duplicates,

@@ -1,8 +1,18 @@
 // Independent 3D inviscid Euler comparison. No learned or Geant4 flow response.
 (function() {
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("euler3d_reference");
+  // Values from this module come from an authored law (physics for comparison), not from the
+  // engine: each public step is reported so the run summary can count it (ctx.authored).
+  const authored = (globalThis.TRECH_TRACE && globalThis.TRECH_TRACE.authored) || function () {};
   if (globalThis.TRECH_EULER3D_REFERENCE) return;
   function create(o) {
     const {nx, ny, nz, dx, gamma, gasConstant, rho, pressure, mach} = o;
+    trace.info("authored 3D Euler reference created (physics for comparison)", {nx, ny, nz, dx, mach});
     const shape = [nx, ny, nz], stride = [1, nx, nx * ny];
     if (!shape.every(n => Number.isInteger(n) && n >= 4) || nx * ny * nz > 30000 ||
         ![dx, gamma - 1, gasConstant, rho, pressure].every(v => Number.isFinite(v) && v > 0) ||
@@ -49,6 +59,7 @@
     }
     const initial = totals();
     function advance(maxDt) {
+      authored("euler3d_reference.advance");
       if (maxDt !== undefined && (!Number.isFinite(maxDt) || maxDt <= 0))
         throw new Error('Maximum timestep must be finite and positive');
       let frequency = 0;

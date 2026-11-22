@@ -29,7 +29,10 @@ The physics content: scenarios set `TRECH_CONFIG` (+ optional `TRECH_HOOKS`). Th
 doubles as the manual regression corpus and as Studio's test tree. Shared modules:
 [`trech_trace.js`](../../../js/trech_trace.js) (host-neutral `TRECH_TRACE` logging API: inside
 `trech` the engine's own object is returned, in Node it installs an environment-configured
-implementation; see the [engine trace guide](../../../docs/engine/engine_trace.md)),
+implementation; see the [engine trace guide](../../../docs/engine/engine_trace.md)). Every
+shared library opens a channel with the same three-way accessor (`TRECH_TRACE`, else
+`require("./trech_trace.js")`, else a no-op) and never writes warn/error; reference solvers call
+`TRECH_TRACE.authored("<library>.<step>")` per public step (channel table in that guide),
 [`trech_helpers.js`](../../../js/trech_helpers.js) (constants, `spectra`,
 `helpers.beamProfiles.spread` presets, `observer.linearClock`, and the common-library entry point),
 [`trech_math.js`](../../../js/trech_math.js) (`helpers.math`: numeric bounds/coercion,

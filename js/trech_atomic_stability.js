@@ -2,6 +2,12 @@
 // Atomic units: lengths a0, masses me, energies Eh. No host/Node dependencies.
 (function (root) {
   'use strict';
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const log = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("atomic_stability");  // `log`: solve() has its own `trace`
   const CONSTANTS = Object.freeze({
     edition: 'CODATA 2022',
     source: 'https://physics.nist.gov/cuu/Constants/',
@@ -107,6 +113,9 @@
 
   function solve(input) {
     const request = normalize(input);
+    // An independent quantum reference, not a Geant4 or learned result.
+    log.count("solves");
+    log.debug("hydrogenic reference solve", {atomic_number: request.atomicNumber, state: request.state});
     const {atomicNumber: z, nuclearMassElectron: mass, state: {n, l}, grid} = request;
     const reducedMass = 1 / (1 + 1 / mass);
     const energyScale = reducedMass * z * z * CONSTANTS.hartreeEv;

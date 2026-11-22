@@ -3,6 +3,12 @@
 // composition map from separate Geant4 mixture probes.
 TRECH_INCLUDE("../data/particle_molecule/response.js");
 globalThis.TRECH_MOLECULAR_PARTICLE = (function () {
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("molecular_particle");
   const data = globalThis.TRECH_PARTICLE_MOLECULE;
   function models() {
     return [
@@ -34,7 +40,10 @@ globalThis.TRECH_MOLECULAR_PARTICLE = (function () {
     const atomic = ctx.evolve({dt: 1, state, aux,
       fields: data.processes.map(p => ({name: p + "_barn", min: 0})),
       operator_role: "particle_response", element_kind: "atom_CHNO"});
-    if (!atomic) return null; // strict mode: no synthesized atom or molecular result
+    if (!atomic) {  // strict mode: no synthesized atom or molecular result
+      trace.debug("no atom response: inference disabled (strict)", {energy_ev: energyEv});
+      return null;
+    }
     if (!atomic.ran || atomic.inferenceCount !== spec.elements.length)
       throw new Error("Missing learned atom response");
     const pooled = {};
@@ -43,6 +52,8 @@ globalThis.TRECH_MOLECULAR_PARTICLE = (function () {
     for (let i = 0; i < spec.elements.length; ++i)
       for (const process of data.processes)
         pooled[spec.elements[i] + "_" + process + "_barn"] += state[process + "_barn"][i];
+    trace.debug("atom responses inferred", {energy_ev: energyEv, atoms: spec.elements.length,
+      inferences: atomic.inferenceCount});
     return {energy_ev: energyEv, atomic_state: state, atomic_trace: atomic.trace,
       atomic_inference_count: atomic.inferenceCount, pooled};
   }
@@ -54,6 +65,7 @@ globalThis.TRECH_MOLECULAR_PARTICLE = (function () {
     if (!molecular || molecular.__cascade.stagesRun !== 1)
       throw new Error("Missing learned molecular response; atom outputs are required");
     const totals = data.processes.map(p => molecular["molecule_" + p + "_barn"]);
+    trace.debug("molecular response inferred", {energy_ev: energyEv, sigma_barn: totals});
     if (totals.some(v => !Number.isFinite(v) || v <= 0)) throw new Error("Invalid molecular response");
     return {energy_ev: energyEv, atomic_state: state, atomic_trace: atoms.atomic_trace,
       atomic_inference_count: atoms.atomic_inference_count, pooled, sigma_barn: totals,

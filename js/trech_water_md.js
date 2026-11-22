@@ -28,6 +28,15 @@
 if (!globalThis.TRECH_RANDOM) TRECH_INCLUDE("trech_random.js");
 globalThis.TRECH_WATER_MD = (function () {
   "use strict";
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("water_md");
+  // Values from this module come from an authored law (physics for comparison), not from the
+  // engine: each public step is reported so the run summary can count it (ctx.authored).
+  const authored = (globalThis.TRECH_TRACE && globalThis.TRECH_TRACE.authored) || function () {};
 
   // ---- fixed SPC/E + rigid-geometry constants (real units: A, amu, fs) ----
   const DEG = Math.PI / 180.0;
@@ -238,6 +247,7 @@ globalThis.TRECH_WATER_MD = (function () {
       // One constrained velocity-Verlet step. pre-step positions are copied into
       // the reused pOld scratch (QuickJS GC dominates otherwise in this loop).
       step(rdfHist) {
+        authored("water_md.step");
         const f0 = sim.force, hdt = 0.5 * dt;
         for (let i = 0; i < atoms.length; i++) {
           const a = atoms[i], inv = 1 / a.m, fi = f0[i], po = pOld[i], p = a.p, v = a.v;
@@ -279,6 +289,7 @@ globalThis.TRECH_WATER_MD = (function () {
       }
     };
     sim.force = computeForces(atoms, mols, null);
+    trace.info("authored water MD created (physics for comparison)", {molecules: mols.length, atoms: atoms.length, dt_fs: dt});
     return sim;
   }
 

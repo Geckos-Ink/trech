@@ -39,6 +39,15 @@ if (!globalThis.TRECH_MATH) TRECH_INCLUDE("trech_math.js");
 if (!globalThis.TRECH_RANDOM) TRECH_INCLUDE("trech_random.js");
 globalThis.TRECH_FOAM = (function () {
   "use strict";
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("foam_solver");
+  // Values from this module come from an authored law (physics for comparison), not from the
+  // engine: each public step is reported so the run summary can count it (ctx.authored).
+  const authored = (globalThis.TRECH_TRACE && globalThis.TRECH_TRACE.authored) || function () {};
 
   const GRAVITY_MM_PER_S2 = 9806.65; // standard gravity, a physical constant
 
@@ -85,6 +94,7 @@ globalThis.TRECH_FOAM = (function () {
   function create(options) {
     const opt = options || {};
     const n = Math.max(8, Math.floor(opt.parcelCount || 256));
+    trace.info("authored foam solver created (physics for comparison)", {parcels: n});
     const fillRadiusMm = Number(opt.fillRadiusMm);
     const fillHeightMm = Number(opt.fillHeightMm);
     const fillBottomMm = Number(opt.fillBottomMm || 0.0);
@@ -682,6 +692,7 @@ globalThis.TRECH_FOAM = (function () {
     }
 
     function step(dt) {
+      authored("foam_solver.step");
       integrate(dt);
       integrateFragments(dt);
       updateBonds(dt);

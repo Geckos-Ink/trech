@@ -20,12 +20,33 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R4 · Engine trace depth: attribution is per hook invocation, not per emitted value (an invocation with one engine call and one unreported authored law counts as engine-backed). Carry value-level origin (lineage) into emit records, and trace the inner decisions of `RivalArbitration` (evolve/react/cascade/interact rivals), cascade stages and `ctx.evolve` operator routing as their own categories instead of only the `trace`-level result digest. ([engine trace](#engine-trace-2026-11-22))
 - **P2** · R1 · Engine trace and provenance: record the trace summary (or its path and digest) in `run_end` provenance when tracing is on, and split the summary per `trech lab` batch (today one summary covers the session); keep it out of the config hash. ([engine trace](#engine-trace-2026-11-22))
 - **P2** · R6 · Studio engine trace residuals: link a trace row to its emit/timeline frame (`hook`+`event` → Emits tab), add a per-hook attribution view of the summary (`emits_without_inference` per hook), and change the level of a running live lab (today it applies from the next start). No committed reference capture of the panel yet. ([script logging and Studio panel](#script-logging-and-studio-trace-panel-2026-11-22))
-- **P2** · R3 · Script logging adoption: the shared `js/` libraries and scenario companions do not use `TRECH_TRACE` channels yet; give each library a channel (process runtime, domain learning, chemistry, foam, water MD) at its authored-law and fallback points, next to the `ctx.authored` adoption above. ([script logging and Studio panel](#script-logging-and-studio-trace-panel-2026-11-22))
+- **P3** · R3 · Library logging residuals: `trech_helpers.js` and the scenario companions (`.validation.js`, `.ui.js`, `.view.js`) have no channel yet; reference solvers report `authored` from inside the library, so a validation companion running one is counted with the normal path (the trace cannot tell a reference run from a normal-path use until companions report their role). ([library channels](#library-trace-channels-2026-11-22))
 - **P3** · R5 · Engine trace Geant4 categories: physics list/process registration, per-run process tallies and geometry resolution as `geant4` trace records, so the base-of-truth side of a run is as visible as the inference side. ([engine trace](#engine-trace-2026-11-22))
 - **P2** · R1 · Runtime (non-`onInit`) hooks cannot patch config, so ignored-override reporting covers `onInit` only; decide whether later hooks may patch at all before extending it. (dated records below)
 - **P2** · R5 · Sweep the three PubChem-dependent scenarios (`beaker_water_n_pentane`, its Studio variant, `testscenario_h2o_electrolysis_combustion`) through inspect/type/unknown-key checks once a PubChem cache is present. (dated records below)
 
 ## Delivery records
+
+<a name="library-trace-channels-2026-11-22"></a>
+
+- [x] Trace channels in the shared JS libraries (2026-11-22). Nineteen `js/` libraries get a channel
+  through one host-tolerant accessor (engine/loader `TRECH_TRACE`, plain-Node
+  `js/trech_trace.js`, otherwise a no-op): process operators/runtime (engine advance vs the
+  reason a process was not advanced, per-contract counters), solution processes, molecular particle
+  (including the strict-mode null path), material facts, domain learning/tracking, chemistry and
+  chemistry scene, ML (definitions; registry resolution vs fallback path), geometry audit, atomic
+  references, and the authored reference solvers (foam, water MD, mW water, 2D/3D Euler,
+  crystallization), whose every public step calls `TRECH_TRACE.authored`. Authored records are
+  thinned to uses 1, 2, 4, 8, … (engine and Node), every use still counted. Libraries never write
+  warn/error. Verification: byte-identical `trech_hook_emits.jsonl`/`trech_scores.jsonl`/
+  `trech_event_scores.jsonl` before vs after and traced vs untraced on nine scenarios covering the
+  instrumented libraries, plus a foam-solver probe (the foam scenario needs the absent PubChem
+  cache, as before); `trech_engine_trace`, Node `ml.test.js`, Release CTest 76/76, V8 JS tests,
+  the atomic-research tree 74/74 (Node atomic tests and the `trech-atomic` QuickJS host, which has
+  no `TRECH_TRACE` and takes the no-op path); a `trace` name collision in `solve()` of
+  `trech_atomic_stability.js` is why that file names its channel `log`;
+  purity report regenerated (only the coefficient-density denominators moved: more code lines,
+  same coefficients, sites and grades). Residuals queued above.
 
 <a name="script-logging-and-studio-trace-panel-2026-11-22"></a>
 

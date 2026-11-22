@@ -105,8 +105,9 @@
     api.authored = function(law, detail) {
       if (level === 'off') return;
       var name = String(law === undefined ? 'unnamed' : law);
-      authored[name] = (authored[name] || 0) + 1;
-      record('debug', 'authored', name, detail, '');
+      const uses = authored[name] = (authored[name] || 0) + 1;
+      // Every use is counted; records are thinned to uses 1, 2, 4, 8, ... (as in the engine).
+      if ((uses & (uses - 1)) === 0) record('debug', 'authored', name, detail === undefined ? { uses: uses } : { uses: uses, detail: detail }, '');
     };
     api.host = opts.host || 'node';
     // Counters and authored-law counts so far (the Node analogue of the engine's run summary).

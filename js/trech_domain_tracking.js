@@ -31,6 +31,16 @@ globalThis.TRECH_TRACK_DOMAINS = function (report, previous = null) {
     const id = group.path === "u" ? null : continued ? continued.id : nextId++;
     return {...group, id, predecessors};
   });
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("domain_tracking");
+  if (trace.enabled("debug")) {
+    trace.debug("domain lineage", {groups: tracked.length,
+      continued: tracked.filter(g => g.predecessors && g.predecessors.length).length, next_id: nextId});
+  }
   return {
     nextId, groups: tracked,
     elementIds: elementGroups.map(index => index === null ? null : tracked[index].id)

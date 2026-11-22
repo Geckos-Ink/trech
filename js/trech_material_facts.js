@@ -3,12 +3,19 @@
 if (!globalThis.TRECH_MATH) TRECH_INCLUDE("trech_math.js");
 globalThis.TRECH_MATERIAL_FACTS = (function () {
   "use strict";
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("material_facts");
   const { clamp01 } = globalThis.TRECH_MATH;
   function opticsRecord(ctx, name) {
     const item = ctx.optics && ctx.optics[name];
     if (!item || !Array.isArray(item.display_rgb)) {
       throw new Error("ctx.optics missing Geant4-derived colour for " + name);
     }
+    if (trace.enabled("trace")) trace.trace("Geant4-derived optics read", {material: name, display_rgb: item.display_rgb});
     return item;
   }
   function opticsRgb(ctx, name) {
@@ -34,6 +41,8 @@ globalThis.TRECH_MATERIAL_FACTS = (function () {
     if (!raw || !raw.cid || !raw.smiles) {
       throw new Error("PubChem structure cache for " + name + " must contain cid + smiles");
     }
+    // An independent PubChem reference (not a Geant4 or learned result).
+    trace.debug("PubChem structure read", {name: String(name), cid: Number(raw.cid)});
     return { cid: Number(raw.cid), smiles: String(raw.smiles),
              formula: String(raw.molecular_formula || "") };
   }

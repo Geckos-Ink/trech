@@ -3,6 +3,12 @@
 TRECH_INCLUDE("trech_process_runtime.js");
 TRECH_INCLUDE("trech_process_operators.js");
 (function() {
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("solution_processes");
   if (globalThis.TRECH_SOLUTION_PROCESSES) return;
   const species = ["water_liquid", "water_vapour", "salt_solid", "salt_dissolved", "salt_crystal"];
   const conservation = [
@@ -95,6 +101,7 @@ TRECH_INCLUDE("trech_process_operators.js");
             if (heat && stageIndex >= heatIndex) context.bath_temperature_k = heat.bath_temperature_k;
             return operators[stageIndex].advance(ctx, state, dt, context);
           }}));
+        trace.debug("solution recipe compiled", {processes: steps.map(s => s.id), water_parcels: water, salt_parcels: salt});
         return {plan: clone(plan), create: () => TRECH_PROCESS_RUNTIME.create({initial, stages, validate})};
       }
     };

@@ -109,7 +109,8 @@ onEventEnd(ctx) {
 ```
 
 - `ctx.authored(law, detail?)` counts one use of a named authored law. The summary lists the
-  count for each law, and a `debug` record carries the detail.
+  count for each law. A `debug` record (`{uses, detail?}`) is written at uses 1, 2, 4, 8, and so
+  on, so a law called inside a loop cannot fill the category.
 - `ctx.log(message, data?)` writes an `info` record in the `scenario` category.
 - `TRECH_LOG(message, data?)` does the same while the scenario is being evaluated, before any
   hook runs.
@@ -167,6 +168,32 @@ span durations.
 - [`js/trech_trace.js`](../../js/trech_trace.js) is host-neutral. Inside `trech`,
   `TRECH_INCLUDE("trech_trace.js")` returns the engine's object, so a library can include it
   without checking which host it runs in.
+
+## What the shared libraries log
+
+The libraries in [`js/`](../../js) log on their own channels. So a trace of any scenario also
+shows what its libraries decided, without any change to the scenario. Each library gets its
+channel through one accessor line. In `trech` and in the model loader this is `TRECH_TRACE`.
+In plain Node it is `js/trech_trace.js`. In any other host it is a silent no-op. No library
+writes `warn` or `error`, so a library never prints on stderr when tracing is off.
+
+| Channel | Records (level) | Counters (`<channel>.<name>`) |
+| --- | --- | --- |
+| `process_operators` | Contract bound (debug). Process advanced by the engine operator, with inferences and selection (debug). **Process not advanced**, with the reason code: `operator_blocked`, `artifact_mismatch`, `unit_mismatch`, `missing_context` and the others (info; `strict_disabled` is debug). | `<contract>.advanced`, `<contract>.<code>`, `<contract>.no_op` |
+| `process_runtime` | Stage advanced (info). Step blocked or rejected, with the reason (info). Every other step (debug). | one per step status: `advanced`, `blocked`, `rejected`, `strict_disabled`, `complete` |
+| `solution_processes` | Recipe compiled (debug). | |
+| `molecular_particle` | Atom and molecular responses inferred, or none because inference is disabled in strict mode (debug). | |
+| `material_facts` | Geant4-derived optics read (trace). PubChem reference structure read (debug). | |
+| `domain_learning`, `domain_tracking` | Learned rates applied to fields (debug). Domain lineage (debug). | `rates_applied`, `rates_untouched` |
+| `chemistry`, `chemistry_scene` | Reaction plan and scene declared (debug). | |
+| `ml` | Model or search defined (debug). **Model resolved from the registry** (checkpoint, version) or the registry **fallback path used** (info). | |
+| `geometry` | Geometry audit (debug; info when it finds a problem). | |
+| `atomic_stability`, `atomic_composition` | Independent quantum reference solve (debug). | `solves`, `analyses` |
+| `foam_solver`, `water_md`, `water_mw`, `euler_reference`, `euler3d_reference`, `crystallization_reference` | **Authored solver created (physics for comparison)** (info). | Each public step calls `TRECH_TRACE.authored("<library>.<step>")`, so the summary's `authored` lists every reference law that ran, for example `water_md.step: 4000`. |
+
+`trech_math.js`, `trech_random.js` and the deterministic-math kernels are not instrumented. They
+are hot numeric primitives with no decisions to report. `trech_helpers.js` is not instrumented
+yet.
 
 ## Watch it live in Studio
 

@@ -6294,10 +6294,15 @@ static JSValue jsTraceAuthored(JSContext* ctx, JSValueConst, int argc, JSValueCo
   if (!trech::trace::active()) return JS_UNDEFINED;
   auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
   const std::string law = traceStringArg(ctx, argc, argv, 0, "unnamed");
-  trech::trace::countAuthored(law);
+  const std::size_t uses = trech::trace::countAuthored(law);
   if (state) state->callAuthored += 1;
-  if (trech::trace::enabled(trech::trace::Level::Debug, "authored")) {
-    trech::trace::record(trech::trace::Level::Debug, "authored", law, traceLogPayload(ctx, argc, argv, 1));
+  // Every use is counted; records are thinned to uses 1, 2, 4, 8, ... so a law called in an
+  // inner loop (a reference solver's step) cannot fill the category cap.
+  const bool powerOfTwo = uses != 0 && (uses & (uses - 1)) == 0;
+  if (powerOfTwo && trech::trace::enabled(trech::trace::Level::Debug, "authored")) {
+    nlohmann::json data = {{"uses", uses}};
+    if (argc > 1 && !JS_IsUndefined(argv[1])) data["detail"] = traceLogPayload(ctx, argc, argv, 1);
+    trech::trace::record(trech::trace::Level::Debug, "authored", law, std::move(data));
   }
   return JS_UNDEFINED;
 }

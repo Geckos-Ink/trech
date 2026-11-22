@@ -3,6 +3,12 @@
 // Real symmetric closed sectors only: no open-channel widths or QED matching.
 (function (root) {
   "use strict";
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("atomic_composition");
   const MAX_DIMENSION = 32;
 
   function finite(x, label) {
@@ -200,6 +206,7 @@
   // Auditable finite-basis entry point. A supplied Hamiltonian is an external
   // mathematical input, not a computed atom, nuclear response, or lifetime.
   function analyze(request) {
+    trace.count("analyses");
     if (!request || typeof request !== "object" || Array.isArray(request))
       throw new Error("composition request must be an object");
     const allowed = ["hamiltonianHartree", "retainedDimension", "projectionEnergyHartree"];

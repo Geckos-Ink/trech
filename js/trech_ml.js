@@ -13,6 +13,12 @@
 // loaded into the same definition can never share an identity or a store directory.
 globalThis.TRECH_ML = (function () {
   "use strict";
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("ml");
 
   const DEFINITION_SCHEMA = "trech_ml_model_definition_v1";
   const SEARCH_SCHEMA = "trech_ml_structure_search_v1";
@@ -499,6 +505,8 @@ globalThis.TRECH_ML = (function () {
     if (declared.definitions.some(function (d) { return d.name === definition.name; }))
       fail(where, "model '" + definition.name + "' is defined twice in the same evaluation");
     declared.definitions.push(definition);
+    trace.debug("model defined", {name: definition.name, scale: definition.scale || null,
+      structure_id: definition.structure_id, parameters: definition.parameter_count});
     return definition;
   }
 
@@ -649,6 +657,7 @@ globalThis.TRECH_ML = (function () {
     if (declared.searches.some(function (s) { return s.name === search.name; }))
       fail(where, "search '" + search.name + "' is defined twice in the same evaluation");
     declared.searches.push(search);
+    trace.debug("structure search defined", {name: search.name, strategy: search.strategy, search_hash: search.search_hash});
     return search;
   }
   function positiveIntOrZero(where, key, value) {
@@ -1001,6 +1010,10 @@ globalThis.TRECH_ML = (function () {
     } else {
       fail("modelEntry(" + name + ")", "no registry index given (pass {index: 'path/to/index.json'} or {fallbackPath})");
     }
+    // Which checkpoint the scenario will load, or that it fell back to a committed file.
+    trace.info(checkpoint ? "model resolved from registry" : "model registry fallback path used",
+      {name: entry.name, path: entry.path, checkpoint: checkpoint ? checkpoint.id : null,
+       version: checkpoint ? checkpoint.version : null, resolved_by: checkpoint ? checkpoint.resolved_by : null});
     if (opts.withRegistry === false) delete entry.registry;
     return entry;
   }

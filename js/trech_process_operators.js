@@ -1,6 +1,12 @@
 // Data-only contracts for process libraries. No model selection or physical law
 // lives here: engine operators still own inference, RNG and execution reports.
 (function() {
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("process_operators");
   if (globalThis.TRECH_PROCESS_OPERATORS) return;
   const copy = value => JSON.parse(JSON.stringify(value));
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
@@ -365,9 +371,16 @@
     function advance(ctx, state, dt, values = {}) {
       if (!Number.isFinite(dt) || dt <= 0) throw new Error("Process dt must be positive seconds");
       let artifacts;
-      const failure = (code, message, engine = null, ran = false) =>
-        ({ran, accepted: false, contract_id: contract.id, error: {code, message}, engine,
-          ...(artifacts ? {artifacts: copy(artifacts)} : {})});
+      const failure = (code, message, engine = null, ran = false) => {
+        // Strict mode is the expected state of a strict run; every other code means the
+        // engine operator did not advance this process and the state was not committed.
+        trace.count(contract.id + "." + code);
+        trace[code === "strict_disabled" ? "debug" : "info"]("process not advanced: " + code,
+          {contract: contract.id, operation: contract.operation, operator_role: contract.operator_role,
+           code, message, engine_ran: !!(engine && engine.ran)});
+        return {ran, accepted: false, contract_id: contract.id, error: {code, message}, engine,
+          ...(artifacts ? {artifacts: copy(artifacts)} : {})};
+      };
       if (!ctx.runtime || ctx.runtime.mode !== "predictive")
         return failure("strict_disabled", "Process inference requires predictive mode");
       if (typeof ctx[contract.operation] !== "function")
@@ -471,13 +484,13 @@
         if (spatial && contract.spatial.empty_neighbourhood === "complete" && engine &&
             engine.blockedReason === "no_pairs" && engine.pairCount === 0 && engine.inferenceCount === 0 &&
             !engine.neighborPairsTruncated && engine.selection && engine.selection.status === "selected")
-          return {ran: false, accepted: true, no_op: "empty_neighbourhood", contract_id: contract.id,
+          return trace.count(contract.id + ".no_op"), {ran: false, accepted: true, no_op: "empty_neighbourhood", contract_id: contract.id,
             error: null, engine, ...(artifacts ? {artifacts: copy(artifacts)} : {})};
         // Likewise only the explicit zero-element verdict, for a declared empty population.
         if (emptyStep && engine && engine.blockedReason === "no_elements" && engine.elementCount === 0 &&
             engine.inferenceCount === 0 && engine.drawCount === 0 &&
             engine.selection && engine.selection.status === "selected")
-          return {ran: false, accepted: true, no_op: "empty_population", contract_id: contract.id,
+          return trace.count(contract.id + ".no_op"), {ran: false, accepted: true, no_op: "empty_population", contract_id: contract.id,
             error: null, engine, ...(artifacts ? {artifacts: copy(artifacts)} : {})};
         return failure("operator_blocked", "Required operator unavailable, ambiguous or missing inputs; no fallback law", engine);
       }
@@ -494,9 +507,17 @@
         }
       } catch (error) { return failure("invalid_proposal", error.message, engine, true); }
       for (const field of writable) state[field.name] = proposed[field.name].slice();
+      trace.count(contract.id + ".advanced");
+      if (trace.enabled("debug"))
+        trace.debug("process advanced by engine operator", {contract: contract.id, operation: contract.operation,
+          operator_role: contract.operator_role, elements: state[writable[0].name].length,
+          inferences: engine.inferenceCount, selection: engine.selection ? engine.selection.status : null});
       return {ran: true, accepted: true, contract_id: contract.id, error: null, engine,
         ...(artifacts ? {artifacts: copy(artifacts)} : {})};
     }
+    trace.debug("process contract bound", {contract: contract.id, operation: contract.operation,
+      operator_role: contract.operator_role, element_kind: contract.element_kind || null,
+      spatial: !!spatial, dimensional_check: !!dimensions});
     return dimensions ? {contract: copy(contract), advance, dimensions: copy(dimensions)} : {contract: copy(contract), advance};
   }
   globalThis.TRECH_PROCESS_OPERATORS = {bind, units};

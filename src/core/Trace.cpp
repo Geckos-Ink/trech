@@ -178,7 +178,8 @@ std::string verdict(const nlohmann::json& totals) {
        << " emits came from hook calls with no engine-backed inference.";
   }
   if (authored > 0) {
-    os << " The scenario reported " << authored << " uses of authored laws (ctx.authored).";
+    os << " " << authored << " uses of authored laws were reported (ctx.authored or a library's "
+          "reference solver); see `authored` for each law.";
   }
   return os.str();
 }
@@ -373,11 +374,11 @@ void countHook(std::string_view hook, std::size_t emits, std::size_t engineBacke
   else t.emitsWithoutInference += emits;
 }
 
-void countAuthored(std::string_view law) {
-  if (!active()) return;
+std::size_t countAuthored(std::string_view law) {
+  if (!active()) return 0;
   auto& s = state();
   std::lock_guard<std::mutex> lock(s.mutex);
-  s.authored[std::string(law)] += 1;
+  return ++s.authored[std::string(law)];
 }
 
 void countModel(std::string_view name, bool loaded) {

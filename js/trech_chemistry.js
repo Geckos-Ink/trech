@@ -1,6 +1,12 @@
 // Authoring/data validation only. No valence, equilibrium geometry, reaction-rate
 // or stability law is supplied here. C++ operators own inference and transitions.
 globalThis.TRECH_CHEMISTRY = (function () {
+  // Engine trace channel (docs/engine/engine_trace.md), silent unless tracing is on. trech and the
+  // Node model loader provide TRECH_TRACE, plain Node loads js/trech_trace.js, any other host
+  // gets a no-op. Logging never changes a result.
+  const trace = (globalThis.TRECH_TRACE || (typeof require === "function" ? require("./trech_trace.js") : null) ||
+    {channel: () => ({info() {}, log() {}, debug() {}, trace() {}, count() {}, enabled: () => false,
+      span: (name, fn) => fn()})}).channel("chemistry");
   function integer(value, label, min, max) {
     if (!Number.isSafeInteger(value) || value < min || value > max)
       throw new Error(label + " must be an integer in [" + min + ", " + max + "]");
@@ -86,6 +92,8 @@ globalThis.TRECH_CHEMISTRY = (function () {
     if (!Number.isFinite(dt) || dt <= 0) throw new Error("Reaction dt must be positive and finite");
     // Shared context is deliberately empty: particle facts come from the engine,
     // species counts from state. No authored fallback rates/zero facts.
+    trace.debug("reaction plan declared", {species: species.length, channels: channels.length,
+      conserved: conservation.length, model_path: raw.modelPath || null});
     return {species, channels, conservation, modelPath: raw.modelPath || "", dt};
   }
   return {structure, components, reaction};
