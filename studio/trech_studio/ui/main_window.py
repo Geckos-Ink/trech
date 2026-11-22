@@ -44,7 +44,8 @@ from ..render.probability import probability_views, build_probability_playback
 from ..render.viewport import create_viewport
 from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_viz_data
 from ..scene.model import SceneModel
-from ..scene.writer import scene_to_js
+from ..scene.dependencies import run_search_dirs
+from ..scene.writer import scene_to_bundle
 from ..precision import build_precision_report
 from ..settings import StudioSettings
 from ..run_summary import build_run_summary, geometry_resolution_marks
@@ -68,6 +69,18 @@ from .processes import ProcessesPanel
 from .spectra import SpectraPanel
 from .model_browser import ModelBrowser
 from .models import ModelsPanel
+
+
+def _scene_bundle(scene: SceneModel, result, config, dependency_dir: str = "scene_deps"):
+    """The exportable bundle of ``scene``: its JS plus model files verified by digest.
+
+    Relative model paths are searched from the recorded experiment's directory, Studio's
+    working directory and the repository root (provenance does not record the run's cwd).
+    """
+    search_dirs = run_search_dirs(result.run_start_provenance(),
+                                  [Path.cwd(), Path(__file__).resolve().parents[3]])
+    return scene_to_bundle(scene, config, artifacts=result.model_artifacts(),
+                           search_dirs=search_dirs, dependency_dir=dependency_dir)
 
 
 class StudioWindow(QMainWindow):
@@ -301,7 +314,7 @@ class StudioWindow(QMainWindow):
                     or self._scene.source_path is None
                     or Path(self._scene.source_path).resolve() != result.viz_scene_path.resolve()):
                 raise ValueError("Load a transport run with its full recorded config to edit the scene.")
-            scene_to_js(self._scene, result.recorded_config())
+            _scene_bundle(self._scene, result, result.recorded_config())
         except ValueError as exc:
             self.inspector.set_editing(False, str(exc))
         else:
@@ -312,7 +325,7 @@ class StudioWindow(QMainWindow):
         try:
             if result is None:
                 raise ValueError("Load a transport run before editing its scene")
-            scene_to_js(candidate, result.recorded_config())
+            _scene_bundle(candidate, result, result.recorded_config())
         except ValueError as exc:
             self.inspector.show_edit_error(str(exc))
             return
@@ -395,7 +408,8 @@ class StudioWindow(QMainWindow):
             config = result.recorded_config()
             if config is None:
                 raise ValueError("This run has no valid recorded config; the scene alone is incomplete")
-            source = scene_to_js(self._scene, config)
+            # Validate (and locate every dependency by its recorded digest) before asking where.
+            _scene_bundle(self._scene, result, config)
         except ValueError as exc:
             QMessageBox.warning(self, "Cannot export scene scenario", str(exc))
             return False
@@ -410,12 +424,26 @@ class StudioWindow(QMainWindow):
                                 "Choose a new file; use Save scenario for the open source workspace")
             return False
         try:
-            target.write_text(source, encoding="utf-8")
-        except OSError as exc:
+            # Each export gets its own dependency folder, so several drafts can share a directory.
+            bundle = _scene_bundle(self._scene, result, config, f"{target.stem}_deps")
+            copies = []
+            for relative, source_file in bundle.files.items():
+                destination = target.parent / relative
+                data = source_file.read_bytes()
+                if destination.exists() and destination.read_bytes() != data:
+                    raise ValueError(f"{destination} already exists with different content; "
+                                     "choose another file name or folder")
+                copies.append((destination, data))
+            for destination, data in copies:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(data)
+            target.write_text(bundle.source, encoding="utf-8")
+        except (OSError, ValueError) as exc:
             QMessageBox.warning(self, "Cannot export scene scenario", str(exc))
             return False
         self._scene_dirty = False
-        self.console.log_info(f"Exported transport scene draft: {target}")
+        packaged = f" with {len(bundle.files)} model file(s) in {target.stem}_deps/" if bundle.files else ""
+        self.console.log_info(f"Exported transport scene draft: {target}{packaged}")
         return True
 
     def _bundle_declarations(self, scenario: Path, parameter_args: List[str]) -> Dict[str, Any]:

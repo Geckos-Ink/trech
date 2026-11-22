@@ -46,8 +46,10 @@ planned stage's recorded execution (calls, committed/blocked/rejected, engine er
 inference accounting; unreported stages read "not reached"). [Authoring contract](../docs/studio/studio_authoring.md).
 **File → Export scene scenario…** saves a loaded transport run as a separate runnable `.js`
 draft using its full recorded config. Source origins/spreads, isotope composition and unedited
-physics settings survive; derived appearance stays a result. Callback-bearing scenarios and
-external model dependencies require the original source. Export leaves the current source
+physics settings survive; derived appearance stays a result. Model files the run loaded are
+copied into a `<name>_deps/` folder beside the export after their SHA-256 matches the run's
+recorded manifest, and volumes are written parents first. Callback-bearing scenarios still
+require the original source. Export leaves the current source
 workspace and workers in place. The Inspector edits world size/material, primitive volume
 shape/pose/material and single/named beam particle/energy, direction/origin, disk spot radius,
 divergence cone half-angle and fractional energy sigma through **Apply scene draft**. Use

@@ -772,7 +772,7 @@ const cfg = {
       geometry.boxVolume({
         name: "left_cathode",
         material: "G4_Cu",
-        sizeMm: [1.5, 18.0, 1.0],
+        sizeMm: [1.5, 11.0, 1.0],
         positionMm: [-4.0, 0.0, 0.0],
         parent: "medium",
         scoreEdep: true,
@@ -781,7 +781,7 @@ const cfg = {
       geometry.boxVolume({
         name: "right_cathode",
         material: "G4_Cu",
-        sizeMm: [1.5, 18.0, 1.0],
+        sizeMm: [1.5, 11.0, 1.0],
         positionMm: [4.0, 0.0, 0.0],
         parent: "medium",
         scoreEdep: true,
@@ -790,7 +790,9 @@ const cfg = {
       geometry.boxVolume({
         name: "oxygen_collector",
         material: "G4_GRAPHITE",
-        sizeMm: [10.0, 1.0, 1.0],
+        // Narrower than the cathode gap, so it clears both cathodes; the cathodes
+        // are shorter than the medium cube (engine overlap check).
+        sizeMm: [6.0, 1.0, 1.0],
         positionMm: [0.0, 4.6, 0.0],
         parent: "medium",
         scoreEdep: true,

@@ -30,13 +30,37 @@ that the viewport does not represent. Recorded optics/appearance remain results.
 keeps the current editor and running jobs in place, and refuses to overwrite loaded source
 files or retained drafts. Open the new file separately to review, inspect and run it.
 
-This bounded export requires matching scene/config geometry and run identity. Missing provenance,
-registered JS callbacks and external model dependencies require editing the original scenario;
-the exporter cannot recover callback source, typed parameter declarations or companions from
-run output. It also rejects unsupported edited shapes and numeric values that JS cannot retain
-exactly. Dependency packaging and complete source round-trip remain M2 work. Export does not validate geometry overlaps or physical behaviour; TRECH owns
-those checks. Python clients can author new transport drafts using the pure
-`trech_studio.scene.scene_to_config` / `scene_to_js` functions without Qt or the engine.
+This bounded export requires matching scene/config geometry and run identity. Missing provenance
+and registered JS callbacks require editing the original scenario: the exporter cannot recover
+callback source, typed parameter declarations or companions from run output. It also rejects
+unsupported edited shapes and numeric values that JS cannot retain exactly. Export does not
+validate geometry overlaps or physical behaviour; TRECH owns those checks.
+
+**Model dependencies travel with the export (since 2026-11-22).** A run that loaded model
+files — `models[].path`, `optics.derive.surrogateModelPath` or `stratify.modelPath` — exports
+as a small bundle: the scenario plus a `<name>_deps/` folder beside it. Studio finds each file
+by its declared path (under the recorded experiment's folder, Studio's working directory and the
+repository root) and copies it only if its bytes match the SHA-256 the engine recorded in the
+run's `model_artifacts` manifest. A TorchScript module's `<model>.pt.io.json` sidecar is copied
+with it under the same check. The exported config then points at the copies, for example
+`"surrogateModelPath": "draft_deps/optics_surrogate_ridge.json"`, which the engine reads beside
+the scenario from any working directory. Export refuses, with the reason, when a dependency
+cannot be tied to bytes the run used: the run predates the manifest, a loader did not open the
+file (strict mode or a disabled loader), the file is missing or has changed, or a file of the
+same name with different content already sits in the target `_deps/` folder. Identical exports
+reuse the existing copies.
+
+**Volume hierarchy.** Volumes are written parents first: the engine builds them in list order,
+so a volume reparented onto a later one is moved just after its parent and every other volume
+keeps its authored position (an unchanged scene still exports byte-identical config). A parent
+that names no scene volume, a parent cycle or a self-parent is rejected instead of falling back
+to the world. A recorded config whose run already relied on that fallback (a child declared
+before its parent, or an unknown parent) is refused too, since reordering it would silently
+change the recorded geometry.
+
+Python clients can author new transport drafts using the pure
+`trech_studio.scene.scene_to_config` / `scene_to_js` functions without Qt or the engine, and
+`scene_to_bundle` returns the JS plus the dependency files to copy.
 The **Inspector** edits exportable transport runs: world size/material, box/sphere/tube/cylinder
 shape dimensions, volume position/rotation/material and a single or named beam's particle/energy,
 direction/origin, disk spot radius (mm), divergence cone half-angle (degrees) and energy sigma

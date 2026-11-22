@@ -157,6 +157,14 @@ struct RunOptions {
 };
 
 std::string runUsage();
+
+// Where a run reads a separately loaded model artifact (`optics.derive.surrogateModelPath`,
+// `stratify.modelPath`). A relative path is read as given, from the working directory; when
+// no regular file exists there, it is read from the experiment's directory instead, the rule
+// the JS host already applies to `models[].path`. Absolute paths, an empty experiment path and
+// paths found nowhere are returned unchanged. Provenance keeps the declared path, so config
+// hashes do not depend on where a run was started.
+std::string resolveArtifactPath(const std::string& declared, const std::string& experimentPath);
 RunOptions parseRunOptions(int argc, char** argv);
 void applyRunOverrides(TrechConfig& cfg, const RunOptions& options);
 // Resolves the trace options (CLI over $TRECH_TRACE*; default file <output>/trech_trace.jsonl)

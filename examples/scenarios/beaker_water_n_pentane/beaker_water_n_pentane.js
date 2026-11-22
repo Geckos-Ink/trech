@@ -435,8 +435,10 @@ globalThis.TRECH_CONFIG = {
         name: "beaker_wall", material: GLASS,
         innerRadiusMm: APPARATUS.beakerInnerRadiusMm,
         outerRadiusMm: APPARATUS.beakerInnerRadiusMm + 2.0,
-        lengthMm: APPARATUS.beakerHeightMm,
-        positionMm: [0, APPARATUS.beakerHeightMm / 2.0, 0],
+        // The wall stands on the 3 mm base (y = 3 .. height) so the two glass
+        // solids touch without overlapping (engine overlap check, 2026-11-22).
+        lengthMm: APPARATUS.beakerHeightMm - 3.0,
+        positionMm: [0, (APPARATUS.beakerHeightMm + 3.0) / 2.0, 0],
         rotationDeg: [90, 0, 0],
         tags: TRECH_VIEWS["beaker_water_n_pentane"]["tags2"]()
       }),

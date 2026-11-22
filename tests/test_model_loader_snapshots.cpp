@@ -1,6 +1,7 @@
 #include "TemporaryDirectory.hpp"
 
 #include "trech/core/Provenance.hpp"
+#include "trech/core/RunOptions.hpp"
 #include "trech/ml/FeaturePipeline.hpp"
 #include "trech/ml/Stratifier.hpp"
 
@@ -99,6 +100,32 @@ int main() {
     cfg.modelPath.clear();
     require(!trech::ml::captureStratifierModel(cfg, predictive),
             "unconfigured classifier must not invent a snapshot");
+
+    // Experiment-relative artifacts: a relative path missing from the working directory is
+    // read beside the experiment, while the snapshot keeps the declared path.
+    namespace fs = std::filesystem;
+    const auto bundle = fixture.path() / "bundle";
+    fs::create_directories(bundle / "scene_deps");
+    const auto experiment = (bundle / "scene.js").string();
+    model["bias"] = 2.0;
+    const auto bundled = model.dump();
+    write(bundle / "scene_deps" / "classifier.json", bundled);
+    const std::string declared = "scene_deps/classifier.json";
+    require(!fs::exists(declared), "test working directory must not contain the bundle path");
+    const auto resolved = trech::resolveArtifactPath(declared, experiment);
+    require(fs::path(resolved) == (bundle / declared).lexically_normal(),
+            "missing working-directory artifact must resolve beside the experiment");
+    require(trech::resolveArtifactPath(declared, "") == declared &&
+            trech::resolveArtifactPath("scene_deps/absent.json", experiment) == "scene_deps/absent.json" &&
+            trech::resolveArtifactPath(resolved, "elsewhere/x.js") == resolved,
+            "empty experiment, unresolvable and absolute paths must stay as declared");
+    cfg.modelPath = declared;
+    const auto relative = trech::ml::captureStratifierModel(cfg, predictive, resolved);
+    require(relative && relative->status == "loaded" && relative->path == declared &&
+            relative->sha256 == trech::sha256Hex(bundled),
+            "snapshot must read the resolved file but record the declared path");
+    require(trech::ml::captureStratifierModel(cfg, predictive)->status == "failed",
+            "without a resolved read path the working-directory lookup still fails");
     std::cout << "model loader snapshots: all checks passed\n";
     return 0;
   } catch (const std::exception& error) {

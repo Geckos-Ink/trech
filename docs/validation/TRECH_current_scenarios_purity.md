@@ -1552,7 +1552,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Inference sites: 1 (`react` 1) · law-shaped math: 3 · inference share: 25%
-- Embedded coefficients: 53 in 844 code lines (6.3/100) · top-level literals: 32 · geometry math: 8
+- Embedded coefficients: 53 in 844 code lines (6.3/100) · top-level literals: 33 · geometry math: 8
 - Geant4 fact reads: 0 · seeded RNG draws: 6 · hooks: yes
 - Comparison-only (excluded): functions `referenceCombustionProbability`, `referenceCombustionStep`, `referenceElectrolysisProbability`, `referenceElectrolysisStep`
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`

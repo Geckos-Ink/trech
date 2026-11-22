@@ -299,6 +299,16 @@ names. Each entry records `loader` (`"optics"` or `"stratifier"`), configured `p
 - `disabled_strict`: strict mode prevented opening/inference, even if the file exists.
 - `disabled`: the associated optics derivation or stratification is disabled; no file is opened.
 
+`path` is always the path as declared, so the config hash does not depend on where a run
+started. **Where the file is read from** (all three dependency kinds): a relative path is
+read from the working directory, and when no file exists there, from the experiment's own
+directory. Registry `models[].path` always followed that rule; since 2026-11-22 the optics
+and stratifier loaders follow it too (`trech::resolveArtifactPath`). Before that, they read
+only from the working directory, so `optics.derive.surrogateModelPath:
+"draft_deps/ridge.json"` failed unless `trech run` started beside the scenario. Studio's
+scene export relies on the rule to ship model copies in a `<name>_deps/` folder beside the
+exported scenario.
+
 Only `loaded` entries have non-null identities/size. Absence of `loaders` in older manifests
 means separate-loader identities were not recorded. The same completed manifest enters both
 provenance phases and scores. Optics loads once before action setup and uses that instance for

@@ -2,6 +2,7 @@
 
 This is data authoring only. Recorded spectra/appearance are never converted to physics.
 Loaded scenes require their canonical config; callback source cannot be recovered from it.
+``scene_to_bundle`` also packages the recorded model files (see ``dependencies.py``).
 """
 
 from __future__ import annotations
@@ -9,8 +10,10 @@ from __future__ import annotations
 from copy import deepcopy
 import json
 import math
-from typing import Dict, Optional
+from pathlib import Path
+from typing import Dict, List, Optional, Sequence
 
+from .dependencies import DEFAULT_DEPENDENCY_DIR, SceneBundle, package_dependencies
 from .loader import scene_from_viz_data
 from .model import Beam, SceneModel, Shape, VolumeNode
 
@@ -112,12 +115,67 @@ def _check_snapshot(scene: SceneModel, config: Dict) -> None:
         raise ValueError("Recorded config and viz scene do not match; load a clean run output directory")
 
 
-def scene_to_config(scene: SceneModel, base_config: Optional[Dict] = None) -> Dict:
+def _parent_key(entry: Dict) -> str:
+    return str(entry.get("placement", {}).get("parent", "") or "").lower()
+
+
+def _check_recorded_hierarchy(volumes: List[Dict], kept: set) -> None:
+    """The recorded run must not have relied on the engine's parent fallback.
+
+    The engine places a volume whose parent is unknown or declared later in the world and
+    records a ``parent_fallback`` issue. Reordering such a config on export would nest the
+    volume and silently change the recorded geometry, so it is refused instead.
+    """
+    declared = set()
+    names = {str(v.get("name", "")).lower() for v in volumes}
+    for entry in volumes:
+        parent = _parent_key(entry)
+        if (str(entry.get("name", "")).lower() in kept and parent
+                and parent not in _BUILTIN_PARENTS and parent not in declared):
+            reason = "is declared after it" if parent in names else "is not a volume"
+            raise ValueError(f"Recorded volume {entry.get('name')}'s parent {parent} {reason}; "
+                             "the run placed it in the world. Fix the original scenario first")
+        declared.add(str(entry.get("name", "")).lower())
+
+
+def _order_volumes(volumes: List[Dict]) -> List[Dict]:
+    """Parents before children, keeping the authored order wherever it is already valid.
+
+    The engine builds volumes in list order and needs each parent built first. A Studio
+    reparent can point a volume at a later one; this stable order moves only what must move.
+    Unknown parents and parent cycles are rejected rather than left to the world fallback.
+    """
+    names = {str(v["name"]).lower() for v in volumes}
+    for entry in volumes:
+        parent = _parent_key(entry)
+        if parent and parent not in _BUILTIN_PARENTS and parent not in names:
+            raise ValueError(f"{entry['name']}'s parent {entry['placement']['parent']} is not a volume in this scene")
+    ordered: List[Dict] = []
+    built = set()
+    pending = list(volumes)
+    while pending:
+        ready = [v for v in pending
+                 if not _parent_key(v) or _parent_key(v) in _BUILTIN_PARENTS or _parent_key(v) in built]
+        if not ready:
+            cycle = ", ".join(str(v["name"]) for v in pending)
+            raise ValueError(f"Volume parents form a cycle: {cycle}")
+        # Take only the first ready volume so later siblings keep their relative order.
+        first = ready[0]
+        ordered.append(first)
+        built.add(str(first["name"]).lower())
+        pending.remove(first)
+    return ordered
+
+
+def scene_to_config(scene: SceneModel, base_config: Optional[Dict] = None, *,
+                    allow_dependencies: bool = False) -> Dict:
     """Return a detached config containing the scene's authored edits.
 
     A loaded scene needs its complete provenance config. Unchanged fields retain the exact
     canonical values (including eV/MeV rounding, isotope composition and source spread).
-    Registered callbacks and external model dependencies are rejected rather than dropped.
+    Registered callbacks are rejected rather than dropped. External model dependencies are
+    rejected too unless ``allow_dependencies`` is set by ``scene_to_bundle``, which then
+    repoints them at packaged copies. Volumes are written parents-first (``_order_volumes``).
     New scenes without ``raw`` can use engine defaults for unrepresented config fields.
     """
     if (scene.raw or scene.source_path) and base_config is None:
@@ -127,7 +185,8 @@ def scene_to_config(scene: SceneModel, base_config: Optional[Dict] = None) -> Di
         raise ValueError("The recorded config must be an object")
     if config.get("hooks", {}).get("registered"):
         raise ValueError("This run uses JS callbacks; edit/save the original scenario to retain its processes")
-    if (config.get("models") or config.get("stratify", {}).get("modelPath")
+    if not allow_dependencies and (
+            config.get("models") or config.get("stratify", {}).get("modelPath")
             or config.get("optics", {}).get("derive", {}).get("surrogateModelPath")):
         raise ValueError("This run uses external models; export their original scenario with its dependencies")
     baseline = scene_from_viz_data(scene.raw) if scene.raw else None
@@ -145,7 +204,10 @@ def scene_to_config(scene: SceneModel, base_config: Optional[Dict] = None) -> Di
                     raise ValueError("medium size must be nonnegative")
             detector[key] = value
 
-    originals = {v["name"]: v for v in config.get("geometry", {}).get("volumes", [])}
+    recorded_volumes = config.get("geometry", {}).get("volumes", [])
+    kept = {v.name.lower() for v in scene.volumes}
+    _check_recorded_hierarchy(recorded_volumes, kept)
+    originals = {v["name"]: v for v in recorded_volumes}
     old_volumes = {v.name: v for v in baseline.volumes} if baseline else {}
     volumes = []
     names = set()
@@ -175,7 +237,7 @@ def scene_to_config(scene: SceneModel, base_config: Optional[Dict] = None) -> Di
                      placement=placement)
         volumes.append(entry)
     if volumes or "geometry" in config:
-        config.setdefault("geometry", {})["volumes"] = volumes
+        config.setdefault("geometry", {})["volumes"] = _order_volumes(volumes)
 
     originals = {m["name"].lower(): m for m in config.get("materials", [])}
     old_materials = {m.name.lower(): m for m in baseline.materials} if baseline else {}
@@ -275,7 +337,25 @@ def scene_to_config(scene: SceneModel, base_config: Optional[Dict] = None) -> Di
 
 def scene_to_js(scene: SceneModel, base_config: Optional[Dict] = None) -> str:
     """Return deterministic, reviewable standalone JS for a transport scene draft."""
-    config = scene_to_config(scene, base_config)
+    return _config_to_js(scene_to_config(scene, base_config))
+
+
+def scene_to_bundle(scene: SceneModel, base_config: Optional[Dict], *,
+                    artifacts: Optional[Dict], search_dirs: Sequence[Path],
+                    dependency_dir: str = DEFAULT_DEPENDENCY_DIR) -> SceneBundle:
+    """Return the scenario JS plus the model files it needs, for a multi-file export.
+
+    ``artifacts`` is the run's ``model_artifacts`` manifest; each dependency is found under
+    ``search_dirs`` by its declared path and must match the SHA-256 recorded there. Paths in
+    the JS point into ``dependency_dir`` beside the scenario, where the engine resolves them.
+    A scene without dependencies yields exactly ``scene_to_js`` and no files.
+    """
+    config = scene_to_config(scene, base_config, allow_dependencies=True)
+    packaged, files = package_dependencies(config, artifacts, search_dirs, dependency_dir)
+    return SceneBundle(source=_config_to_js(packaged), files=files)
+
+
+def _config_to_js(config: Dict) -> str:
 
     def check_js_value(value):
         if isinstance(value, dict):

@@ -70,7 +70,6 @@ later step regress an earlier contract.
 
 - Safe `trech lab` reinitialization of geometry/beam/physics/scoring patches (now restart-required), then the restart handshake through Studio. — [engine/runtime](engine/runtime/ROADMAP.md#priority-queue)
 - Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab` and `simulate` streams snapshots back (engine reinitialization is a runtime P1). — [studio/authoring](studio/authoring/ROADMAP.md#priority-queue)
-- Complete the `SceneModel → scenario .js` round-trip for source dependencies and volume hierarchy. — [studio/authoring](studio/authoring/ROADMAP.md#priority-queue)
 
 **R8 Formal laws (Lean)**
 

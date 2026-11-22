@@ -278,13 +278,17 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
       status = "disabled";
       note = "optics derivation is disabled; artifact not opened";
     } else {
-      status = surrogate.load(cfg.opticsDerive.surrogateModelPath) ? "loaded" : "failed";
+      status = surrogate.load(trech::resolveArtifactPath(cfg.opticsDerive.surrogateModelPath,
+                                                         options.experimentPath))
+          ? "loaded" : "failed";
       note = surrogate.note();
     }
     loaders.push_back(loaderArtifact("optics", cfg.opticsDerive.surrogateModelPath,
         status, note, surrogate.contentId(), surrogate.contentSha256(), surrogate.contentSizeBytes()));
   }
-  options.stratifierModelSnapshot = trech::ml::captureStratifierModel(cfg.stratify, cfg.determinism);
+  options.stratifierModelSnapshot = trech::ml::captureStratifierModel(
+      cfg.stratify, cfg.determinism,
+      trech::resolveArtifactPath(cfg.stratify.modelPath, options.experimentPath));
   if (options.stratifierModelSnapshot) {
     const auto& snapshot = *options.stratifierModelSnapshot;
     loaders.push_back(loaderArtifact("stratifier", snapshot.path, snapshot.status, snapshot.loadNote,

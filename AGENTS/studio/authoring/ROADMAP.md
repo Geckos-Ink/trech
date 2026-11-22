@@ -13,11 +13,12 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 dated record below, and queue its residuals in the same change.
 
 - **P1** · R6 · Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab`, and live batches redraw the viewport instead of only logging to the console (engine reinitialization is a runtime P1). Options-panel `params`, saved-edit reloads (`--watch`) and generation/refusal logging landed 2026-11-21 in **Run ▸ Start live lab**; a status widget for the active generation and a timed batch loop at `lab.targetHz` are still missing. ([detail](#milestone-2--real-time-scenario-editing))
-- **P1** · R6 · Complete the `SceneModel → scenario .js` round-trip for source dependencies and volume hierarchy. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · All-scenario render parity: moving apparatus meshes, scalar colour bars, chart/text overlays, simultaneous streams and an all-family capture matrix. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P2** · R6 · Transform gizmos (translate/rotate/scale) on the selected volume. ([detail](#milestone-2--real-time-scenario-editing))
-- **P2** · R6 · Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics, undo/redo. ([detail](#milestone-2--real-time-scenario-editing))
+- **P2** · R6 · Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics, undo/redo. The writer already orders and validates reparented/nested volumes (2026-11-22); the Inspector has no parent control yet. ([detail](#milestone-2--real-time-scenario-editing))
+- **P2** · R6 · Callback-bearing scene round-trip: reconstruct typed declarations (`TRECH_VALUE`), companions and callback source so a run that registered hooks can be exported; `scene_to_config` still refuses `hooks.registered`. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Code editor: inline error markers, dynamic aliases/computed properties, template interpolation and complete config-schema completion (from Milestone 0). ([detail](../ROADMAP.md#milestone-0--the-basis-this-scaffold-landed-2026-07-11))
+- **P3** · R6 · Dependency packaging refuses model files the recorded run never opened (strict mode or a disabled optics/stratifier loader records no SHA-256), so such transport runs cannot be exported with their declared model; files a model names internally are not followed. ([detail](#milestone-2--real-time-scenario-editing))
 - **P3** · R6 · JavaScript engine selector in Run settings: pass `--js-engine quickjs|v8` to runs and the live lab when the engine binary has V8 (today only an inherited `TRECH_JS_ENGINE` selects it). ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P3** · R6 · Live authoring extensions: asynchronous inspection, draft persistence, crash recovery, atomic multi-file saves, source-content provenance, widget layout, workflow jobs, validated model/kernel hot swap. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 
@@ -116,6 +117,18 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   live snapshots/precision into the viewport, plus a restart/reinitialize handshake for
   kernel-bound geometry/beam/physics/scoring edits (currently rejected explicitly).
 - [ ] Transform gizmos (translate/rotate/scale) on the selected volume.
+- [x] **Source dependencies and volume hierarchy (2026-11-22):** `scene_to_bundle` packages
+  every `models[].path`, optics surrogate and stratifier file (and a TorchScript `.io.json`
+  sidecar) into `<export>_deps/` only when its bytes match the run's `model_artifacts`
+  SHA-256, and repoints the config; File ▸ Export writes the folder and never replaces a
+  different existing file. The engine now reads optics/stratifier paths beside the scenario
+  too (`trech::resolveArtifactPath`), so the bundle runs from any directory. Volumes export
+  parents-first with a stable order; unknown parents, cycles and recorded configs that relied
+  on the world fallback are refused. Verification: `test_scene_dependencies.py` (16 tests,
+  including a real Geant4 run of `optics_surrogate_demo`, an edited export and its rerun from
+  an unrelated working directory loading the same ridge SHA-256 under `--strict-config`) and
+  CTest `trech_model_loader_snapshots`. Residuals are queued (callback round-trip, unopened
+  dependencies, Inspector parent control).
 - [ ] Complete `SceneModel → scenario .js` round-trip. **Transport foundation landed:**
   pure `scene_to_config` / `scene_to_js` plus `File → Export scene scenario…` export loaded
   transport runs using the full recorded config. Exact unchanged config and isolated geometry/
@@ -123,9 +136,9 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   materials, physics options and independent primary sources survive. Derived appearance is
   excluded. Export rejects missing/mismatched config, JS callbacks and external models instead
   of silently stripping them or breaking relative dependencies. The File action preserves the
-  current source workspace and cannot overwrite its sources/drafts. Remaining: scene
-  hierarchy authoring, typed declarations/companions/callback source reconstruction, portable dependency
-  packaging and full multi-file scenario round-trip. Named beam source identity survives
+  current source workspace and cannot overwrite its sources/drafts. Hierarchy ordering and
+  dependency packaging landed 2026-11-22 (above). Remaining: typed declarations/companions/
+  callback source reconstruction (queued P2) and Inspector hierarchy controls. Named beam source identity survives
   reorder/nonprimary deletion; primary replacement, renaming/adding identities and ambiguous
   unnamed-source edits still require the original scenario. Geometry overlap/material validation and
   physical results remain the engine's responsibility; inspection alone does not validate them.

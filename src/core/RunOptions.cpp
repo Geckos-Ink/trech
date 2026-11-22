@@ -33,6 +33,18 @@ bool parseInteger(const std::string& text, int& value) {
 
 } // namespace
 
+std::string resolveArtifactPath(const std::string& declared, const std::string& experimentPath) {
+  namespace fs = std::filesystem;
+  const fs::path path(declared);
+  if (declared.empty() || path.is_absolute() || experimentPath.empty()) return declared;
+  std::error_code ec;
+  if (fs::is_regular_file(path, ec)) return declared;
+  const fs::path base = fs::path(experimentPath).parent_path();
+  if (base.empty()) return declared;
+  const fs::path alternative = (base / path).lexically_normal();
+  return fs::is_regular_file(alternative, ec) ? alternative.string() : declared;
+}
+
 std::string runUsage() {
   std::ostringstream out;
   out << "Usage:\n"

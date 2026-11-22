@@ -25,7 +25,7 @@ std::string normalizeMode(std::string mode) {
 } // namespace
 
 std::shared_ptr<const StratifierModelSnapshot> captureStratifierModel(
-    const StratifyConfig& cfg, const DeterminismConfig& determinism) {
+    const StratifyConfig& cfg, const DeterminismConfig& determinism, const std::string& readPath) {
   if (cfg.modelPath.empty()) return {};
   auto snapshot = std::make_shared<StratifierModelSnapshot>();
   snapshot->path = cfg.modelPath;
@@ -40,7 +40,7 @@ std::shared_ptr<const StratifierModelSnapshot> captureStratifierModel(
     return snapshot;
   }
   snapshot->status = "failed";
-  std::ifstream in(cfg.modelPath, std::ios::binary);
+  std::ifstream in(readPath.empty() ? cfg.modelPath : readPath, std::ios::binary);
   if (!in) {
     snapshot->loadNote = "cannot open model: " + cfg.modelPath;
     return snapshot;

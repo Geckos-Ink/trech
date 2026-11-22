@@ -236,7 +236,10 @@ Composition → refractive index surrogate (TorchScript `.pt` **or** ridge `.jso
 only (abs/scat carry a negative "not predicted" sentinel so the caller keeps extractor values).
 Opt-in via `optics.derive.surrogateModelPath`; leave-one-out validated, off by default.
 GeantRunner permits the override only in predictive mode. The loader parses/hashes one binary
-snapshot; `contentId`/`contentSha256`/`contentSizeBytes` reset on failed reload.
+snapshot; `contentId`/`contentSha256`/`contentSizeBytes` reset on failed reload. GeantRunner
+opens `trech::resolveArtifactPath(path, experimentPath)` ([`RunOptions.cpp`](../../../src/core/RunOptions.cpp)):
+a relative path missing from the working directory is read beside the experiment, the rule
+`models[].path` already used; the manifest keeps the declared path (2026-11-22).
 
 - **Key symbols:** `encodeComposition` (renormalises all 14 `kCompositionElements` slots, matching
   the Python harvester); `kCompositionElements`.
@@ -252,7 +255,9 @@ Event stratification stack. `FeaturePipeline` owns the frozen feature schema (`k
 `TorchScriptStub` is move-only in both builds, with lifecycle methods defined out of line so
 clients need no complete Torch Module type. TorchScript interpreter errors fail inference cleanly.
 `captureStratifierModel` captures/validates bytes before Geant4 action setup; workers use
-`LoadSnapshot` to retain isolated modules without reopening paths. Failed/strict/disabled snapshots
+`LoadSnapshot` to retain isolated modules without reopening paths. Its optional `readPath`
+is the resolved file to open (same `resolveArtifactPath` rule); `snapshot.path` stays declared.
+`test_model_loader_snapshots` covers the rule. Failed/strict/disabled snapshots
 never retry a changed path. RunAction emits the captured FNV hash instead of hashing current files.
 [`EventFeatures.hpp`](../../../include/trech/ml/EventFeatures.hpp) is the shared snapshot struct.
 

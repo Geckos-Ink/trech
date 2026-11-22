@@ -164,7 +164,7 @@ labels:
    chain in fluids/chemistry/biology/electronics/resonance (standing objective, [inference roadmap](../engine/inference/ROADMAP.md)).
 2. Constantly **reduce simulation degeneration** (real sampled distributions; convergence to
    measured behaviour) — tracked by `sampling_diversity_non_degenerate` in the [transport roadmap](../engine/simulation/optics/ROADMAP.md).
-3. Studio: property-driven editing + `SceneModel → .js` round-trip ([desktop milestones](../studio/authoring/ROADMAP.md#milestone-2--real-time-scenario-editing)).
+3. Studio: property-driven editing + `SceneModel → .js` round-trip for callback-bearing scenarios (transport dependencies and hierarchy landed 2026-11-22; [desktop milestones](../studio/authoring/ROADMAP.md#milestone-2--real-time-scenario-editing)).
 
 ## Task start and handoff checklist
 

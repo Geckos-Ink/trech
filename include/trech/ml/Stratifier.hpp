@@ -29,8 +29,12 @@ struct StratifierModelSnapshot {
   std::size_t sizeBytes = 0;
 };
 
+// `readPath` (empty: `cfg.modelPath`) is the file actually opened, for example the
+// experiment-relative location from trech::resolveArtifactPath. The snapshot keeps
+// `cfg.modelPath` as its declared, provenance-facing path.
 std::shared_ptr<const StratifierModelSnapshot> captureStratifierModel(
-    const StratifyConfig& cfg, const DeterminismConfig& determinism);
+    const StratifyConfig& cfg, const DeterminismConfig& determinism,
+    const std::string& readPath = {});
 
 class EventStratifier {
 public:

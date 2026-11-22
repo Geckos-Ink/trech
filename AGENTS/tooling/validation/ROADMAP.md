@@ -21,7 +21,6 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R5 · `h2o_bulk_water_structure` passes, but on 2026-11-18 its Green-Kubo self-diffusion (4.06e-9 m²/s) no longer agrees with the Einstein estimate (1.43e-9; experiment 2.3e-9), where 2026-11-14 had 2.57/2.79. `green_kubo_consistent_with_einstein` is reported, not gated: find which change moved the MD and decide whether the check should gate. ([detail](#in-progress))
 - **P2** · R5 · The full scenario suite (`scripts/run_validation_suite.sh`, ~1 h 40 min) last ran at `9026a7e` (2026-11-18). Ten commits since then (online domain learning, the efflux campaign, engine-owned lattice/`ctx.evolveField`, the method registry and `MethodArbiter`, `ctx.evolve` rival arbitration) were verified by CTest and focused cases only. Rerun it on current `main`, regenerate `docs/validation/validation_report.md`, and fix the stale header in `docs/validation/validation_summary.md`, which still cites the 2026-11-14 run at `bb1c3f1`. ([detail](#in-progress))
 - **P2** · R5 · Bring single-family validators (molecular series, particle observer, spectrum prediction) into the full validation report with machine-readable sidecars. ([detail](#in-progress))
-- **P2** · R5 · Strict-config coverage: rerun the three unchecked PubChem invocations with a cache. ([detail](#in-progress))
 - **P2** · R3 · Seven bundles graded B–D still run hand-authored response surfaces on the normal path; `spectrum_prediction` has no statically resolvable model (ledger owns the migrations). ([detail](#in-progress))
 - **P3** · R5 · Purity report: lexical evidence limits (feature scaling vs authored law, template literals, reachability) and runtime-built model paths are counted, not graded. ([detail](#in-progress))
 - **P3** · R5 · Pre-commit hook regenerates from the working tree, not the index; PubChem snapshot digests are not in run provenance or refresh mode. ([detail](#in-progress))
@@ -50,6 +49,17 @@ in the [statistical domain validation workflow](AGENTS.md#statistical-domain-val
 
 ## In progress
 
+- [x] Strict-config PubChem coverage (2026-11-22). With the local cache
+  (`TRECH_PUBCHEM_CACHE_DIR=build/dev/pubchem_cache`, ten records), the three invocations the
+  2026-11-16 sweep could not check — `beaker_water_n_pentane` and both
+  `testscenario_h2o_electrolysis_combustion` runs (operator and `reaction_source="reference"`) —
+  pass `trech run --strict-config` for 1 event on the rebuilt dev engine, so all 50 suite
+  invocations have now been checked under the flag (49 clean plus the intended
+  `geometry_refusal_guard` refusal). The sweep also exposed untracked geometry overlaps in two
+  of them, fixed in the same change (see the [simulation roadmap](../../engine/simulation/ROADMAP.md));
+  at suite event counts both cases pass 12/12 with unchanged summaries. The full suite and
+  `docs/validation/validation_report.*` were not regenerated (queued above).
+
 - [x] Validation suite runs with `--strict-config` (2026-11-16; closes the
   [core residual](../../engine/core/ROADMAP.md)). Every `trech run` in
   `run_validation_suite.sh` goes through `trech_run` (flag on by default, `STRICT_CONFIG=0`
@@ -61,7 +71,8 @@ in the [statistical domain validation workflow](AGENTS.md#statistical-domain-val
   `beaker_water_n_pentane` and both `testscenario_h2o_electrolysis_combustion` runs failed while
   the scenario was still evaluating, so their configs are unchecked. The full suite was not
   rerun and `docs/validation/validation_report.*` was not refreshed. Residuals:
-  - [ ] Confirm the three unchecked PubChem invocations under the flag with a cache.
+  - [x] Confirm the three unchecked PubChem invocations under the flag with a cache
+    (2026-11-22, record below).
   - [x] `run_magnetic_resonance_tissues.py` and `run_magnetic_resonance_brain.py` start `trech`
     themselves; since 2026-11-17 they pass `--strict-config` (default, `--no-strict-config`
     opts out, the suite maps `STRICT_CONFIG` onto it). Both drivers ran clean under the flag on

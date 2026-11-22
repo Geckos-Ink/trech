@@ -191,7 +191,15 @@ dated record below, and queue its residuals in the same change.
   validation case fails on an overlap and no "refuse to run" option; sampling is a bound, not a
   proof (thin slivers can be missed); a lab geometry restart reuses the first report; the
   committed `briggs_rauscher`/`magnetic_resonance_tissues` demo media and
-  `docs/validation/validation_report.*` predate these geometry fixes.
+  `docs/validation/validation_report.*` predate these geometry fixes. **[2026-11-22]** The
+  PubChem-cached strict-config sweep reached two more silently overlapping examples:
+  `beaker_water_n_pentane` (`beaker_wall` overlapped `beaker_base` by ≥ 1.46 mm; the wall now
+  stands on the 3 mm base) and `testscenario_h2o_electrolysis_combustion` (18 mm cathodes
+  protruded 3 mm from the 12 mm medium and both touched the 10 mm `oxygen_collector`; cathodes
+  are now 11 mm, the collector 6 mm wide). Both report `clean`; at suite event counts
+  `beaker_water_n_pentane_inference` (12/12) and `h2o_electrolysis_combustion_cycle` (12/12,
+  same 24 MeV deposit and 0.0667 cathode imbalance — 8 keV electrons stop in the water) pass
+  unchanged. The committed beaker reference GIF predates the fix (gated media item).
 - [x] Per-event secondary multiplicity and track-length shape (2026-11-10). `system_event_secondaries_*`
   (mean/stddev/stderr/min/max/zero fraction/skewness/excess kurtosis/`dispersion_index`) and
   `system_event_track_length_*_mm` reuse `EventMoments.hpp` (new `merge`, `dispersionIndex`;

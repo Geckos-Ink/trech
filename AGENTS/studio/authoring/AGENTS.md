@@ -36,7 +36,18 @@ unchanged canonical fields remain intact, including source origin/spread, isotop
 composition, unused materials, physics options and an independent primary beam. Only authored
 model edits are overlaid; derived optics/appearance never become physics inputs. The writer
 checks geometry/source and run identity against the recorded snapshot, rejecting callbacks,
-external models, unsupported edited shapes, nonfinite values and JS values that cannot round-trip.
+unsupported edited shapes, nonfinite values and JS values that cannot round-trip. Volumes are
+emitted parents-first by a stable order (`_order_volumes`); unknown parents, cycles and recorded
+configs that relied on the engine's world fallback (`_check_recorded_hierarchy`) are refused.
+**Dependency packaging:** `scene/dependencies.py` (`recorded_dependencies`, `locate_dependency`,
+`package_dependencies`, `run_search_dirs`) and `writer.scene_to_bundle` tie every
+`models[].path` / optics surrogate / stratifier path to the run's `model_artifacts` SHA-256
+(plus `io_sidecar_sha256` for TorchScript sidecars), copy verified files to
+`<export>_deps/` and repoint the config; anything without a recorded loaded digest is refused.
+`ui/main_window._scene_bundle` drives both Inspector export-ability and the File action, which
+never overwrites a different existing dependency file. The engine resolves these relative
+paths beside the scenario (`trech::resolveArtifactPath`). Tests: `studio/tests/test_scene_dependencies.py`
+(includes a real-engine export rerun from an unrelated working directory).
 Named beams retain their source fields across reorder/nonprimary deletion; primary deletion,
 identity changes and edits among multiple unnamed sources require the original scenario.
 `File → Export scene scenario…` saves a separate transport draft without changing the open
