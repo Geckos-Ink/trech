@@ -11,7 +11,9 @@
 #include "trech/core/LatticeKinetic.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
+#include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/MethodArbiter.hpp"
+#include "trech/ml/PairInteraction.hpp"
 #include "trech/sim/KleinNishina.hpp"
 
 #include <nlohmann/json.hpp>
@@ -23,6 +25,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -256,6 +259,89 @@ void transitionPairs() {
          false);
 }
 
+void loadConformanceModel(trech::ml::GenericSurrogate& model, const std::string& path,
+                          std::vector<std::string> outputs, std::vector<double> bias) {
+  const nlohmann::json layer = {{"weights", std::vector<std::vector<double>>(bias.size(), {0.0})},
+                                {"bias", bias}, {"activation", "none"}};
+  const nlohmann::json spec = {{"model", "generic_surrogate_v1"}, {"input_features", {"dt"}},
+                               {"output_features", outputs}, {"layers", {layer}}};
+  std::ofstream(path) << spec;
+  if (!model.load(path)) throw std::runtime_error("Could not load conformance model: " + path);
+}
+
+void transitionConservation() {
+  const trech::test::TemporaryDirectory fixture;
+  trech::ml::GenericSurrogate model;
+  loadConformanceModel(model, (fixture.path() / "transition.json").string(), {"hazard_split"}, {1.0});
+  trech::ml::DiscreteTransition transition;
+  transition.addStage("split", trech::ml::DimensionScale::kMicro, &model);
+  const auto limit = std::numeric_limits<std::int64_t>::max();
+  trech::ml::DiscreteTransitionRequest request;
+  request.speciesNames = {"whole", "half"};
+  request.elementCount = 4;
+  request.dt = 1.0;
+  request.state = {5, 1, 0, 4, 1, limit - 1, 1, limit - 2};
+  request.channels = {{"split", {-1, 2}}};
+  request.conservation = {{"units", {2, 1}}};
+  const auto run = transition.react(request);
+  if (run.transitionsAccepted != 2 || run.rejectedAvailability != 2 ||
+      run.state != std::vector<std::int64_t>{4, 3, 0, 4, 1, limit - 1, 0, limit}) {
+    throw std::runtime_error("Transition failed to apply or reject each full channel atomically");
+  }
+  std::vector<double> before, after;
+  for (std::size_t i = 0; i < 4; i += 2) {
+    before.push_back(static_cast<double>(2 * request.state[i] + request.state[i + 1]));
+    after.push_back(static_cast<double>(2 * run.state[i] + run.state[i + 1]));
+  }
+  expect(formal::checkAgreement("transition.declared_conservation",
+                                "Trech.Methods.Transition.applyChannel_conserves",
+                                before, after, 0.0, 0.0));
+  const bool allInRange = std::all_of(run.state.begin(), run.state.end(),
+                                     [](std::int64_t count) { return count >= 0; });
+  expect(formal::checkAgreement("transition.nonnegative_counts",
+                                "Trech.Methods.Transition.applyChannel_nonnegative",
+                                {static_cast<double>(allInRange)}, {1.0}, 0.0, 0.0));
+
+  request.channels[0].delta = {-1, 1};
+  const auto unbalanced = transition.react(request);
+  if (unbalanced.transitionSchemaValid || unbalanced.drawCount != 0 || unbalanced.state != request.state ||
+      unbalanced.channelTrace.at(0).violatedConservation != std::vector<std::string>{"units"}) {
+    throw std::runtime_error("Unbalanced transition must be reported before drawing or applying");
+  }
+  request.conservation.clear();
+  request.channels[0].delta = {std::numeric_limits<std::int64_t>::min(), 1};
+  const auto insufficient = transition.react(request);
+  if (insufficient.rejectedAvailability != request.elementCount || insufficient.state != request.state) {
+    throw std::runtime_error("Most negative signed delta must be rejected atomically");
+  }
+}
+
+void pairConservation() {
+  const trech::test::TemporaryDirectory fixture;
+  trech::ml::GenericSurrogate model;
+  loadConformanceModel(model, (fixture.path() / "pair.json").string(), {"d_heat_dt", "add_heat"}, {1.3, 0.2});
+  trech::ml::PairInteraction interaction;
+  interaction.addStage("exchange", trech::ml::DimensionScale::kMicro, &model);
+  trech::ml::PairInteractionRequest request;
+  request.elementCount = 3;
+  request.fields = {{"heat"}};
+  request.links = {{0, 1}, {1, 2}};
+  request.state = {4.0, 3.0, 2.0};
+  request.dt = 0.3;
+  const auto run = interaction.interact(request);
+  if (run.inferenceCount != 2 || run.state == request.state) {
+    throw std::runtime_error("Both pair links must contribute to the exchange");
+  }
+  const char* declaration = "Trech.Methods.PairInteraction.exchange_preserves_sum";
+  expect(formal::checkAgreement("pair.antisymmetric_exchange", declaration,
+                                run.state, {4.59, 3.0, 1.41}, 2e-15, 0.0));
+  expect(formal::checkConservedTotal("pair.exchange_conserves_total", declaration, request.state, run.state, 1e-15));
+  request.fields[0].maxValue = 4.0;
+  const auto clipped = interaction.interact(request);
+  expect(formal::checkConservedTotal("pair.clipped_exchange_negative_control", "", request.state, clipped.state, 1e-15),
+         false);
+}
+
 void arbiterPairs() {
   // Trech.Methods.Arbiter.squaredScore_mean_lt on the engine's MethodArbiter: with noisy references,
   // the method that predicts the conditional mean scores lowest and leads; biased methods lose.
@@ -481,6 +567,8 @@ int main() {
     latticePairs();
     scalarLatticePairs();
     transitionPairs();
+    transitionConservation();
+    pairConservation();
     arbiterPairs();
     javascriptPairs();
     runRecordContract();

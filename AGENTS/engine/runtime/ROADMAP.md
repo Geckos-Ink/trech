@@ -28,6 +28,18 @@ dated record below, and queue its residuals in the same change.
 - **P3** · RX · IASF ledger, physical bases, open channels and validated transition elements; quantitative basis/model uncertainties and held-out predictive gain. ([detail](#atomic-stability-research))
 - **P3** · R7 · Relocatable/Windows research hosting for the Node launcher. ([detail](#atomic-stability-research))
 
+## Initialization override guardrails (2026-11-22)
+
+- [x] `onInit` can set `beam.originMm` and `run.threads`. Malformed vector arrays preserve the
+  original vector. Vector objects report each rejected component. Event and worker counts are
+  validated in the engine's integer range before assignment. Strict-config and lab reload
+  checks use the existing override report and kernel signature.
+- Verification: the Debug engine suite passed 80/80 and the V8 hook and formal checks passed
+  3/3. A Geant4 run emitted the patched primary origin and replayed scores and emits byte for
+  byte. A strict run refused an invalid direction and worker count. The permissive run recorded
+  both ignored paths, and a scenario-backed lab retained its initial script after the source
+  moved in a reload candidate.
+
 ## V8 JavaScript backend (2026-11-21)
 
 - [x] V8 as a full TRECH JavaScript engine. `JsRuntime.cpp` compiles a second time against

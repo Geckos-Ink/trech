@@ -30,6 +30,9 @@ dated record below, and queue its residuals in the same change.
 
 - **P1** · R3 · Complete the JS-law removal through the audited ledger; next rows: CNT (2), magnetic resonance (3), osmosis remainder (6). (owned by the [scenarios/migrations queue](../../scenarios/migrations/ROADMAP.md#priority-queue))
 
+The [formal-law roadmap](../formal/ROADMAP.md#operator-conservation-2026-11-22) records the
+`ctx.react` and `ctx.interact` conservation checks and owns the remaining proof work.
+
 ## Engine-side inference operator — removing hard-coded JS physics/chemistry
 
 `ctx.cascade` answers *"given this context, what are the properties?"*. That left the other half of

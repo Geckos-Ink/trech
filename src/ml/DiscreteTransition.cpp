@@ -191,6 +191,8 @@ DiscreteTransitionResult DiscreteTransition::react(
       result.transitionSchemaValid = false;
     }
   }
+  // Trech.Methods.Transition.applyChannel_conserves assumes each declared
+  // coefficient vector has zero dot product with the channel's change.
   std::set<std::string> conservationSeen;
   for (const TransitionConservation& invariant : request.conservation) {
     if (invariant.name.empty() ||
@@ -761,19 +763,13 @@ DiscreteTransitionResult DiscreteTransition::react(
     TransitionChannelTrace& channelTrace = result.channelTrace[selected];
     ++channelTrace.attempted;
     ++result.transitionAttempts;
+    // Trech.Methods.Transition.applyChannel_nonnegative: preflight every sum
+    // against the integer range before committing any part of the channel.
+    const auto& delta = request.channels[selected].delta;
     bool countsAvailable = true;
     for (std::size_t s = 0; s < speciesCount; ++s) {
-      const std::int64_t current = result.state[stateBase + s];
-      const std::int64_t delta = request.channels[selected].delta[s];
-      if (delta < 0) {
-        const std::uint64_t magnitude =
-            static_cast<std::uint64_t>(-(delta + 1)) + 1;
-        if (static_cast<std::uint64_t>(current) < magnitude) {
-          countsAvailable = false;
-          break;
-        }
-      } else if (current >
-                 std::numeric_limits<std::int64_t>::max() - delta) {
+      std::int64_t next = 0;
+      if (!checkedAdd(result.state[stateBase + s], delta[s], &next) || next < 0) {
         countsAvailable = false;
         break;
       }
@@ -784,7 +780,7 @@ DiscreteTransitionResult DiscreteTransition::react(
       continue;
     }
     for (std::size_t s = 0; s < speciesCount; ++s) {
-      result.state[stateBase + s] += request.channels[selected].delta[s];
+      result.state[stateBase + s] += delta[s];
     }
     ++channelTrace.accepted;
     ++result.transitionsAccepted;

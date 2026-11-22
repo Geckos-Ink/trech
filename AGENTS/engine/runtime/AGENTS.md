@@ -164,6 +164,11 @@ Mixed-stream replay, parameter guards, mean/variance/tails and fresh-runtime rep
 by `tests/test_js_runtime.cpp`, which now requires bit equality with the deterministic host math
 (below), including the `mean + sigma * z` transform.
 [`docs/engine/scenario_hooks.md`](../../../docs/engine/scenario_hooks.md) documents the executable surface.
+`onInit` can override `beam.originMm` and `run.threads` before Geant4 initialization. Beam
+vector arrays are checked before any axis is assigned. Vector objects patch and report individual
+axes. The host checks `run.nEvents` and `run.threads` before narrowing to `int`. Literal keys
+containing dots are reported in brackets so they cannot match a valid nested path. The ignored
+paths reach the CLI and lab strict-config checks. Lab reloads still use the kernel signature.
 Cascade traces distinguish numeric `localInDomain` from effective `inDomain`;
 sorted `upstreamOutOfDomainInputs` names consumed facts produced outside their model's domain.
 Hook out-of-domain counters include these inherited cascade failures. Lineage is per cascade

@@ -8,14 +8,15 @@ statement written in Lean (a *theorem*) is accepted only with a proof that Lean'
 [Mathlib](https://github.com/leanprover-community/mathlib4) is the community library of
 mathematics written in Lean, from real analysis to linear algebra and probability.
 
-**Status (2026-11-22): six law pairs exist and their 19 Lean theorems are verified.** The
+**Status (2026-11-22): eight law pairs exist and their 22 Lean theorems are verified.** The
 classic code of each pair is checked against its Lean statement by an ordinary test, without
 Lean. The Lean files compile with Lean `v4.37.0-rc1` and the pinned Mathlib, and every theorem
-rests only on Lean's three standard axioms, so no step is assumed. The proofs are about real
-numbers: they do not by themselves prove the floating-point code correct (see below). TRECH
-does not link or run Lean. Runs now record their law checks: the engine checks the lattice
-theorems' hypotheses each time it builds a lattice, the `analytic_compton_transfer` validation
-companion checks its Compton reference, and both land in the run's outputs and provenance
+rests only on Lean's three standard axioms. The transition count proof uses mathematical
+integers. Other proofs that use real numbers carry a separate floating-point conformance test
+where applicable. TRECH runs the classic implementations and records their runtime checks.
+The engine checks the lattice theorems' hypotheses each time it builds a lattice. The
+`analytic_compton_transfer` validation companion checks its Compton reference. Both checks
+appear in the run's outputs and provenance
 ([below](#law-checks-in-run-outputs)). The open work is in the
 [formal-laws roadmap](../../AGENTS/engine/formal/ROADMAP.md#priority-queue).
 
@@ -68,6 +69,8 @@ Lean file and theorems, and the classic sources.
 | Lattice mass conservation | `Trech.Methods.Lattice`: the collision keeps a cell's mass if the equilibrium does, a zero-sum source keeps it, streaming along a bijection keeps the total | `src/core/LatticeKinetic.cpp` | the theorems' hypotheses (velocity-set moments, opposite-direction table, streaming map) and the total mass over 300 forced steps on a periodic lattice |
 | Scalar lattice conservation | `Trech.Methods.Lattice.advectedEquilibrium_sum`: the advection-diffusion equilibrium carries the cell's value, so with the same collision and streaming theorems a scalar lattice with closed (zero-flux) walls keeps its total | `src/core/LatticeKinetic.cpp`, `src/core/LatticeContinuum.cpp` | the engine's own hypothesis checks on a walled lattice with an obstacle, and the scalar total over 400 advected steps; a Dirichlet wall (which adds scalar by design) is the counter-example |
 | Reaction step probabilities (`ctx.react`) | `Trech.Methods.Transition`: the engine's two-stage draw fires channel `c` with probability `h·s_c/S`; these are nonnegative and add up to the event hazard `h ≤ 1`, leaving `1 − h` for "no transition" | `selectTransitionChannel` in `src/ml/DiscreteTransition.cpp` | the engine's draw function swept over 2²⁰ evenly spaced draws for four hazard/score cases; each outcome's share matches its probability within 2/2²⁰ |
+| Reaction count conservation (`ctx.react`) | `Trech.Methods.Transition.applyChannel_conserves` and `applyChannel_nonnegative` preserve declared weighted totals and the valid count range when applying or rejecting a channel | `src/ml/DiscreteTransition.cpp` | exact integer counts after accepted, unbalanced, insufficient and overflowing changes, including the signed 64-bit limit |
+| Antisymmetric exchange (`ctx.interact`) | `Trech.Methods.PairInteraction.exchange_preserves_sum` conserves the real-valued total when each member receives opposite rates and increments and the resulting state stays within its bounds | `src/ml/PairInteraction.cpp` | two links sharing a member exchange a field within `1e-15` relative tolerance on the total. Forcing a bound to clip the state demonstrates the conservation check detects the change |
 | Method arbiter scoring | `Trech.Methods.Arbiter`: the squared error is minimised exactly by the mean prediction (a *strictly proper* score), and ranking by `log(error + floor)` keeps the error order | `src/ml/MethodArbiter.cpp` | 40 noisy graded calls with an unbiased method and two biased ones: the unbiased one scores lowest and leads, although the declared fallback is a biased one |
 
 The attenuation row shows why the real-versus-float caveat matters. Over the reals,
@@ -75,13 +78,17 @@ The attenuation row shows why the real-versus-float caveat matters. Over the rea
 in the last place, so the check states a tolerance of `2e-15` relative, and a second check
 that demands exact equality fails on purpose to keep that gap visible.
 
-Two of the new pairs state properties of engine methods rather than physical laws. In the
-reaction step, `h` is the chance that anything happens in the step and `s_c` is channel `c`'s
+In the reaction step, `h` is the chance that anything happens in the step and `s_c` is channel `c`'s
 score, with total `S`. One random number `u` between 0 and 1 decides: nothing happens when
 `u ≥ h`; otherwise `u` is rescaled and the channel whose share of the scores contains it fires.
 For example, with `h = 0.3` and scores `0.2, 0.5, 0.3`, the channels fire with probabilities
 `0.06, 0.15, 0.09` and nothing happens with probability `0.7`. The theorem proves this always
 gives a valid probability vector; the test confirms the engine's actual function produces it.
+
+For a channel that exchanges one whole unit for two half units, the count change is `[-1, 2]`
+and the conservation weights are `[2, 1]`. The weighted change is zero. If both updated counts
+fit in `[0, INT64_MAX]`, TRECH applies the channel and the weighted total is preserved exactly.
+If either count falls outside the range, both counts retain their original values.
 
 A scoring rule is *proper* when a method scores best, on average, by predicting the true
 expected value instead of a shifted one. The arbiter grades methods by squared error, and the
@@ -169,7 +176,7 @@ python3 scripts/check_lean_laws.py
 ```
 
 The last command builds the package and prints one line per theorem with the axioms it uses,
-ending with `19/19 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
+ending with `22/22 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
 an added axiom makes it fail. Add `--report build/lean_audit.json` to also save the audit
 as JSON: the Lean version, toolchain and Mathlib revision, the SHA-256 hash of `laws.json` and
 of every Lean file, one combined hash of all of them, and each theorem's axioms. A run reads it

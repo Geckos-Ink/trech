@@ -120,8 +120,8 @@ Pitfalls follow their owning source: [engine](../engine/AGENTS.md),
   relaxation in provenance.
 - **Secrets/privacy:** none in-repo; PubChem fetches hit a public API and cache under `build/`.
   No credentials or personal data belong in configs, provenance, or this handbook.
-- **Kernel-bound live edits:** `trech lab` accepts live event-count/seed/planner changes but MUST
-  reject a geometry/beam/physics/scoring patch after Geant4 init with a restart-required error
+- **Kernel-bound live edits:** `trech lab` accepts live event-count/seed/planner changes and
+  requires a restart for geometry, beam, worker-count, physics or scoring changes
   until safe reinitialization lands (**Known gap**, tracked in the [runtime roadmap](../engine/runtime/ROADMAP.md)).
 
 ## Current status, known gaps, and roadmap snapshot

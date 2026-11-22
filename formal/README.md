@@ -10,17 +10,18 @@ Contract: [formal-laws handbook](../AGENTS/engine/formal/AGENTS.md).
 | [`Trech/Laws/Compton.lean`](Trech/Laws/Compton.lean) | `Trech.Laws.Compton` | [`KleinNishina.hpp`](../include/trech/sim/KleinNishina.hpp), [`trech_formal_laws.js`](../js/trech_formal_laws.js) |
 | [`Trech/Laws/Attenuation.lean`](Trech/Laws/Attenuation.lean) | `Trech.Laws.Attenuation` | [`AnalyticCrossCheck.cpp`](../src/sim/AnalyticCrossCheck.cpp), [`trech_formal_laws.js`](../js/trech_formal_laws.js) |
 | [`Trech/Methods/Lattice.lean`](Trech/Methods/Lattice.lean) | `Trech.Methods.Lattice` | [`LatticeKinetic.cpp`](../src/core/LatticeKinetic.cpp), [`LatticeContinuum.cpp`](../src/core/LatticeContinuum.cpp) |
-| [`Trech/Methods/Transition.lean`](Trech/Methods/Transition.lean) | `Trech.Methods.Transition` | [`DiscreteTransition.cpp`](../src/ml/DiscreteTransition.cpp) (`selectTransitionChannel`) |
+| [`Trech/Methods/Transition.lean`](Trech/Methods/Transition.lean) | `Trech.Methods.Transition` | [`DiscreteTransition.cpp`](../src/ml/DiscreteTransition.cpp) (channel probabilities and count conservation) |
+| [`Trech/Methods/PairInteraction.lean`](Trech/Methods/PairInteraction.lean) | `Trech.Methods.PairInteraction` | [`PairInteraction.cpp`](../src/ml/PairInteraction.cpp) (antisymmetric exchange) |
 | [`Trech/Methods/Arbiter.lean`](Trech/Methods/Arbiter.lean) | `Trech.Methods.Arbiter` | [`MethodArbiter.cpp`](../src/ml/MethodArbiter.cpp) |
 
 [`laws.json`](laws.json) lists the pairs. `tests/test_formal_law_pairs.py` checks that both sides
 exist and cite each other; `tests/test_formal_laws.cpp` runs the classic code against each
 statement. Neither needs Lean.
 
-**Status (2026-11-22): all 19 theorems compile and use only the standard axioms**
+**Status (2026-11-22): all 22 theorems compile and use only the standard axioms**
 (`propext`, `Classical.choice`, `Quot.sound`), with Lean `v4.37.0-rc1` and Mathlib
-`6ebcce3733`, on macOS arm64. They are statements about real numbers; the float gap is
-handled by the classic checks' stated tolerances.
+`6ebcce3733`, on macOS arm64. Transition counts are proved over mathematical integers.
+Checks for real-valued proofs state a tolerance where the classic results round.
 
 Set up once (the Mathlib cache is about 7 GB, kept in ignored `thirds/mathlib4/.lake`):
 

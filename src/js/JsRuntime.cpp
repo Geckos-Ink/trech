@@ -458,31 +458,69 @@ static void collectPatchLeaves(const nlohmann::json& j, const std::string& path,
     return;
   }
   for (auto it = j.begin(); it != j.end(); ++it) {
-    collectPatchLeaves(it.value(), path.empty() ? it.key() : path + "." + it.key(), out);
+    const auto& key = it.key();
+    const std::string leafPath = key.empty() || key.find_first_of(".[]") != std::string::npos
+                                     ? path + "[" + nlohmann::json(key).dump() + "]"
+                                     : (path.empty() ? key : path + "." + key);
+    collectPatchLeaves(it.value(), leafPath, out);
   }
 }
 
-// Leaves no applied path covers (equal to it, or below it: "beam.direction"
-// covers "beam.direction.x").
+// Arrays are atomic leaves. Object components are reported at the axis itself.
 static std::vector<std::string> ignoredPatchLeaves(const nlohmann::json& patch,
                                                    const std::vector<std::string>& applied) {
   std::vector<std::string> leaves;
   collectPatchLeaves(patch, "", leaves);
   std::vector<std::string> ignored;
   for (const auto& leaf : leaves) {
-    const bool covered = std::any_of(applied.begin(), applied.end(), [&](const std::string& a) {
-      return leaf == a || leaf.rfind(a + ".", 0) == 0;
-    });
-    if (!covered) {
+    if (std::find(applied.begin(), applied.end(), leaf) == applied.end()) {
       ignored.push_back(leaf);
     }
   }
   return ignored;
 }
 
+static void patchHookTriple(const nlohmann::json& value, const std::string& path,
+                            std::vector<std::string>& appliedPaths,
+                            double& x, double& y, double& z) {
+  if (value.is_array() && value.size() >= 3 && value[0].is_number() &&
+      value[1].is_number() && value[2].is_number()) {
+    x = value[0].get<double>();
+    y = value[1].get<double>();
+    z = value[2].get<double>();
+    appliedPaths.push_back(path);
+    return;
+  }
+  if (!value.is_object()) return;
+
+  const auto patchAxis = [&](const char* axis, double& component) {
+    const auto it = value.find(axis);
+    if (it != value.end() && it->is_number()) {
+      component = it->get<double>();
+      appliedPaths.push_back(path + "." + axis);
+    }
+  };
+  patchAxis("x", x);
+  patchAxis("y", y);
+  patchAxis("z", z);
+}
+
+static void patchHookInt(const nlohmann::json& run, const char* key, int minimum,
+                         int& target, std::vector<std::string>& appliedPaths) {
+  const auto it = run.find(key);
+  if (it == run.end() || !it->is_number_integer() ||
+      (!it->is_number_unsigned() && it->get<std::int64_t>() < 0)) return;
+
+  const auto value = it->get<std::uint64_t>();
+  if (value >= static_cast<std::uint64_t>(minimum) &&
+      value <= static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
+    target = static_cast<int>(value);
+    appliedPaths.push_back(std::string("run.") + key);
+  }
+}
+
 static bool applyHookOverridePatch(TrechConfig& cfg, const nlohmann::json& patch,
                                    std::vector<std::string>& appliedPaths) {
-  bool changed = false;
   if (!patch.is_object()) {
     return false;
   }
@@ -492,57 +530,33 @@ static bool applyHookOverridePatch(TrechConfig& cfg, const nlohmann::json& patch
     if (beam.contains("particle") && beam.at("particle").is_string()) {
       cfg.beam.particle = beam.at("particle").get<std::string>();
       appliedPaths.push_back("beam.particle");
-      changed = true;
     }
     if (beam.contains("energyMeV") && beam.at("energyMeV").is_number()) {
       cfg.beam.energyMeV = beam.at("energyMeV").get<double>();
       appliedPaths.push_back("beam.energyMeV");
-      changed = true;
     }
     if (beam.contains("direction")) {
-      const auto& dir = beam.at("direction");
-      if (dir.is_array() && dir.size() >= 3) {
-        cfg.beam.directionX = dir.at(0).get<double>();
-        cfg.beam.directionY = dir.at(1).get<double>();
-        cfg.beam.directionZ = dir.at(2).get<double>();
-        appliedPaths.push_back("beam.direction");
-        changed = true;
-      } else if (dir.is_object()) {
-        if (dir.contains("x") && dir.at("x").is_number()) {
-          cfg.beam.directionX = dir.at("x").get<double>();
-        }
-        if (dir.contains("y") && dir.at("y").is_number()) {
-          cfg.beam.directionY = dir.at("y").get<double>();
-        }
-        if (dir.contains("z") && dir.at("z").is_number()) {
-          cfg.beam.directionZ = dir.at("z").get<double>();
-        }
-        appliedPaths.push_back("beam.direction");
-        changed = true;
-      }
+      patchHookTriple(beam.at("direction"), "beam.direction", appliedPaths,
+                      cfg.beam.directionX, cfg.beam.directionY, cfg.beam.directionZ);
+    }
+    if (beam.contains("originMm")) {
+      patchHookTriple(beam.at("originMm"), "beam.originMm", appliedPaths,
+                      cfg.beam.originXMm, cfg.beam.originYMm, cfg.beam.originZMm);
     }
   }
 
   if (patch.contains("run") && patch.at("run").is_object()) {
     const auto& run = patch.at("run");
-    if (run.contains("nEvents") && run.at("nEvents").is_number_integer()) {
-      const auto nEvents = run.at("nEvents").get<int>();
-      if (nEvents > 0) {
-        cfg.run.nEvents = nEvents;
-        appliedPaths.push_back("run.nEvents");
-        changed = true;
-      }
-    }
+    patchHookInt(run, "nEvents", 1, cfg.run.nEvents, appliedPaths);
+    patchHookInt(run, "threads", 0, cfg.run.threads, appliedPaths);
     if (run.contains("seed") && run.at("seed").is_number_unsigned()) {
       cfg.run.seed = run.at("seed").get<std::uint64_t>();
       appliedPaths.push_back("run.seed");
-      changed = true;
     } else if (run.contains("seed") && run.at("seed").is_number_integer()) {
       const auto seed = run.at("seed").get<long long>();
       if (seed >= 0) {
         cfg.run.seed = static_cast<std::uint64_t>(seed);
         appliedPaths.push_back("run.seed");
-        changed = true;
       }
     }
   }
@@ -552,23 +566,19 @@ static bool applyHookOverridePatch(TrechConfig& cfg, const nlohmann::json& patch
     if (optics.contains("enable") && optics.at("enable").is_boolean()) {
       cfg.optics.enable = optics.at("enable").get<bool>();
       appliedPaths.push_back("optics.enable");
-      changed = true;
     }
     if (optics.contains("refractiveIndex") && optics.at("refractiveIndex").is_number()) {
       cfg.optics.refractiveIndex = optics.at("refractiveIndex").get<double>();
       appliedPaths.push_back("optics.refractiveIndex");
-      changed = true;
     }
     if (optics.contains("absorptionLengthMm") &&
         optics.at("absorptionLengthMm").is_number()) {
       cfg.optics.absorptionLengthMm = optics.at("absorptionLengthMm").get<double>();
       appliedPaths.push_back("optics.absorptionLengthMm");
-      changed = true;
     }
     if (optics.contains("scatterLengthMm") && optics.at("scatterLengthMm").is_number()) {
       cfg.optics.scatterLengthMm = optics.at("scatterLengthMm").get<double>();
       appliedPaths.push_back("optics.scatterLengthMm");
-      changed = true;
     }
   }
 
@@ -577,27 +587,22 @@ static bool applyHookOverridePatch(TrechConfig& cfg, const nlohmann::json& patch
     if (system.contains("enable") && system.at("enable").is_boolean()) {
       cfg.system.enable = system.at("enable").get<bool>();
       appliedPaths.push_back("system.enable");
-      changed = true;
     }
     if (system.contains("mode") && system.at("mode").is_string()) {
       cfg.system.mode = system.at("mode").get<std::string>();
       appliedPaths.push_back("system.mode");
-      changed = true;
     }
     if (system.contains("frame") && system.at("frame").is_string()) {
       cfg.system.frame = system.at("frame").get<std::string>();
       appliedPaths.push_back("system.frame");
-      changed = true;
     }
     if (system.contains("ensemble") && system.at("ensemble").is_string()) {
       cfg.system.ensemble = system.at("ensemble").get<std::string>();
       appliedPaths.push_back("system.ensemble");
-      changed = true;
     }
     if (system.contains("volumeMm3") && system.at("volumeMm3").is_number()) {
       cfg.system.volumeMm3 = system.at("volumeMm3").get<double>();
       appliedPaths.push_back("system.volumeMm3");
-      changed = true;
     }
   }
 
@@ -607,74 +612,64 @@ static bool applyHookOverridePatch(TrechConfig& cfg, const nlohmann::json& patch
         stratify.at("edepMeVThreshold").is_number()) {
       cfg.stratify.edepMeVThreshold = stratify.at("edepMeVThreshold").get<double>();
       appliedPaths.push_back("stratify.edepMeVThreshold");
-      changed = true;
     }
     if (stratify.contains("opticalTrackLengthMmThreshold") &&
         stratify.at("opticalTrackLengthMmThreshold").is_number()) {
       cfg.stratify.opticalTrackLengthMmThreshold =
           stratify.at("opticalTrackLengthMmThreshold").get<double>();
       appliedPaths.push_back("stratify.opticalTrackLengthMmThreshold");
-      changed = true;
     }
     if (stratify.contains("totalTrackLengthMmThreshold") &&
         stratify.at("totalTrackLengthMmThreshold").is_number()) {
       cfg.stratify.totalTrackLengthMmThreshold =
           stratify.at("totalTrackLengthMmThreshold").get<double>();
       appliedPaths.push_back("stratify.totalTrackLengthMmThreshold");
-      changed = true;
     }
     if (stratify.contains("totalTrackCountThreshold") &&
         stratify.at("totalTrackCountThreshold").is_number_integer()) {
       cfg.stratify.totalTrackCountThreshold =
           stratify.at("totalTrackCountThreshold").get<int>();
       appliedPaths.push_back("stratify.totalTrackCountThreshold");
-      changed = true;
     }
     if (stratify.contains("totalStepCountThreshold") &&
         stratify.at("totalStepCountThreshold").is_number_integer()) {
       cfg.stratify.totalStepCountThreshold =
           stratify.at("totalStepCountThreshold").get<int>();
       appliedPaths.push_back("stratify.totalStepCountThreshold");
-      changed = true;
     }
     if (stratify.contains("opticalPhotonTrackThreshold") &&
         stratify.at("opticalPhotonTrackThreshold").is_number_integer()) {
       cfg.stratify.opticalPhotonTrackThreshold =
           stratify.at("opticalPhotonTrackThreshold").get<int>();
       appliedPaths.push_back("stratify.opticalPhotonTrackThreshold");
-      changed = true;
     }
     if (stratify.contains("opticalPhotonStepThreshold") &&
         stratify.at("opticalPhotonStepThreshold").is_number_integer()) {
       cfg.stratify.opticalPhotonStepThreshold =
           stratify.at("opticalPhotonStepThreshold").get<int>();
       appliedPaths.push_back("stratify.opticalPhotonStepThreshold");
-      changed = true;
     }
     if (stratify.contains("labelPredictable") &&
         stratify.at("labelPredictable").is_string()) {
       cfg.stratify.labelPredictable =
           stratify.at("labelPredictable").get<std::string>();
       appliedPaths.push_back("stratify.labelPredictable");
-      changed = true;
     }
     if (stratify.contains("labelExceptional") &&
         stratify.at("labelExceptional").is_string()) {
       cfg.stratify.labelExceptional =
           stratify.at("labelExceptional").get<std::string>();
       appliedPaths.push_back("stratify.labelExceptional");
-      changed = true;
     }
     if (stratify.contains("labelUnclassified") &&
         stratify.at("labelUnclassified").is_string()) {
       cfg.stratify.labelUnclassified =
           stratify.at("labelUnclassified").get<std::string>();
       appliedPaths.push_back("stratify.labelUnclassified");
-      changed = true;
     }
   }
 
-  return changed;
+  return !appliedPaths.empty();
 }
 
 static std::uint64_t hashHookSeed(const std::string& hookName,

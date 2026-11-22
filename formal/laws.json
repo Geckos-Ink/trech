@@ -94,6 +94,31 @@
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["transition.outcomes_probability_vector", "transition.channel_probability"]}
     },
     {
+      "id": "transition.declared_conservation",
+      "role": "invariant",
+      "statement": "An atomic discrete channel with zero weighted change preserves the declared integer total. All counts remain in range when all started in range, including when the change is rejected.",
+      "lean": {
+        "file": "formal/Trech/Methods/Transition.lean",
+        "declarations": [
+          "Trech.Methods.Transition.applyChannel_conserves",
+          "Trech.Methods.Transition.applyChannel_nonnegative"
+        ]
+      },
+      "classic": [{"path": "src/ml/DiscreteTransition.cpp", "cites": "Trech.Methods.Transition"}],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["transition.declared_conservation", "transition.nonnegative_counts"]}
+    },
+    {
+      "id": "pair.exchange_conserves_total",
+      "role": "invariant",
+      "statement": "Over the reals, an antisymmetric pair preserves the sum of a field when both the increment and the time-integrated rate are applied with opposite signs and no bounds clip the resulting state.",
+      "lean": {
+        "file": "formal/Trech/Methods/PairInteraction.lean",
+        "declarations": ["Trech.Methods.PairInteraction.exchange_preserves_sum"]
+      },
+      "classic": [{"path": "src/ml/PairInteraction.cpp", "cites": "Trech.Methods.PairInteraction"}],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["pair.antisymmetric_exchange", "pair.exchange_conserves_total"]}
+    },
+    {
       "id": "arbiter.squared_score_proper",
       "role": "method_property",
       "statement": "Over any weighted sample the squared score sum w (x - p)^2 equals the mean's score plus (sum w)(m - p)^2, so the weighted mean minimises it (strictly for positive weight); log(error + floor) with floor > 0 keeps the order of nonnegative errors.",

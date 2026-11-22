@@ -156,8 +156,10 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `hook_unknown_registered_count` (number): number of unrecognized hook names in registration.
 - `hook_patch_count` (number): number of hook override patches applied during the run (`onInit` + runtime dispatch accounting).
 - `hook_patch_ignored_paths` (array[string], provenance only, only when non-empty): leaf paths of
-  the `onInit` `override` that no patchable field applied (unknown, non-patchable or wrong-typed),
-  e.g. `run.nEvent`. `trech run` warns about each; `--strict-config` refuses the run instead.
+  the `onInit` `override` that the engine could not apply, for example `run.nEvent` for an
+  unknown key or `beam.direction.y` for a mistyped component. A malformed vector array is
+  reported at the vector path. A literal key containing a dot uses brackets, for example
+  `beam["originMm.x"]`. `trech run` warns about each path. `--strict-config` refuses the run.
 - `hook_emit_count` (number): total number of `ctx.emit(...)` records emitted during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_dropped_count` (number): total number of dropped `ctx.emit(...)` records due to guardrails or payload validation.
 - `hook_predict_count` (number): total learned inferences run (`ctx.predict` calls + each
@@ -243,9 +245,9 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   `lean_status` is `not_checked_by_this_run` (no report), `audit_unreadable`, `audit_mismatch`
   (the report was made from other law sources), `audit_incomplete` (a cited declaration is
   missing from the report or uses a non-standard axiom) or `audited`. `audited` means the cited
-  Lean theorems were proved, as statements about real numbers, from the sources this binary
-  embeds; it does not mean the run's floating-point code was proved. It never enters
-  `config_json` or `config_hash`.
+  Lean theorems were proved from the sources this binary embeds. Proofs about mathematical
+  reals have separate floating-point conformance checks. The `formal` object is outside
+  `config_json` and `config_hash`.
 
 Example:
 

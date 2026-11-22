@@ -54,6 +54,13 @@ struct PairEntry {
   std::size_t link = kNoLink;
 };
 
+// Trech.Methods.PairInteraction.exchange_preserves_sum uses equal-and-opposite
+// contributions. The two sums here and the later integration still round.
+void accumulatePairContribution(double& a, double& b, double value, PairSymmetry symmetry) {
+  a += value;
+  b += symmetry == PairSymmetry::kSymmetric ? value : -value;
+}
+
 // The reserved per-call fact every operator may declare as an input: the
 // bounded step it is being integrated over.
 constexpr const char* kStepInputName = "dt";
@@ -784,18 +791,11 @@ PairInteractionResult PairInteraction::interact(
         switch (target.kind) {
           case OutputKind::kElementRate:
           case OutputKind::kElementIncrement: {
-            // Equal and opposite (or shared) BY CONSTRUCTION: the same double
-            // is applied to both members, so an antisymmetric field's pair
-            // contribution cancels exactly.
             std::vector<double>& sink = target.kind == OutputKind::kElementRate
                                             ? elementRates
                                             : elementIncrements;
-            const double other =
-                request.fields[target.index].symmetry == PairSymmetry::kSymmetric
-                    ? value
-                    : -value;
-            sink[aBase + target.index] += value;
-            sink[bBase + target.index] += other;
+            accumulatePairContribution(sink[aBase + target.index], sink[bBase + target.index],
+                                       value, request.fields[target.index].symmetry);
             break;
           }
           case OutputKind::kPairRate:
@@ -905,9 +905,9 @@ PairInteractionResult PairInteraction::interact(
               continue;
             }
             std::vector<double>& sink = out.kind == OutputKind::kElementRate ? elementRates : elementIncrements;
-            const double other = request.fields[out.index].symmetry == PairSymmetry::kSymmetric ? delta : -delta;
-            sink[pair.a * fieldCount + out.index] += delta;
-            sink[pair.b * fieldCount + out.index] += other;
+            accumulatePairContribution(sink[pair.a * fieldCount + out.index],
+                                       sink[pair.b * fieldCount + out.index], delta,
+                                       request.fields[out.index].symmetry);
           }
         }
       }

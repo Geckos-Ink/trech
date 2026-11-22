@@ -73,7 +73,7 @@ later step regress an earlier contract.
 
 **R8 Formal laws (Lean)**
 
-- Law inventory, continued: `ctx.react` declared conservation, `ctx.interact` pair symmetry, Geant4 secondary energy conservation (six pairs landed 2026-11-22, including `ctx.react` step probabilities, the arbiter's proper score and scalar-lattice conservation). — [engine/formal](engine/formal/ROADMAP.md#priority-queue)
+- Law inventory, continued: energy conservation in recorded Geant4 secondaries. Eight law pairs now cover the classic references and engine methods, including `ctx.react` declared count conservation and `ctx.interact` antisymmetric exchange. — [engine/formal](engine/formal/ROADMAP.md#priority-queue)
 
 ### Gated items (need a go-ahead)
 

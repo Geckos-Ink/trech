@@ -18,7 +18,7 @@ Standing constraint for every item: Lean stays optional. Each law keeps its clas
 implementation as the running path, with the Lean definition beside it for validation
 ([rule](AGENTS.md#rules)).
 
-- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Next candidates: `ctx.react` declared conservation (a channel with `coefficients · delta = 0` keeps the invariant, and atomic application never makes a count negative), `ctx.interact` equal-and-opposite pair updates conserving the summed quantity, and energy conservation in recorded Geant4 secondaries. Search Mathlib first for each. ([detail](#more-law-pairs-and-the-first-engine-check--2026-11-22))
+- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Added declared `ctx.react` count conservation and antisymmetric `ctx.interact` exchange. Next: energy conservation in recorded Geant4 secondaries. Search Mathlib first. ([detail](#operator-conservation-2026-11-22))
 - **P2** · R8 · Conformance harness: a Lean reference evaluator (`@[export]` C symbols linked behind an opt-in `TRECH_ENABLE_LEAN`, default OFF, or a separate `lake exe` fed JSON) that checks the classic kernel on sampled or recorded inputs offline. Measure its cost; it never runs per step in production and never changes physics, RNG or emits. ([detail](#route-opened--2026-11-22))
 - **P2** · R8 · Hardware acceleration contract: Lean compiles to scalar CPU code, so accelerated kernels (C++ SIMD, LibTorch, GPU) stay the compute path. Define how a proof about an algorithm's model transfers to its accelerated implementation (shared algorithm spec, sampled conformance, documented reduction-order and fused-operation differences). ([detail](#route-opened--2026-11-22))
 - **P3** · R8 · More companions recording law checks: only `analytic_compton_transfer` records `TRECH_FORMAL_LAWS` verdicts. Candidates: `analytic_beer_lambert` (memorylessness at its own attenuation coefficients), and companions of `ctx.react` scenarios checking recorded per-cell probabilities with `checkProbabilityVector`. Always from the `.validation.js` companion under the `validation` role, never on the decision path. ([detail](#law-checks-in-run-outputs--2026-11-22))
@@ -29,6 +29,18 @@ implementation as the running path, with the Lean definition beside it for valid
 - **P3** · R5 · Geant4 secondary track: Lean statements of Geant4's basic laws (two-body kinematics, the Compton relation from four-momentum conservation, exponential attenuation, energy conservation in `SampleSecondaries`), attached through derived classes in shadow mode (inheritance preferred; `patches/geant4/` only for non-virtual code). Observation first; any replacement needs byte parity or a validated tolerance, a regression against the unpatched build and the owner's go-ahead. ([detail](AGENTS.md#geant4-secondary-track))
 - **gated** · R8 · Owner decision: whether to add a physics-specific Lean library (for example PhysLean) as a further reference checkout, so physical laws are also checked against it before being declared.
 - **gated** · R8 · Owner decision: when (if ever) Lean stops being optional for a given path.
+
+## Operator conservation (2026-11-22)
+
+- [x] Added Lean statements for declared integer conservation and atomic count bounds in
+  `ctx.react`, plus exchange of equal-and-opposite rates and increments in `ctx.interact`.
+  Checked all 22 theorems against the standard axioms on the pinned Mathlib toolchain.
+- [x] Classic conformance covers acceptance, availability and signed 64-bit overflow, early
+  rejection of an unbalanced channel, and two antisymmetric links sharing a member. Pair
+  conformance uses `1e-15` relative tolerance and verifies that clipping changes the total.
+- Verification: Debug CTest 80/80 and the focused V8 set 3/3. The Geant4 Compton smoke accepted
+  the new audit identity for all recorded checks and kept 200-event scores byte-identical with
+  and without the audit.
 
 ## Route opened — 2026-11-22
 

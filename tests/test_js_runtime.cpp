@@ -403,9 +403,10 @@ int main() {
     out << "    const delta = ctx.rng.int(1, 3);\n";
     out << "    return {\n";
     out << "      override: {\n";
-    out << "        run: { nEvents: 5, nEvent: 9 },\n";
+    out << "        run: { nEvents: 5, nEvent: 9, threads: 1 },\n";
     out << "        geometry: { volumes: [] },\n";
-    out << "        beam: { energyMeV: 2.0 + delta },\n";
+    out << "        beam: { energyMeV: 2.0 + delta, originMm: [1, -2, 3], 'originMm.x': 9,\n";
+    out << "                direction: { x: 0.5, y: false, typo: 2 } },\n";
     out << "        system: { ensemble: \"patched\" }\n";
     out << "      }\n";
     out << "    };\n";
@@ -481,13 +482,44 @@ int main() {
     failures += expect(initReport.emitDroppedCount == 0,
                        "Expected onInit not to drop emits.");
     failures += expect(cfg.run.nEvents == 5, "Expected onInit patch to override nEvents.");
+    failures += expect(cfg.run.threads == 1, "Expected onInit patch to override threads.");
     failures += expect(initReport.ignoredPatchPaths ==
-                           std::vector<std::string>{"geometry.volumes", "run.nEvent"},
+                           std::vector<std::string>{"beam.direction.typo", "beam.direction.y",
+                                                    "beam[\"originMm.x\"]", "geometry.volumes", "run.nEvent"},
                        "Expected the unapplied override leaves to be reported.");
+    failures += expect(cfg.beam.originXMm == 1 && cfg.beam.originYMm == -2 && cfg.beam.originZMm == 3,
+                       "Expected onInit to override the beam origin array.");
+    failures += expect(cfg.beam.directionX == 0.5 && cfg.beam.directionY == 0 && cfg.beam.directionZ == 1,
+                       "Expected only valid direction object members to apply.");
     failures += expect(cfg.system.ensemble == "patched",
                        "Expected onInit patch to override system ensemble.");
     failures += expect(cfg.beam.energyMeV >= 3.0 && cfg.beam.energyMeV <= 5.0,
                        "Expected deterministic rng patch energy in expected range.");
+
+    const auto mixedPatchPath = fixture.path() / "mixed_hook_patch.js";
+    {
+      std::ofstream out(mixedPatchPath);
+      out << R"JS(
+globalThis.TRECH_CONFIG = {run: {nEvents: 2, threads: 3}, beam: {originMm: [1, 2, 3]}};
+globalThis.TRECH_HOOKS = {onInit() { return {override: {
+  beam: {direction: [0.5, "bad", 1], originMm: {z: -4}},
+  run: {nEvents: 4294967301, threads: -1}, system: {ensemble: "valid"}
+}}; }};
+)JS";
+    }
+    trech::JsRuntime mixedJs;
+    auto mixed = trech::configFromJsonString(mixedJs.evalExperimentAndGetConfigJson(mixedPatchPath.string()));
+    const auto mixedReport = mixedJs.dispatchHook("onInit", {}, &mixed, true);
+    failures += expect(mixedReport.patchApplied &&
+                           mixedReport.ignoredPatchPaths == std::vector<std::string>{
+                               "beam.direction", "run.nEvents", "run.threads"},
+                       "Expected malformed vectors and out-of-range integers to be reported.");
+    failures += expect(mixed.beam.directionX == 0 && mixed.beam.directionY == 0 && mixed.beam.directionZ == 1 &&
+                           mixed.run.nEvents == 2 && mixed.run.threads == 3,
+                       "Expected rejected override fields to retain their authored values.");
+    failures += expect(mixed.beam.originXMm == 1 && mixed.beam.originYMm == 2 && mixed.beam.originZMm == -4 &&
+                           mixed.system.ensemble == "valid",
+                       "Expected valid fields to apply alongside rejected fields.");
 
     const auto eventReport = js.dispatchHook(
         "onEventStart",

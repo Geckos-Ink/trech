@@ -30,6 +30,12 @@ Conformance: `tests/test_formal_laws.cpp` sweeps `u` over a uniform grid of `[0,
 classic selection and compares each channel's share with `stepProbability`. Mathlib supplies
 the field and order facts (`Finset.sum_div`, `Finset.mul_sum`, `div_lt_iff₀`, `lt_div_iff₀`);
 it has no statement about this two-stage draw.
+
+The same classic operator applies a selected channel only if every resulting count falls in
+the supported integer range. It validates each declared conservation vector by a checked
+integer dot product with the channel delta. `applyChannel` models the atomic update over
+mathematical integers. Mathlib's `Finset.sum_add_distrib` and `mul_add` give the conservation
+identity. The C++ tests additionally check machine-integer rejection and reporting.
 -/
 
 @[expose] public section
@@ -74,5 +80,30 @@ theorem channelDraw_lt_iff {u h S t : ℝ} (hh : 0 < h) (hS : 0 < S) :
     u / h * S < t ↔ u < h * t / S := by
   rw [div_mul_eq_mul_div, div_lt_iff₀ hh, lt_div_iff₀ hS]
   constructor <;> intro hu <;> linarith [mul_comm t h]
+
+/-- Apply the whole channel if every new count fits, or return the starting state. -/
+noncomputable def applyChannel (limit : ℤ) (state delta : C → ℤ) : C → ℤ := by
+  classical
+  exact if ∀ c, 0 ≤ state c + delta c ∧ state c + delta c ≤ limit
+        then fun c => state c + delta c else state
+
+/-- A zero weighted change keeps the declared integer total on either branch. -/
+theorem applyChannel_conserves (limit : ℤ) (state delta coefficients : C → ℤ)
+    (balanced : ∑ c, coefficients c * delta c = 0) :
+    ∑ c, coefficients c * applyChannel limit state delta c = ∑ c, coefficients c * state c := by
+  unfold applyChannel
+  split
+  · simp only [mul_add, Finset.sum_add_distrib, balanced, add_zero]
+  · rfl
+
+/-- An accepted channel stays within the count range, and a rejected one retains it. -/
+theorem applyChannel_nonnegative (limit : ℤ) (state delta : C → ℤ)
+    (available : ∀ c, 0 ≤ state c ∧ state c ≤ limit) (c : C) :
+    0 ≤ applyChannel limit state delta c ∧ applyChannel limit state delta c ≤ limit := by
+  unfold applyChannel
+  split
+  · rename_i fits
+    exact fits c
+  · exact available c
 
 end Trech.Methods.Transition

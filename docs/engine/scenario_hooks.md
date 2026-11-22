@@ -234,6 +234,29 @@ All hooks are optional. `onTrackStart` / `onTrackEnd` (since 2026-11-14) fire on
 track, before its first step and after its last, with `ctx.track`; the engine installs its
 tracking action only when one of them is registered.
 
+### Initialization overrides
+
+`onInit` may return `{ override: { ... } }` before TRECH creates the Geant4 kernel. For
+example, this sets the source 5 mm along the negative z axis and requests a single worker
+for a hook that accumulates state across events.
+
+```js
+onInit() {
+  return { override: { beam: { originMm: [0, 0, -5] }, run: { threads: 1 } } };
+}
+```
+
+`beam.originMm` and `beam.direction` both accept `[x, y, z]` or an object such as
+`{ z: -5 }` that changes only the named axes. The first three array components must all
+be numeric for the vector to apply. `run.threads` accepts a nonnegative integer within
+the engine's integer range. Zero restores Geant4's default worker selection. `run.nEvents`
+accepts a positive integer within the same range.
+
+TRECH reports unsupported paths and invalid values in `hook_patch_ignored_paths` and warns
+while applying any valid fields. With `--strict-config`, TRECH refuses a run or lab scenario
+with an ignored path. A scenario-backed lab can apply source and worker settings on initial
+load. Changing either after startup requires a restart.
+
 <a name="context-object-draft"></a>
 
 ## Context object

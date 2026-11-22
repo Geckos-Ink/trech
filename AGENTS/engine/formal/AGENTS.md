@@ -6,15 +6,17 @@ Related owners: [Builds and dependencies](../../tooling/dependencies/AGENTS.md) 
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
-**Maturity (2026-11-22): six law pairs, 19 proofs verified; Lean stays optional.** The pairs
+**Maturity (2026-11-22): eight law pairs, 22 proofs verified. Lean stays optional.** The pairs
 ([`formal/laws.json`](../../../formal/laws.json)) are Compton kinematics, Beer–Lambert
 attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step
-probabilities and the method arbiter's proper squared score. Their classic C++/JS code is
+probabilities and declared count conservation, antisymmetric `ctx.interact` exchange, and the
+method arbiter's proper squared score. Their classic C++/JS code is
 checked against each Lean statement by `trech_formal_laws`, and the pair links by
-`trech_formal_law_pairs` (both in the normal suite, no Lean needed). The 19 Lean theorems
+`trech_formal_law_pairs` (both in the normal suite, no Lean needed). The 22 Lean theorems
 compile with Lean `v4.37.0-rc1` and Mathlib `6ebcce3733` and depend only on the standard
 axioms (`propext`, `Classical.choice`, `Quot.sound`), checked by the opt-in
-`trech_formal_lean_build`. The proofs are about real numbers, not the floating-point code. The
+`trech_formal_lean_build`. The count proof uses mathematical integers. The exchange proof uses
+reals, with classic conformance tested before bound clipping at `1e-15` relative. The
 engine runs one classic check itself: `Lattice` checks its pair's hypotheses once per build
 (`lawChecks()`, trace category `formal`). Runs record their checks (2026-11-22): `law_checks`
 in the `run_end` scores (origins `engine` and `validation`) and a provenance `formal` object
@@ -156,7 +158,7 @@ conservation, exponential attenuation from a constant interaction rate, energy c
 ## Current pins
 
 The TRECH git tree records the revisions (`git submodule status thirds/lean4 thirds/mathlib4`).
-First checkout (2026-11-22): lean4 `5ec4e0be17` (`master`), mathlib4 `6ebcce3733` (`master`),
+Current checkout (2026-11-22): lean4 `5730ab5` (`master`), mathlib4 `6ebcce3733` (`master`),
 whose `lean-toolchain` is `leanprover/lean4:v4.37.0-rc1`. The lean4 `master` tip is newer than
 that release candidate, so a from-source toolchain build must check out the tag first.
 
@@ -167,7 +169,7 @@ that release candidate, so a from-source toolchain build must check out the tag 
 | [`scripts/pull_lean.sh`](../../../scripts/pull_lean.sh) | Fast-forward both checkouts, print heads, check the toolchain Mathlib expects. |
 | [`scripts/lean_mathlib_search.py`](../../../scripts/lean_mathlib_search.py) | Grep Mathlib declaration headers (`theorem`, `lemma`, `def`, `structure`, …) by regex. |
 | [`docs/engine/formal_laws.md`](../../../docs/engine/formal_laws.md) | User guide: what the route is for, how to pull and search, what is not done yet. |
-| [`formal/`](../../../formal) | Lake package `trech_formal` (Mathlib by path from `thirds/mathlib4`, `lean-toolchain` copied from it; every file uses the module system: `module`, `public import` for statement types, plain `import` for proof tactics, `@[expose] public section`): `Trech/Laws/Compton.lean`, `Trech/Laws/Attenuation.lean`, `Trech/Methods/Lattice.lean`, `Trech/Methods/Transition.lean`, `Trech/Methods/Arbiter.lean`. |
+| [`formal/`](../../../formal) | Lake package `trech_formal` (Mathlib by path from `thirds/mathlib4`, with the same toolchain). The [module index](../../../formal/README.md) links each proof to the running C++ or JavaScript implementation. |
 | [`formal/laws.json`](../../../formal/laws.json) | `trech_formal_laws_v1` pair manifest: id, role, statement, Lean file + declarations, classic sources and the namespace each cites, conformance checks. |
 | [`include/trech/core/FormalLaws.hpp`](../../../include/trech/core/FormalLaws.hpp) · [`src/core/FormalLaws.cpp`](../../../src/core/FormalLaws.cpp) | `trech::formal::LawCheck` and the physics-agnostic classic checks: `checkConservedTotal` (Neumaier sums), `checkWithinBounds`, `checkProbabilityVector`, `checkAgreement`, and the hypothesis checks `checkPermutation`, `checkInvolution`, `checkVelocityMoments`. `toJson()` records `lean_status: "not_checked_by_this_check"`. In `trech_core`; the engine calls the three hypothesis checks from `Lattice::checkLaws` ([`LatticeContinuum.cpp`](../../../src/core/LatticeContinuum.cpp)). |
 | [`DiscreteTransition.hpp`](../../../include/trech/ml/DiscreteTransition.hpp) · [`MethodArbiter.cpp`](../../../src/ml/MethodArbiter.cpp) | `selectTransitionChannel` (the `ctx.react` draw, pair `Trech.Methods.Transition`) and the arbiter's squared-error grading (pair `Trech.Methods.Arbiter`). |

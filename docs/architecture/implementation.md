@@ -21,6 +21,8 @@ and `ctx.emit(tag, payload)`) across init/run/event/step boundaries.
 `onInit` can return `{ override: { ... } }` for deterministic runtime patching on a whitelisted
 config surface (`beam`, `run`, `optics`, `system`, `stratify`), and outputs now persist
 `hook_patch_count`, `hook_emit_count`, and `trech_hook_emits.jsonl`.
+The [initialization override contract](../engine/scenario_hooks.md#initialization-overrides)
+covers source position, worker count and reporting of ignored paths.
 System aggregation now emits run-level event energy moments (`system_event_count`,
 `system_event_edep_mean_mev`, `system_event_edep_variance_mev2`, `system_event_edep_stddev_mev`)
 alongside existing density metrics, plus the distribution's shape (`system_event_edep_stderr_mev`,

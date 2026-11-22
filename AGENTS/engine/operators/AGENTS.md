@@ -82,7 +82,9 @@ stoichiometric channels and conserved linear quantities, evaluated through scale
 - **Key invariants:** topology/conservation validate before inference or RNG; hazards/weights clamp
   to [0,1]; competing direct hazards above unity renormalize deterministically; at most one channel
   is attempted per element per call; availability is checked before an atomic delta; integer state
-  never goes negative. `inferenceCount` is N×K model evaluations while `drawCount`,
+  remains in the supported signed 64-bit count range. The [Lean pair](../formal/AGENTS.md)
+  and classic conformance cover declared linear totals and the atomic count check.
+  `inferenceCount` is N×K model evaluations while `drawCount`,
   `transitionAttempts`, `transitionsAccepted`, and `rejectedAvailability` remain distinct.
 - **Tests:** [`tests/test_discrete_transition.cpp`](../../../tests/test_discrete_transition.cpp) +
   the `ctx.react` boundary/strict-mode case in [`tests/test_js_runtime.cpp`](../../../tests/test_js_runtime.cpp).
@@ -94,7 +96,9 @@ The pair/neighbour **interaction** operator behind `ctx.interact`: where `StateE
 every remaining authored solver loop (MD force loops, bonded foam networks, PBF neighbourhood sums,
 parcel cohesion/collision). The engine builds a deterministic uniform cell list, evaluates
 scale-tagged `GenericSurrogate` stages over each canonical pair, and accumulates the result back
-onto both members.
+onto both members. Antisymmetric fields apply opposite rates and increments through the
+same accumulator for ordinary outputs and arbitration corrections. The
+[Lean pair](../formal/AGENTS.md) covers real-valued conservation without bound clipping.
 
 - **Naming convention:** `d_<element field>_dt` → rate contribution to both members (integrated once
   over `dt`); `add_<element field>` → direct increment (neighbourhood sum, no `dt`);

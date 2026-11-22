@@ -46,8 +46,8 @@ class GenericSurrogate;
 //   * the cell list and the canonical, implementation-independent pair order
 //     (pairs are enumerated, then sorted by `(a,b)`, so the floating-point
 //     accumulation order cannot change with a hash-map layout or a cell size),
-//   * equal-and-opposite application, so an antisymmetric field's pair
-//     contribution cancels EXACTLY (`a += v`, `b -= v` with the same double),
+//   * equal-and-opposite contributions (`a += v`, `b -= v` with the same
+//     double), whose signs cancel before accumulation, integration and bounds,
 //   * the caller's declared bounds, the single integration of accumulated rates
 //     over dt, and honest accounting: `pairs x stages` inferences, with the
 //     same per-stage training-domain trust profile every other inference path
@@ -87,9 +87,9 @@ class GenericSurrogate;
 
 // How a pair's contribution to an element field is applied to the two members.
 enum class PairSymmetry {
-  // `a += v`, `b -= v`.  Exactly equal and opposite, so the pair conserves the
-  // field's total in the strictest floating-point sense (the same double is
-  // added and subtracted).  Forces/impulses, heat and mass exchange.
+  // `a += v`, `b -= v`. The same double is added and subtracted, with rounding
+  // in the resulting state and possible clipping by bounds. Forces/impulses,
+  // heat and mass exchange.
   kAntisymmetric,
   // `a += v`, `b += v`.  A shared neighbourhood contribution: density,
   // coordination count, overlap, pair energy attributed to both members.
