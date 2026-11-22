@@ -1,5 +1,7 @@
 #include "trech/core/LatticeContinuum.hpp"
 
+#include "trech/core/Trace.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <deque>
@@ -201,6 +203,45 @@ void Lattice::build() {
     }
   }
   rate_.assign(F, 0.0); target_.assign(F, 0.0); constant_.assign(F, 0.0);
+  checkLaws();
+}
+
+// Lean pair (optional, for validation): Trech.Methods.Lattice (formal/Trech/Methods/Lattice.lean).
+// relaxTRT_sum_eq needs the velocity moments (sum feq = rho, zero-sum forcing) and an involutive
+// opp; stream_sum_eq needs src to be a bijection; advectedEquilibrium_sum needs sum w = 1 and
+// sum w c = 0. Cheap (O(Q F), once per lattice), never on the step path.
+void Lattice::checkLaws() {
+  lawChecks_.clear();
+  const std::size_t F = domain_.count();
+  auto checkSet = [&](const VelocitySet& s, const std::vector<int32_t>& src, const char* role, bool conservative,
+                      const char* why) {
+    const std::string tag = std::string("lattice.") + role;
+    lawChecks_.push_back(formal::checkVelocityMoments(tag + ".velocity_moments", "Trech.Methods.Lattice.relaxTRT_sum_eq",
+                                                      s.q(), s.cx.data(), s.cy.data(), s.cz.data(), s.w.data(), s.cs2,
+                                                      s.dimensions, 1e-15));
+    lawChecks_.push_back(formal::checkInvolution(tag + ".opposite_involution", "Trech.Methods.Lattice.relaxTRT_sum_eq",
+                                                 s.opp.data(), s.q()));
+    formal::LawCheck stream = formal::checkPermutation(tag + ".streaming_bijection",
+                                                       "Trech.Methods.Lattice.stream_sum_eq", src.data(), s.q() * F);
+    if (!conservative && stream.passed) stream.detail = std::string("bijective, but ") + why;
+    lawChecks_.push_back(std::move(stream));
+  };
+  if (flowSet_) checkSet(*flowSet_, fSrc_, "flow", wallTerm_.empty(), "moving walls add momentum and mass by design");
+  if (scalarSet_) {
+    bool dirichlet = false;
+    for (uint8_t a : anti_) dirichlet = dirichlet || a != 0;
+    checkSet(*scalarSet_, gSrc_, "scalar", !dirichlet, "Dirichlet (anti-bounce-back) links exchange the scalar by design");
+  }
+  bool failed = false;
+  for (const auto& check : lawChecks_) failed = failed || !check.passed;
+  if (!failed && !trace::active()) return;
+  nlohmann::json checks = nlohmann::json::array();
+  for (const auto& check : lawChecks_) checks.push_back(check.toJson());
+  trace::record(trace::Level::Info, "formal",
+                failed ? "lattice law hypothesis failed" : "lattice law hypotheses checked",
+                {{"cells", F}, {"flow", flowSet_ ? flowSet_->name : ""}, {"scalar", scalarSet_ ? scalarSet_->name : ""},
+                 {"checks", std::move(checks)}},
+                failed ? "warn" : "");
 }
 
 namespace {

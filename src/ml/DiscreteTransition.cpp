@@ -115,6 +115,26 @@ std::string DiscreteTransition::channelWeightOutputName(
   return "weight_" + channel;
 }
 
+// Lean pair (optional, for validation): Trech.Methods.Transition
+// (formal/Trech/Methods/Transition.lean) proves that this two-stage draw fires channel c with
+// probability eventHazard * scores[c] / scoreSum, the channels and "no transition" forming a
+// probability vector; tests/test_formal_laws.cpp checks this function against it.
+long selectTransitionChannel(double draw, double eventHazard, const double* scores,
+                             double scoreSum, std::size_t channelCount) {
+  if (draw >= eventHazard) return -1;
+  const double channelDraw = (draw / eventHazard) * scoreSum;
+  double cumulative = 0.0;
+  std::size_t selected = channelCount - 1;
+  for (std::size_t c = 0; c < channelCount; ++c) {
+    cumulative += scores[c];
+    if (channelDraw < cumulative) {
+      selected = c;
+      break;
+    }
+  }
+  return static_cast<long>(selected);
+}
+
 void DiscreteTransition::addStage(std::string name, DimensionScale scale,
                                   const GenericSurrogate* model,
                                   std::size_t elementKindIndex) {
@@ -732,19 +752,11 @@ DiscreteTransitionResult DiscreteTransition::react(
 
     const double draw = uniform01(&randomState);
     ++result.drawCount;
-    if (draw >= eventHazard) {
+    const long choice = selectTransitionChannel(draw, eventHazard, scores, scoreSum, channelCount);
+    if (choice < 0) {
       continue;
     }
-    const double channelDraw = (draw / eventHazard) * scoreSum;
-    double cumulative = 0.0;
-    std::size_t selected = channelCount - 1;
-    for (std::size_t c = 0; c < channelCount; ++c) {
-      cumulative += scores[c];
-      if (channelDraw < cumulative) {
-        selected = c;
-        break;
-      }
-    }
+    const std::size_t selected = static_cast<std::size_t>(choice);
 
     TransitionChannelTrace& channelTrace = result.channelTrace[selected];
     ++channelTrace.attempted;

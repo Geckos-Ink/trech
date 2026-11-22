@@ -6,8 +6,11 @@
 #include "TemporaryDirectory.hpp"
 
 #include "trech/core/FormalLaws.hpp"
+#include "trech/core/LatticeContinuum.hpp"
 #include "trech/core/LatticeKinetic.hpp"
 #include "trech/js/JsRuntime.hpp"
+#include "trech/ml/DiscreteTransition.hpp"
+#include "trech/ml/MethodArbiter.hpp"
 #include "trech/sim/KleinNishina.hpp"
 
 #include <nlohmann/json.hpp>
@@ -162,6 +165,145 @@ void latticePairs() {
                                      "Trech.Methods.Lattice.relaxTRT_sum_eq", before, f, 1e-13));
 }
 
+void scalarLatticePairs() {
+  // Trech.Methods.Lattice.advectedEquilibrium_sum + relaxTRT_sum_eq + stream_sum_eq on the engine's
+  // scalar lattice: zero-flux walls, an interior solid block, a prescribed advection velocity and
+  // no source conserve the total. The engine's own build-time hypothesis checks must all pass.
+  trech::lattice::LatticeSpec spec;
+  spec.shape = {11, 8, 1};
+  spec.flow = false;
+  spec.scalarLattice = "D2Q5";
+  spec.diffusivity = 0.05;
+  spec.solid = [](int x, int y, int) { return x >= 4 && x <= 5 && y >= 3 && y <= 4; };
+  spec.initialScalar = [](int x, int y, int) { return 1.0 + 0.1 * x - 0.03 * y * y; };
+  trech::lattice::Lattice lattice(spec);
+  const std::size_t F = lattice.domain().count();
+  lattice.advectionX().assign(F, 0.04);
+  lattice.advectionY().assign(F, -0.02);
+  lattice.advectionZ().assign(F, 0.0);
+  for (const auto& check : lattice.lawChecks()) expect(check);
+  if (lattice.lawChecks().size() != 3) {
+    std::fprintf(stderr, "scalar lattice recorded %zu law checks, expected 3\n", lattice.lawChecks().size());
+    ++failures;
+  }
+  const std::vector<double> before = lattice.scalarValues();
+  lattice.advance(400);
+  const std::vector<double> after = lattice.scalarValues();
+  expect(formal::checkConservedTotal("lattice.scalar_conserves_total",
+                                     "Trech.Methods.Lattice.advectedEquilibrium_sum", before, after, 1e-13));
+  // A Dirichlet wall exchanges scalar by design: the bijection still holds, and the check says why
+  // conservation does not apply, while the total moves.
+  spec.dirichlet = [](int, int, int, int, int, int, double& value) { value = 3.0; return true; };
+  trech::lattice::Lattice open(spec);
+  const auto& stream = open.lawChecks().back();
+  if (!stream.passed || stream.detail.find("by design") == std::string::npos) {
+    std::fprintf(stderr, "Dirichlet lattice should note that it is not conservative by design\n");
+    ++failures;
+  }
+  const std::vector<double> openBefore = open.scalarValues();
+  open.advance(50);
+  expect(formal::checkConservedTotal("lattice.scalar_dirichlet_negative_control", "", openBefore, open.scalarValues(),
+                                     1e-13),
+         false);
+  // A walled D3Q19 flow lattice: the engine's flow hypotheses hold.
+  trech::lattice::LatticeSpec flow;
+  flow.shape = {6, 5, 4};
+  flow.scalar = false;
+  trech::lattice::Lattice walled(flow);
+  for (const auto& check : walled.lawChecks()) expect(check);
+}
+
+void transitionPairs() {
+  // Trech.Methods.Transition on the engine's own two-stage draw (selectTransitionChannel): sweep the
+  // uniform draw over a grid of [0, 1) and compare each outcome's share with h * s_c / S.
+  const std::size_t N = 1u << 20;
+  struct Case { double hazard; std::vector<double> scores; };
+  std::vector<Case> cases = {
+      {0.3, {0.2, 0.5, 0.3}},           // weighted mode: event hazard and channel weights
+      {0.12, {0.07, 0.0, 0.05}},        // direct mode below 1: h = sum, a zero channel never fires
+      {1.0, {0.6, 0.9, 0.25, 0.4}},     // direct mode renormalised: sum > 1, h = 1
+      {0.999, {1e-3, 1.0}},             // a rare channel
+  };
+  std::vector<double> measured, expected, withoutHazard;
+  for (const auto& k : cases) {
+    double S = 0.0;
+    for (double s : k.scores) S += s;
+    std::vector<double> hits(k.scores.size() + 1, 0.0);  // channels, then "no transition"
+    for (std::size_t i = 0; i < N; ++i) {
+      const double u = static_cast<double>(i) / static_cast<double>(N);
+      const long c = trech::ml::selectTransitionChannel(u, k.hazard, k.scores.data(), S, k.scores.size());
+      hits[c < 0 ? k.scores.size() : static_cast<std::size_t>(c)] += 1.0 / static_cast<double>(N);
+    }
+    expect(formal::checkProbabilityVector("transition.outcomes_probability_vector",
+                                          "Trech.Methods.Transition.noEvent_nonneg", hits, 1e-12));
+    for (std::size_t c = 0; c < k.scores.size(); ++c) {
+      measured.push_back(hits[c]);
+      expected.push_back(k.hazard * k.scores[c] / S);
+      withoutHazard.push_back(k.scores[c] / S);
+    }
+    measured.push_back(hits.back());
+    expected.push_back(1.0 - k.hazard);
+    withoutHazard.push_back(0.0);
+  }
+  // Each interval edge can land between two grid points: at most 2/N per outcome.
+  expect(formal::checkAgreement("transition.channel_probability", "Trech.Methods.Transition.sum_stepProbability",
+                                measured, expected, 2.0 / static_cast<double>(N), 0.0));
+  expect(formal::checkAgreement("transition.negative_control", "", measured, withoutHazard,
+                                2.0 / static_cast<double>(N), 0.0),
+         false);
+}
+
+void arbiterPairs() {
+  // Trech.Methods.Arbiter.squaredScore_mean_lt on the engine's MethodArbiter: with noisy references,
+  // the method that predicts the conditional mean scores lowest and leads; biased methods lose.
+  trech::ml::MethodArbiterOptions o;
+  o.methods = {"low", "mean", "high"};
+  o.features = {"x"};
+  o.fallback = "low";  // the prior favours a biased method; evidence must overturn it
+  trech::ml::MethodArbiter arbiter(o);
+  std::uint64_t state = 0x2545f4914f6cdd1dULL;
+  auto noise = [&]() {
+    state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+    return 2.0 * (static_cast<double>(state >> 11) / 9007199254740992.0) - 1.0;  // [-1, 1)
+  };
+  const std::size_t n = 64;
+  const double sigma = 0.2;
+  std::string leader;
+  for (int call = 0; call < 40; ++call) {
+    trech::ml::MethodArbiterBatch b;
+    b.time = call;
+    b.count = n;
+    for (std::size_t e = 0; e < n; ++e) {
+      const double x = static_cast<double>(e) / static_cast<double>(n);
+      const double mean = std::sin(3.0 * x) + 0.5 * x;
+      b.features.push_back(x);
+      b.predictions.insert(b.predictions.end(), {mean - 0.5 * sigma, mean, mean + 0.3 * sigma});
+      b.reference.push_back(mean + sigma * noise());
+    }
+    leader = arbiter.step(b).leader;
+  }
+  const auto summary = arbiter.summary();
+  std::vector<double> meanScore, otherScores;
+  for (const char* m : {"low", "high"}) {
+    meanScore.push_back(summary.at("methods").at("mean").at("rmse_common").get<double>());
+    otherScores.push_back(summary.at("methods").at(m).at("rmse_common").get<double>());
+  }
+  // Bounds check: mean score <= each biased score (upper bound), from 0.
+  expect(formal::checkWithinBounds("arbiter.mean_scores_lowest", "Trech.Methods.Arbiter.squaredScore_mean_lt",
+                                   meanScore, {0.0, 0.0}, otherScores, 0.0));
+  formal::LawCheck leads;
+  leads.law = "arbiter.mean_leads";
+  leads.leanDeclaration = "Trech.Methods.Arbiter.logError_lt_iff";
+  leads.kind = "invariant";
+  leads.samples = 1;
+  leads.passed = leader == "mean" && summary.at("best_single_method") == "mean";
+  if (!leads.passed) {
+    leads.violations = 1;
+    leads.detail = "leader " + leader + ", best single " + summary.at("best_single_method").get<std::string>();
+  }
+  expect(leads);
+}
+
 void javascriptPairs() {
   // The JS classic implementations: their own checks, then agreement with the C++ ones.
   const auto root = std::filesystem::path(TRECH_SOURCE_DIR);
@@ -217,6 +359,9 @@ int main() {
     comptonPairs();
     attenuationPairs();
     latticePairs();
+    scalarLatticePairs();
+    transitionPairs();
+    arbiterPairs();
     javascriptPairs();
     const auto sample = formal::checkProbabilityVector("probability.example", "", {0.25, 0.25, 0.5}, 1e-15);
     expect(sample);

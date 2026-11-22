@@ -148,6 +148,14 @@ struct DiscreteTransitionResult {
   std::vector<RivalCandidates> rivals;
 };
 
+// The engine's two-stage draw for one element, given one uniform `draw` in [0, 1): no
+// transition (-1) when draw >= eventHazard, else the channel whose cumulative score interval
+// holds (draw / eventHazard) * scoreSum (the last channel absorbs rounding at the top). Channel
+// c fires with probability eventHazard * scores[c] / scoreSum (Lean pair, optional:
+// Trech.Methods.Transition). Pure; it consumes no RNG itself.
+long selectTransitionChannel(double draw, double eventHazard, const double* scores,
+                             double scoreSum, std::size_t channelCount);
+
 // Physics-agnostic learned discrete transition operator.
 //
 // Models may expose exactly one of two output conventions:

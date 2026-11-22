@@ -1,4 +1,5 @@
 #pragma once
+#include "trech/core/FormalLaws.hpp"
 #include "trech/core/LatticeKinetic.hpp"
 
 #include <array>
@@ -127,7 +128,16 @@ class Lattice {
   double mass() const;
   double scalarTotal() const;
 
+  // Hypotheses of the lattice's Lean law pair (Trech.Methods.Lattice), checked once when the
+  // lattice is built: velocity-set moments, opposite-direction involution and the streaming
+  // table's bijection, for the flow and the scalar lattice. Observation only: they never change
+  // a population, RNG stream, emit or output, and are reported through the engine trace
+  // (category "formal"; a failed check is a warning). Moving walls and Dirichlet links add
+  // mass by design, so a lattice that has them records conservation as not applicable.
+  const std::vector<formal::LawCheck>& lawChecks() const { return lawChecks_; }
+
  private:
+  void checkLaws();
   void build();
   LatticeSpec spec_;
   Domain domain_;
@@ -143,6 +153,7 @@ class Lattice {
   double flowOmegaPlus_ = 1.0, flowOmegaMinus_ = 1.0, scalarOmegaPlus_ = 1.0, scalarOmegaMinus_ = 1.0;
   std::uint64_t steps_ = 0;
   double maxMach_ = 0.0;
+  std::vector<formal::LawCheck> lawChecks_;
 };
 
 // Trilinear sample of a fluid-cell field at lattice coordinates (cell centres at integers).

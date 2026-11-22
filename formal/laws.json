@@ -54,6 +54,62 @@
         {"path": "src/core/LatticeKinetic.cpp", "cites": "Trech.Methods.Lattice"}
       ],
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["lattice.velocity_moments", "lattice.opposite_involution", "lattice.streaming_bijection", "lattice.collision_conserves_mass"]}
+    },
+    {
+      "id": "lattice.scalar_conserves_total",
+      "role": "method_property",
+      "statement": "The scalar (advection-diffusion) equilibrium w_k v (1 + c_k.u / cs2) carries the cell value v when sum w = 1 and sum w c = 0; with the TRT collision and bijective pull streaming, a scalar lattice with zero-flux walls and no source conserves its total.",
+      "lean": {
+        "file": "formal/Trech/Methods/Lattice.lean",
+        "declarations": [
+          "Trech.Methods.Lattice.advectedEquilibrium_sum",
+          "Trech.Methods.Lattice.relaxTRT_sum_eq",
+          "Trech.Methods.Lattice.stream_sum_eq"
+        ]
+      },
+      "classic": [
+        {"path": "src/core/LatticeKinetic.cpp", "cites": "Trech.Methods.Lattice"},
+        {"path": "src/core/LatticeContinuum.cpp", "cites": "Trech.Methods.Lattice"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["lattice.scalar_conserves_total"]}
+    },
+    {
+      "id": "transition.step_probability",
+      "role": "method_property",
+      "statement": "The engine's two-stage transition draw (no transition when u >= h, else the channel whose cumulative score interval holds (u / h) S) fires channel c with probability h s_c / S: nonnegative, summing to h <= 1, leaving 1 - h for no transition, and equal to s_c in direct mode below renormalisation.",
+      "lean": {
+        "file": "formal/Trech/Methods/Transition.lean",
+        "declarations": [
+          "Trech.Methods.Transition.stepProbability_nonneg",
+          "Trech.Methods.Transition.sum_stepProbability",
+          "Trech.Methods.Transition.noEvent_nonneg",
+          "Trech.Methods.Transition.stepProbability_direct",
+          "Trech.Methods.Transition.channelDraw_lt_iff"
+        ]
+      },
+      "classic": [
+        {"path": "src/ml/DiscreteTransition.cpp", "cites": "Trech.Methods.Transition"},
+        {"path": "include/trech/ml/DiscreteTransition.hpp", "cites": "Trech.Methods.Transition"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["transition.outcomes_probability_vector", "transition.channel_probability"]}
+    },
+    {
+      "id": "arbiter.squared_score_proper",
+      "role": "method_property",
+      "statement": "Over any weighted sample the squared score sum w (x - p)^2 equals the mean's score plus (sum w)(m - p)^2, so the weighted mean minimises it (strictly for positive weight); log(error + floor) with floor > 0 keeps the order of nonnegative errors.",
+      "lean": {
+        "file": "formal/Trech/Methods/Arbiter.lean",
+        "declarations": [
+          "Trech.Methods.Arbiter.squaredScore_decompose",
+          "Trech.Methods.Arbiter.squaredScore_mean_le",
+          "Trech.Methods.Arbiter.squaredScore_mean_lt",
+          "Trech.Methods.Arbiter.logError_lt_iff"
+        ]
+      },
+      "classic": [
+        {"path": "src/ml/MethodArbiter.cpp", "cites": "Trech.Methods.Arbiter"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["arbiter.mean_scores_lowest", "arbiter.mean_leads"]}
     }
   ]
 }

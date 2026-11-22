@@ -16,6 +16,9 @@
 namespace trech::ml {
 namespace {
 constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
+// Lean pair (optional, for validation): Trech.Methods.Arbiter (formal/Trech/Methods/Arbiter.lean)
+// proves that the squared error graded below is a strictly proper score for the mean and that
+// log(error + floor) keeps the order of errors; tests/test_formal_laws.cpp checks this arbiter.
 // Errors are learned as log(error + floor), floor = 1e-6 x the output scale: an absolute
 // error regressed by local laws goes negative near zero and would then win every selection;
 // the log keeps predicted errors positive and makes the ranking relative.

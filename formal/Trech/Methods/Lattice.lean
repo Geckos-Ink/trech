@@ -11,7 +11,9 @@ Role: `method_property`. These theorems state why the engine-owned lattice Boltz
 conserves the summed populations; they say nothing about any material.
 
 Classic implementation (the running path): `src/core/LatticeKinetic.cpp` — `flowStep`
-(two-relaxation-time collision, then pull streaming `f[k] = post[src[k]]`).
+(two-relaxation-time collision, then pull streaming `f[k] = post[src[k]]`) and `scalarStep`
+(the same collision and streaming for the advection-diffusion lattice). The engine checks the
+hypotheses below once per built lattice (`src/core/LatticeContinuum.cpp`, `Lattice::lawChecks`).
 
 Hypothesis checks and conformance: `tests/test_formal_laws.cpp` checks that the classic
 kernel's inputs satisfy the hypotheses below (`src` is a permutation, `opp` an involution,
@@ -49,6 +51,20 @@ does not change the mass. -/
 theorem sum_add_zero_source (g s : Q → ℝ) (hs : ∑ k, s k = 0) :
     ∑ k, (g k + s k) = ∑ k, g k := by
   rw [Finset.sum_add_distrib, hs, add_zero]
+
+/-- The scalar (advection-diffusion) equilibrium `w k · v · (1 + a k)` carries the cell's value
+`v` when the weights sum to one and the advection term has zero weighted mean. The classic
+`scalarStep` uses `a k = (c_k · u) / cs2`, whose weighted sum is zero by the velocity set's first
+moment `∑ w c = 0`; together with `relaxTRT_sum_eq` and `stream_sum_eq` this is why a scalar
+lattice with zero-flux (bounce-back) walls and no source conserves its total. -/
+theorem advectedEquilibrium_sum (w a : Q → ℝ) (v : ℝ) (hw : ∑ k, w k = 1)
+    (ha : ∑ k, w k * a k = 0) :
+    ∑ k, w k * v * (1 + a k) = v := by
+  have split : ∀ k, w k * v * (1 + a k) = v * w k + v * (w k * a k) := by
+    intro k
+    ring
+  simp only [split, Finset.sum_add_distrib, ← Finset.mul_sum, hw, ha]
+  ring
 
 /-- Pull streaming along a bijection of the links (periodic wrap and plain bounce-back both
 are one) conserves the total. -/

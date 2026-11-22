@@ -18,13 +18,14 @@ Standing constraint for every item: Lean stays optional. Each law keeps its clas
 implementation as the running path, with the Lean definition beside it for validation
 ([rule](AGENTS.md#rules)).
 
-- **P1** · R8 · Law-pair contract, second half. The manifest (`trech_formal_laws_v1`), the `LawCheck` record and the citation rule landed 2026-11-22. Still open: provenance fields for a run that performs a law check (declaration, Lean module hash, toolchain, Mathlib revision), conditionally serialized, and where a validation companion's JS law-check records go in the outputs. Design first; no engine field before review. ([detail](#first-law-pairs--2026-11-22))
-- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation. Next candidates: probability normalisation and nonnegativity of `ctx.react` transition outputs, the arbiter's prequential score as a proper scoring rule, energy conservation in recorded Geant4 secondaries, and the scalar lattice's conservation under zero-flux walls. Search Mathlib first for each. ([detail](#first-law-pairs--2026-11-22))
-- **P2** · R8 · Call the classic checks from the engine: run `checkVelocityMoments`, `checkInvolution` and `checkPermutation` when a lattice is built (cheap, once), and expose the JS checks to validation companions' recorded output, without changing physics, RNG or emits. ([detail](#first-law-pairs--2026-11-22))
+- **P1** · R8 · Law-pair contract, second half. Landed: the manifest, the `LawCheck` record and the citation rule; the audit identity (`check_lean_laws.py --report`, `trech_lean_audit_v1`, 2026-11-22); a [design draft](#provenance-design-draft--2026-11-22) for where law checks go in run outputs. Still open: owner review of that draft, then the conditionally serialized provenance block and the `law_checks` output it proposes. No engine field before review. ([detail](#provenance-design-draft--2026-11-22))
+- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Next candidates: `ctx.react` declared conservation (a channel with `coefficients · delta = 0` keeps the invariant, and atomic application never makes a count negative), `ctx.interact` equal-and-opposite pair updates conserving the summed quantity, and energy conservation in recorded Geant4 secondaries. Search Mathlib first for each. ([detail](#more-law-pairs-and-the-first-engine-check--2026-11-22))
+- **P2** · R8 · Classic checks in run records. Landed 2026-11-22: `Lattice` runs the velocity-moment, involution and bijection checks once per build and traces them (`formal`). Still open, after the provenance design is reviewed: carry those records into the run outputs, and expose the JS checks to validation companions' recorded output, without changing physics, RNG or emits. ([detail](#more-law-pairs-and-the-first-engine-check--2026-11-22))
 - **P2** · R8 · Conformance harness: a Lean reference evaluator (`@[export]` C symbols linked behind an opt-in `TRECH_ENABLE_LEAN`, default OFF, or a separate `lake exe` fed JSON) that checks the classic kernel on sampled or recorded inputs offline. Measure its cost; it never runs per step in production and never changes physics, RNG or emits. ([detail](#route-opened--2026-11-22))
 - **P2** · R8 · Hardware acceleration contract: Lean compiles to scalar CPU code, so accelerated kernels (C++ SIMD, LibTorch, GPU) stay the compute path. Define how a proof about an algorithm's model transfers to its accelerated implementation (shared algorithm spec, sampled conformance, documented reduction-order and fused-operation differences). ([detail](#route-opened--2026-11-22))
-- **P2** · R8 · Scenario side: a `.validation.js` companion uses `TRECH_FORMAL_LAWS` next to its own classic reference and records both verdicts (the library exists; no companion uses it yet). Never from the physics script, never on the decision path. ([detail](#route-opened--2026-11-22))
+- **P2** · R8 · Scenario side: a validation companion records `TRECH_FORMAL_LAWS` verdicts next to its own classic reference. Finding (2026-11-22): the analytic companions (`analytic_compton_transfer`, `analytic_beer_lambert`) are declarative JSON contracts graded after the run, with no JS that runs per run, so this waits for the output location in the provenance design. Never from the physics script, never on the decision path. ([detail](#provenance-design-draft--2026-11-22))
 - **P3** · R8 · Reals vs floats: bridge Mathlib's `ℝ` theorems to IEEE-754 kernels with stated error bounds, interval arithmetic or a rounding-model proof; until then label every Lean verdict as covering the real-valued statement only. ([detail](#route-opened--2026-11-22))
+- **P3** · R8 · Arbiter ranking across calls: `Trech.Methods.Arbiter` covers one weighted sample; the leader ranks by the decayed mean of log call RMSE (a geometric mean over calls) and the learned policy by a decayed log-ratio score. State and prove what those rankings preserve (for example, that a method better on every call ranks first) or document why they need no such guarantee. ([detail](#more-law-pairs-and-the-first-engine-check--2026-11-22))
 - **P3** · R8 · Lean CI beyond this machine: the toolchain, cache and `trech_formal_lean_build` are verified on macOS arm64 only; check Linux and decide whether CI runs the Lean check. ([detail](#proofs-compiled-and-audited--2026-11-22))
 - **P3** · R8 · Better Mathlib search now that Mathlib is built: `exact?`/`apply?`/Loogle-style queries in place of the grep, so equivalent statements under other names are found. ([detail](#route-opened--2026-11-22))
 - **P3** · R5 · Geant4 secondary track: Lean statements of Geant4's basic laws (two-body kinematics, the Compton relation from four-momentum conservation, exponential attenuation, energy conservation in `SampleSecondaries`), attached through derived classes in shadow mode (inheritance preferred; `patches/geant4/` only for non-virtual code). Observation first; any replacement needs byte parity or a validated tolerance, a regression against the unpatched build and the owner's go-ahead. ([detail](AGENTS.md#geant4-secondary-track))
@@ -77,3 +78,58 @@ implementation as the running path, with the Lean definition beside it for valid
   option was then set back OFF there.
 - [ ] Verified on macOS arm64 only; other platforms, and the audit after the next Mathlib pull,
   are untested. The proofs cover the real-valued statements, not the float kernels (queued above).
+
+## More law pairs and the first engine check — 2026-11-22
+
+- [x] Pulled both Lean checkouts first (`scripts/pull_lean.sh`: no movement, lean4 `5ec4e0be17`,
+  mathlib4 `6ebcce3733`). Mathlib searched for each statement: it has `Real.log_lt_log_iff` and
+  the measure-theoretic `ProbabilityTheory.variance` lemmas, but no finite weighted
+  "mean minimises the squared score" and nothing on the two-stage draw, so both are stated here.
+- [x] `Trech.Methods.Transition` (5 theorems): `stepProbability h s c = h·s c/∑ s` is
+  nonnegative, sums to `h`, leaves `1 − h ≥ 0`, equals `s c` in direct mode, and
+  `channelDraw_lt_iff` is the inverse-CDF step. Classic side: the draw in
+  `DiscreteTransition::react` moved verbatim into `selectTransitionChannel` (same operations in
+  the same order, so RNG and results are unchanged; every CTest passed after it).
+- [x] `Trech.Methods.Arbiter` (4 theorems): bias–variance split of the weighted squared score,
+  the mean minimises it (strictly for positive weight), `log(error + floor)` keeps the order.
+- [x] `Trech.Methods.Lattice.advectedEquilibrium_sum`: the scalar equilibrium carries the cell
+  value; with the existing collision and streaming theorems it gives the scalar-lattice pair.
+- [x] Engine call site: `Lattice::checkLaws` (end of `build()`), stored in `lawChecks()` and
+  traced at info under `formal` (warn when a check fails). Moving walls and Dirichlet links
+  record "not conservative by design".
+- [x] Conformance (`trech_formal_laws`): `selectTransitionChannel` over 2^20 grid draws in four
+  hazard/score cases matches `h·s_c/S` within 2/2^20 (8.7e-7 seen); the arbiter with a biased
+  fallback ends with the unbiased method leading and lowest in `rmse_common`; a walled D2Q5
+  lattice with an obstacle and prescribed advection keeps its total over 400 steps (1.6e-14
+  relative seen, 1e-13 allowed) while a Dirichlet copy does not (negative control).
+- [x] Audit: 19 distinct theorems (shared ones now audited once), all on the standard axioms;
+  `--report` writes `trech_lean_audit_v1`. Full CTest in `build/rel`: 80/80 passed.
+- [ ] Open: the provenance and output location (draft below), the next inventory items, and
+  the arbiter's cross-call ranking, all queued above. Verified on macOS arm64 only.
+
+## Provenance design draft — 2026-11-22
+
+For owner review; nothing below is implemented. It answers the P1 item: what a run records
+when it performs a law check, and where the records go.
+
+1. **Run outputs.** A run that performs at least one law check writes a `law_checks` array in
+   its `run_end` record of `trech_scores.jsonl`: one `LawCheck` JSON each (the current
+   `toJson()` shape plus `origin`: `engine` for `Lattice::checkLaws`, `validation` for a
+   companion's `TRECH_FORMAL_LAWS` call). A run without checks writes no key, so existing
+   outputs keep their bytes. Lattices built several times in a run record each distinct check
+   once, with a count.
+2. **Provenance.** The same run adds a `formal` object to its provenance record, again only when
+   a check ran: the SHA-256 of `formal/laws.json`, the declarations cited by its checks and,
+   when an audit report is supplied (`--formal-audit PATH` or `TRECH_FORMAL_AUDIT`), that
+   report's `lean_version`, `toolchain`, `mathlib_revision`, module hashes and `passed`. Without
+   a report, `lean_status` stays `not_checked_by_this_check`; the run never invokes Lean.
+3. **Config.** No config field: law checks are not a scenario choice and must not change the
+   config hash. A companion's checks are part of the validation companion, which already sits
+   off the decision path.
+4. **Companion output.** A validation companion that wants recorded verdicts gets an
+   executable hook (for example `onValidate(ctx)` beside its JSON contract) whose returned
+   `LawCheck` records land in `law_checks` with `origin: "validation"`. It runs under the
+   `validation` trace role and cannot emit physical fields.
+5. **Tests.** Round-trip: a scenario without checks keeps its config hash and output bytes; a
+   lattice scenario gains only `law_checks` and `formal`; strict replay stays byte-identical.
+

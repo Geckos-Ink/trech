@@ -286,7 +286,9 @@ the single-model path; **`StateEvolution`/`ctx.evolve` is the per-element OPERAT
 mechanism for moving a scenario's hand-written per-element rate law behind engine inference
 (mechanism shipped + tested). **`DiscreteTransition`/`ctx.react` is the integer stochastic
 operator path**: learned hazards, engine-owned seeded channel choice, availability, exact declared
-conservation and atomic mutation. **`PairInteraction`/`ctx.interact` is the pair/neighbour path**
+conservation and atomic mutation. Its channel choice is the pure `selectTransitionChannel`
+(`DiscreteTransition.hpp`), proved in Lean to fire channel `c` with probability `h·s_c/S`
+(`Trech.Methods.Transition`, [formal laws](../formal/AGENTS.md)); keep every draw going through it. **`PairInteraction`/`ctx.interact` is the pair/neighbour path**
 (mechanism shipped + tested 2026-08-15; **no scenario migrated onto it yet**): deterministic cell
 list, canonical `(a,b)` enumeration, caller-declared symmetry applied equal-and-opposite,
 persistent bond state, `pairs × stages` accounting — the prerequisite for moving the MD force loop,
@@ -357,7 +359,9 @@ expert or delegates to the pooled model. See the
 domain-free selection among prediction methods. A path that owns several ways to predict the same
 quantity (algorithms, learned operators, surrogate networks, baselines, and any method added
 later) passes per-element context and one prediction per method; NaN means the method abstains
-there. The arbiter works as follows:
+there. Its squared-error grading is a strictly proper score for the mean and its
+`log(error + floor)` ranking keeps the error order (Lean pair `Trech.Methods.Arbiter`; a change of
+score must keep both or update the pair). The arbiter works as follows:
 - one `DomainLearner` per method learns that method's log error from the elements it predicted;
 - the method with the lowest predicted error is chosen, but only under the learned policy, and an
   element leaves the recent leader only when the advantage exceeds the error learners' own

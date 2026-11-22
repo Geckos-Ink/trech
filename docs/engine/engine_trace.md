@@ -57,13 +57,14 @@ Each level includes everything below it.
 | --- | --- |
 | `off` | Nothing (default). |
 | `summary` | Only the attribution summaries: one per batch and one for the run (counters are kept, no per-call records). |
-| `info` | Run start (mode, models declared and loaded), each model load **or miss**, method-arbiter leader changes, hook exceptions, `ctx.log`/`TRECH_LOG` notes. |
+| `info` | Run start (mode, models declared and loaded), each model load **or miss**, method-arbiter leader changes, lattice law-hypothesis checks, hook exceptions, `ctx.log`/`TRECH_LOG` notes. |
 | `debug` | One record per hook invocation (engine calls, engine-backed calls, emits by tag, `ctx.authored` reports) and per method-arbiter step (policy, leader, methods selected, RMSE). |
 | `trace` | One record per `ctx.*` inference call with digests of its arguments and result. This level is large: filter it by category. |
 
 ### Categories
 
-`run`, `model`, `hook`, `scenario`, `authored`, `arbiter`, and one per inference entry point:
+`run`, `model`, `hook`, `scenario`, `authored`, `arbiter`, `formal` (law-hypothesis checks the engine runs
+once per built lattice; see [formal laws](formal_laws.md)), and one per inference entry point:
 `predict`, `cascade`, `evolve`, `react`, `interact`, `lift`, `detectDomains`, `learnDomains`,
 `evolveField`. The simulation and learning libraries have their own: `geant4`, `geant4_track`
 and `geant4_step` ([Geant4](#geant4-what-was-simulated-and-how)), `torch`

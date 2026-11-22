@@ -8,12 +8,18 @@ fails the check. Needs ``lake`` matching ``formal/lean-toolchain`` and the Mathl
 (``lake exe cache get``). Used by the opt-in CTest ``trech_formal_lean_build``
 (``-DTRECH_ENABLE_LEAN_CHECK=ON``).
 
-    python3 scripts/check_lean_laws.py [--lake PATH]
+``--report PATH`` also writes the audit as JSON (schema ``trech_lean_audit_v1``): the Lean
+version, the toolchain and Mathlib revision, the SHA-256 of ``formal/laws.json`` and of every
+Lean module it lists, and each declaration's laws and axioms. It is the identity a run that
+cites a Lean verdict would record; nothing in the engine reads it yet.
+
+    python3 scripts/check_lean_laws.py [--lake PATH] [--report PATH]
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -29,6 +35,7 @@ STANDARD = {"propext", "Classical.choice", "Quot.sound"}
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--lake", default="lake", help="lake executable (default: lake on PATH)")
+    parser.add_argument("--report", type=Path, help="write the audit as JSON (trech_lean_audit_v1)")
     args = parser.parse_args(argv)
 
     build = subprocess.run([args.lake, "build"], cwd=FORMAL, text=True, capture_output=True)
@@ -41,7 +48,12 @@ def main(argv: list[str] | None = None) -> int:
         print(line)
 
     laws = json.loads((FORMAL / "laws.json").read_text(encoding="utf-8"))["laws"]
-    declarations = [d for law in laws for d in law["lean"]["declarations"]]
+    # A theorem shared by several laws (relaxTRT_sum_eq) is audited once; dict keeps the order.
+    laws_of: dict[str, list[str]] = {}
+    for law in laws:
+        for d in law["lean"]["declarations"]:
+            laws_of.setdefault(d, []).append(law["id"])
+    declarations = list(laws_of)
     with tempfile.TemporaryDirectory() as scratch:
         probe = Path(scratch) / "Axioms.lean"
         probe.write_text("import Trech\n" + "".join(f"#print axioms {d}\n" for d in declarations),
@@ -72,7 +84,40 @@ def main(argv: list[str] | None = None) -> int:
             print(f"     non-standard axioms: {sorted(extra)}", file=sys.stderr)
             failures += 1
     print(f"{len(declarations) - failures}/{len(declarations)} theorems proved from standard axioms only")
+    if args.report:
+        write_report(args.report, args.lake, laws, laws_of, found, failures == 0)
+        print(f"report: {args.report}")
     return 1 if failures else 0
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def write_report(path: Path, lake: str, laws: list[dict], laws_of: dict[str, list[str]],
+                 found: dict[str, set[str]], passed: bool) -> None:
+    version = subprocess.run([lake, "env", "lean", "--version"], cwd=FORMAL, text=True,
+                             capture_output=True).stdout.strip()
+    mathlib = subprocess.run(["git", "-C", str(ROOT / "thirds" / "mathlib4"), "rev-parse", "HEAD"],
+                             text=True, capture_output=True).stdout.strip()
+    modules = sorted({law["lean"]["file"] for law in laws})
+    report = {
+        "schema": "trech_lean_audit_v1",
+        "passed": passed,
+        "lean_version": version,
+        "toolchain": (FORMAL / "lean-toolchain").read_text(encoding="utf-8").strip(),
+        "mathlib_revision": mathlib,
+        "manifest": {"path": "formal/laws.json", "sha256": sha256(FORMAL / "laws.json")},
+        "modules": [{"path": m, "sha256": sha256(ROOT / m)} for m in modules],
+        "standard_axioms": sorted(STANDARD),
+        "declarations": [
+            {"name": d, "laws": laws_of[d], "axioms": sorted(found.get(d, [])),
+             "standard_only": d in found and not (found[d] - STANDARD)}
+            for d in laws_of
+        ],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

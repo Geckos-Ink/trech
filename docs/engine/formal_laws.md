@@ -8,12 +8,14 @@ statement written in Lean (a *theorem*) is accepted only with a proof that Lean'
 [Mathlib](https://github.com/leanprover-community/mathlib4) is the community library of
 mathematics written in Lean, from real analysis to linear algebra and probability.
 
-**Status (2026-11-22): three law pairs exist and their nine Lean proofs are verified.** The
+**Status (2026-11-22): six law pairs exist and their 19 Lean theorems are verified.** The
 classic code of each pair is checked against its Lean statement by an ordinary test, without
 Lean. The Lean files compile with Lean `v4.37.0-rc1` and the pinned Mathlib, and every theorem
 rests only on Lean's three standard axioms, so no step is assumed. The proofs are about real
 numbers: they do not by themselves prove the floating-point code correct (see below). TRECH
-does not link or run Lean, and no run output records a law check yet. The open work is in the
+does not link or run Lean. The engine itself now checks the lattice theorems' hypotheses each
+time it builds a lattice and reports them in the [engine trace](engine_trace.md), but no run
+output or provenance record carries a law check yet. The open work is in the
 [formal-laws roadmap](../../AGENTS/engine/formal/ROADMAP.md#priority-queue).
 
 ## What it is for
@@ -63,11 +65,37 @@ Lean file and theorems, and the classic sources.
 | Compton kinematics | `Trech.Laws.Compton`: the electron's share `T/E` lies between 0 and the Compton edge `2ε/(1+2ε)`, and equals the edge at back-scatter | `include/trech/sim/KleinNishina.hpp`, `js/trech_formal_laws.js` | 410 (energy, angle) samples respect the bound; the C++ and JavaScript values are bit-identical |
 | Beer–Lambert attenuation | `Trech.Laws.Attenuation`: survival `exp(-μx)` multiplies over consecutive paths, stays in (0, 1] and decreases with path length | `src/sim/AnalyticCrossCheck.cpp`, `js/trech_formal_laws.js` | `S(x+y)` against `S(x)·S(y)` on 20 path pairs, within a stated float tolerance |
 | Lattice mass conservation | `Trech.Methods.Lattice`: the collision keeps a cell's mass if the equilibrium does, a zero-sum source keeps it, streaming along a bijection keeps the total | `src/core/LatticeKinetic.cpp` | the theorems' hypotheses (velocity-set moments, opposite-direction table, streaming map) and the total mass over 300 forced steps on a periodic lattice |
+| Scalar lattice conservation | `Trech.Methods.Lattice.advectedEquilibrium_sum`: the advection-diffusion equilibrium carries the cell's value, so with the same collision and streaming theorems a scalar lattice with closed (zero-flux) walls keeps its total | `src/core/LatticeKinetic.cpp`, `src/core/LatticeContinuum.cpp` | the engine's own hypothesis checks on a walled lattice with an obstacle, and the scalar total over 400 advected steps; a Dirichlet wall (which adds scalar by design) is the counter-example |
+| Reaction step probabilities (`ctx.react`) | `Trech.Methods.Transition`: the engine's two-stage draw fires channel `c` with probability `h·s_c/S`; these are nonnegative and add up to the event hazard `h ≤ 1`, leaving `1 − h` for "no transition" | `selectTransitionChannel` in `src/ml/DiscreteTransition.cpp` | the engine's draw function swept over 2²⁰ evenly spaced draws for four hazard/score cases; each outcome's share matches its probability within 2/2²⁰ |
+| Method arbiter scoring | `Trech.Methods.Arbiter`: the squared error is minimised exactly by the mean prediction (a *strictly proper* score), and ranking by `log(error + floor)` keeps the error order | `src/ml/MethodArbiter.cpp` | 40 noisy graded calls with an unbiased method and two biased ones: the unbiased one scores lowest and leads, although the declared fallback is a biased one |
 
 The attenuation row shows why the real-versus-float caveat matters. Over the reals,
 `exp(-μ(x+y)) = exp(-μx)·exp(-μy)` exactly. In doubles the two sides differ by about two units
 in the last place, so the check states a tolerance of `2e-15` relative, and a second check
 that demands exact equality fails on purpose to keep that gap visible.
+
+Two of the new pairs state properties of engine methods rather than physical laws. In the
+reaction step, `h` is the chance that anything happens in the step and `s_c` is channel `c`'s
+score, with total `S`. One random number `u` between 0 and 1 decides: nothing happens when
+`u ≥ h`; otherwise `u` is rescaled and the channel whose share of the scores contains it fires.
+For example, with `h = 0.3` and scores `0.2, 0.5, 0.3`, the channels fire with probabilities
+`0.06, 0.15, 0.09` and nothing happens with probability `0.7`. The theorem proves this always
+gives a valid probability vector; the test confirms the engine's actual function produces it.
+
+A scoring rule is *proper* when a method scores best, on average, by predicting the true
+expected value instead of a shifted one. The arbiter grades methods by squared error, and the
+theorem proves that over any weighted set of references the mean prediction beats every
+other value by exactly `(total weight)·(shift)²`. So the arbiter cannot reward a biased
+method that happens to look stable. The theorem covers one weighted set of references; the
+arbiter's leader ranks by an average of log errors across calls, which it does not cover.
+
+The engine also runs the lattice hypothesis checks itself. Each time it builds a lattice for
+field evolution it checks the velocity set's moments, the opposite-direction table and the
+streaming table, once, without touching the populations. With tracing on
+(`--trace info:formal`), the [engine trace](engine_trace.md) gets one `formal` record per
+lattice listing each check. A failed check is always printed as a warning. A lattice with
+moving walls or fixed-value (Dirichlet) walls still passes, with a note that it adds mass or
+scalar by design, so the conservation theorems do not apply to it.
 
 Run the checks (both are part of the normal CTest suite):
 
@@ -97,9 +125,12 @@ python3 scripts/check_lean_laws.py
 ```
 
 The last command builds the package and prints one line per theorem with the axioms it uses,
-ending with `9/9 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
-an added axiom makes it fail. Configuring TRECH with `-DTRECH_ENABLE_LEAN_CHECK=ON` runs the
-same check as the CTest entry `trech_formal_lean_build`. More detail:
+ending with `19/19 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
+an added axiom makes it fail. Add `--report build/lean_audit.json` to also save the audit
+as JSON: the Lean version, toolchain and Mathlib revision, the SHA-256 hash of `laws.json` and
+of every Lean file, and each theorem's axioms. This is the identity a run would record once
+law checks reach the run outputs; nothing reads it yet. Configuring TRECH with
+`-DTRECH_ENABLE_LEAN_CHECK=ON` runs the same check as the CTest entry `trech_formal_lean_build`. More detail:
 [`formal/README.md`](../../formal/README.md).
 
 ## Get and update the sources

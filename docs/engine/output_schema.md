@@ -1136,7 +1136,7 @@ points at it through [`trace`](#trech_provenancejsonl). Each line is one record:
 | `schema` | string | `trech_trace_v1`. |
 | `seq` | integer | Order of writing within the file. With several Geant4 workers, the order across workers is not deterministic. |
 | `level` | string | `info`, `debug`, `trace` or `summary`. |
-| `cat` | string | Category: `trace`, `run`, `model`, `hook`, `scenario`, `authored`, `arbiter`, an inference entry point (`predict`, `cascade`, `evolve`, `react`, `interact`, `lift`, `detectDomains`, `learnDomains`, `evolveField`), `geant4`, `geant4_track`, `geant4_step`, `torch`, `numpy`, `arch`, `python` or `summary`. |
+| `cat` | string | Category: `trace`, `run`, `model`, `hook`, `scenario`, `authored`, `arbiter`, `formal`, an inference entry point (`predict`, `cascade`, `evolve`, `react`, `interact`, `lift`, `detectDomains`, `learnDomains`, `evolveField`), `geant4`, `geant4_track`, `geant4_step`, `torch`, `numpy`, `arch`, `python` or `summary`. |
 | `host` | string | `python` on records written by `trech_torch.trace`; absent on engine records. |
 | `msg` | string | A short description, the hook name, or the law name for `authored`. |
 | `severity` | string | `warn` or `error` for script warnings (`TRECH_TRACE.warn/error`, `console.warn/error`); absent otherwise. |
@@ -1161,6 +1161,12 @@ Payloads:
   `selected{method:count}`, `selected_from_learned_errors`, `unpredicted`, `graded`, `frozen`,
   and when graded `arbitrated_rmse`, `oracle_rmse`, `method_rmse`. A leader change (info) has
   `from`, `to`, `policy`, `methods`.
+- `formal` (info, once per built lattice): message `lattice law hypotheses checked`, or
+  `lattice law hypothesis failed` with `severity: "warn"` (printed on stderr even when the trace is
+  off); `cells`, `flow` and `scalar` (velocity-set names, `""` when absent) and `checks`, one
+  `LawCheck` record each (`law`, `lean_declaration`, `lean_status`, `kind`, `samples`,
+  `violations`, `max_abs_error`, `tolerance`, `passed`, `detail`). A lattice with moving walls or
+  Dirichlet links passes its streaming check with a `detail` saying it is not conservative by design.
 - `scenario`: the `data` passed to `ctx.log` / `TRECH_LOG`; `authored`: the `detail`.
 - `geant4`, `geant4_track`, `geant4_step`, `torch` and the Python categories: see the
   [engine trace guide](engine_trace.md#geant4-what-was-simulated-and-how) for each record. Records
