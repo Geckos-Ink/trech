@@ -1,6 +1,6 @@
 # Scenario catalog
 
-[Documentation home](../README.md) · [Scenario index](README.md) · [First run](../first_run.md) · [Preview gallery](../previews.md)
+[Documentation home](../README.md) · [Scenario index](README.md) · [Categories and pruning](categories.md) · [First run](../first_run.md) · [Preview gallery](../previews.md)
 
 Choose a question, then follow the scenario source and the evidence for its answer.
 Previews use the latest committed capture for each scenario. Click a still to play

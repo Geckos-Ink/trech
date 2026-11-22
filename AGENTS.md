@@ -62,6 +62,7 @@ never drawn.
   why it matters, and what readers need to do or understand. Define unfamiliar terms and
   use a concrete example when it helps readers apply or verify the change.
 - Update durable facts in the owning `AGENTS/…/AGENTS.md` and unfinished work in its paired `ROADMAP.md` in the same change. Parent/root files hold shared principles and navigation; update them when those change. Keep README/schema/dataflow docs aligned when their facts change.
+- **Keep the [scenario categories](docs/scenarios/categories.md) current.** When a scenario bundle is created, removed, or changed in content (physics, purity grade, validation cases, tests or the planned work that names it), update its category, rank, evidence and verdict, plus the summary counts, in the same change.
 - The [project workflow](AGENTS/project/AGENTS.md) owns detailed maintenance and handoff rules; references there to the shared handbook/roadmap mean this categorized collection. Do not grow the root files with component status or delivery history.
 - Documentation alone does not implement a capability. Change the owning C++ or Studio source, retain honest maturity labels, and record every residual/scaffold/missing validation in the owning roadmap's **Priority queue** with a priority key ([keys and implementation route](AGENTS/ROADMAP.md#priority-keys)).
 - Every caveat or gap in a final report is also a queued roadmap item (see the [project workflow](AGENTS/project/AGENTS.md)); chat is not tracking.
