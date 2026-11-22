@@ -76,9 +76,11 @@ class LabSession(QObject):
         scenario: Optional[Path] = None,
         params: Sequence[str] = (),
         watch: bool = False,
+        extra_args: Sequence[str] = (),
     ) -> bool:
         """Start ``trech lab``. ``scenario`` hosts that experiment's hooks live (``params`` are
-        ``--param`` arguments, ``watch`` adds ``--watch``); ``bootstrap`` is a config-only lab."""
+        ``--param`` arguments, ``watch`` adds ``--watch``); ``bootstrap`` is a config-only lab.
+        ``extra_args`` are appended as given (for example the engine trace's ``--trace``)."""
         if not self._engine.available:
             self.failed.emit(self._engine.describe())
             return False
@@ -102,6 +104,7 @@ class LabSession(QObject):
         if output_dir is not None:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
             args += ["--output", str(output_dir)]
+        args += list(extra_args)
 
         proc = QProcess(self)
         proc.setProcessChannelMode(QProcess.MergedChannels)

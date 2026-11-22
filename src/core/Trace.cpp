@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -42,6 +43,14 @@ struct State {
   std::map<std::string, HookTally> hooks;
   std::map<std::string, std::size_t> authored;
   std::map<std::string, bool> models;
+  std::map<std::string, double> counters;
+  struct Span {
+    std::string category, name, hook;
+    long long event = -1;
+    std::chrono::steady_clock::time_point start;
+  };
+  std::map<std::uint64_t, Span> spans;
+  std::uint64_t nextSpan = 0;
 };
 
 State& state() {
@@ -109,22 +118,27 @@ nlohmann::json digestImpl(const nlohmann::json& v, int depth, std::size_t& budge
 }
 
 void writeLocked(State& s, Level level, std::string_view category, std::string_view message,
-                 const nlohmann::json& data) {
+                 const nlohmann::json& data, std::string_view severity = {}) {
   nlohmann::json line = {{"schema", "trech_trace_v1"},
                          {"seq", ++s.seq},
                          {"level", levelName(level)},
                          {"cat", std::string(category)},
                          {"msg", std::string(message)}};
+  if (!severity.empty()) line["severity"] = std::string(severity);
   if (!tHook.empty()) line["hook"] = tHook;
   if (tEvent >= 0) line["event"] = tEvent;
   if (tStep >= 0) line["step"] = tStep;
   if (!data.is_null()) line["data"] = data;
   if (s.file.is_open()) {
+    // Flushed per record so a live reader (Studio's trace panel) sees it as it happens.
     s.file << line.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) << '\n';
+    s.file.flush();
   }
   if (s.options.toStderr) {
     std::ostringstream os;
-    os << "[trech:" << levelName(level) << "] " << category;
+    os << "[trech:" << levelName(level) << "] ";
+    if (!severity.empty()) os << severity << " ";
+    os << category;
     if (!tHook.empty()) {
       os << " " << tHook;
       if (tEvent >= 0) os << "#" << tEvent;
@@ -237,6 +251,8 @@ void configure(const Options& options) {
   s.hooks.clear();
   s.authored.clear();
   s.models.clear();
+  s.counters.clear();
+  s.spans.clear();
   s.finished = options.level == Level::Off;
   if (options.level != Level::Off && !options.path.empty()) {
     s.file.open(options.path, std::ios::out | std::ios::trunc);
@@ -278,7 +294,16 @@ Scope::~Scope() {
   tStep = previousStep_;
 }
 
-void record(Level level, std::string_view category, std::string_view message, nlohmann::json data) {
+void record(Level level, std::string_view category, std::string_view message, nlohmann::json data,
+            std::string_view severity) {
+  const bool loud = severity == "warn" || severity == "error";
+  if (loud && (level == Level::Off || !enabled(level, category))) {
+    std::ostringstream os;
+    os << "TRECH js " << severity << ": " << message;
+    if (!data.is_null()) os << " " << data.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    std::cerr << os.str() << '\n';
+    return;
+  }
   if (level == Level::Off || !enabled(level, category)) return;
   auto& s = state();
   std::lock_guard<std::mutex> lock(s.mutex);
@@ -289,7 +314,42 @@ void record(Level level, std::string_view category, std::string_view message, nl
     return;
   }
   ++n;
-  writeLocked(s, level, category, message, data);
+  writeLocked(s, level, category, message, data, severity);
+}
+
+void countScript(std::string_view name, double amount) {
+  if (!active()) return;
+  auto& s = state();
+  std::lock_guard<std::mutex> lock(s.mutex);
+  s.counters[std::string(name)] += amount;
+}
+
+std::uint64_t spanBegin(std::string_view category, std::string_view name) {
+  if (!enabled(Level::Debug, category)) return 0;
+  auto& s = state();
+  std::lock_guard<std::mutex> lock(s.mutex);
+  const std::uint64_t id = ++s.nextSpan;
+  s.spans[id] = {std::string(category), std::string(name), tHook, tEvent,
+                 std::chrono::steady_clock::now()};
+  return id;
+}
+
+void spanEnd(std::uint64_t id, nlohmann::json data) {
+  if (id == 0) return;
+  State::Span span;
+  {
+    auto& s = state();
+    std::lock_guard<std::mutex> lock(s.mutex);
+    const auto it = s.spans.find(id);
+    if (it == s.spans.end()) return;
+    span = std::move(it->second);
+    s.spans.erase(it);
+  }
+  const double ms =
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - span.start).count();
+  nlohmann::json payload = {{"span", span.name}, {"duration_ms", ms}};
+  if (!data.is_null()) payload["data"] = std::move(data);
+  record(Level::Debug, span.category, span.name, std::move(payload));
 }
 
 void countCall(std::string_view call, std::string_view outcome) {
@@ -385,6 +445,7 @@ nlohmann::json summary() {
                         {"authored", authored}, {"models", models}, {"verdict", verdict(totals)}};
   if (!missing.empty()) out["models_missing"] = missing;
   if (!s.suppressed.empty()) out["suppressed_records"] = s.suppressed;
+  if (!s.counters.empty()) out["counters"] = s.counters;
   return out;
 }
 
@@ -400,6 +461,7 @@ void finish() {
                            {"cat", "summary"},           {"msg", "run attribution summary"},
                            {"data", report}};
     s.file << line.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) << '\n';
+    s.file.flush();
   }
   // A short human table on stderr: the answer to "engine or authored?" without opening a file.
   std::ostringstream os;
@@ -418,6 +480,11 @@ void finish() {
   }
   for (const auto& [law, n] : report.at("authored").items()) {
     os << "  authored " << law << ": " << n.dump() << '\n';
+  }
+  if (report.contains("counters")) {
+    for (const auto& [name, n] : report.at("counters").items()) {
+      os << "  counter " << name << ": " << n.dump() << '\n';
+    }
   }
   if (report.contains("models_missing")) {
     os << "  models missing (ctx.predict/cascade return null for them): "

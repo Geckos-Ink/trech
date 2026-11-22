@@ -310,6 +310,7 @@ trech_studio/
     parameters.py    #   `trech inspect` → typed TRECH_VALUE metadata
     runner.py        #   `trech run exp.js --output dir` (QProcess, streamed)
     lab.py           #   `trech lab` bridge (snapshots + adaptive-round telemetry)
+    trace_feed.py    #   live tail of trech_trace.jsonl, --trace arguments, display filter (Qt-free)
     outputs.py       #   parse an output dir → typed run results
   scene/             # the editable scenario model
     model.py         #   SceneModel (world, volumes, materials, beams, run)
@@ -322,6 +323,7 @@ trech_studio/
     main_window.py outliner.py inspector.py scenario_options.py code_editor.py console.py theme.py
     run_summary.py   #   sectioned, honesty-labelled run header (provenance/tallies/gaps)
     emits.py         #   tag-filtered hook-emit browser + "show on timeline"
+    trace_log.py     #   Engine trace panel: live engine log at the requested level
     scenarios.py     #   left-sidebar scenario tree (defaults to examples/)
     timeline.py      #   playback bar scrubbing the animation preview
 tests/               # headless unit tests (playback + appearance + offscreen Qt + capture/animation)
@@ -331,10 +333,33 @@ run_examples_suite.sh # run the example scenarios + capture PNG/MP4/GIF for vali
 
 Layering rule: `ui → scene/engine/render`, never the reverse. See the [project handbook](../AGENTS/studio/AGENTS.md#studio-desktop-ui).
 
+## Engine trace panel
+
+The **Engine trace** tab in the bottom dock shows the engine's verbose log while a run or a live
+lab is running. For what the engine records, see the [engine trace guide](../docs/engine/engine_trace.md).
+
+- **Level** and **Categories** set what Studio asks the engine to record. Studio passes them to
+  the next run or live lab as `--trace <level>[:<categories>] --trace-file <output>/trech_trace.jsonl`.
+  Studio remembers both settings. The default is `info`, and *Off* passes nothing.
+- The panel reads the file as the engine writes it (about four times per second). Each record
+  appears as a row with its level, category, hook and event, message and data. Select a row to
+  see the full record. Lowering the level, narrowing the categories or typing in the filter box
+  changes what is shown immediately. Raising the level applies from the next run, because a
+  running engine records only what it was asked for. Warnings, errors and the summary are
+  always shown.
+- When the run ends, the banner shows the **run attribution** verdict, for example
+  *"0 of 4 ctx inference calls returned an engine result … 3 of 3 emits came from hook calls with
+  no engine-backed inference"*. It also names any model that failed to load.
+- Opening a finished output directory loads its `trech_trace.jsonl`. If Studio was started with
+  `TRECH_TRACE` set, a run's trace is shown even when the panel is set to *Off*.
+
+`console.log`, `TRECH_TRACE.info(...)` and `ctx.log(...)` in a scenario all appear here under
+their categories (`console`, `script` or a channel name, `scenario`).
+
 ## Run summary + emits + scale ladder
 
-The bottom dock tabs are **Console** (the streamed `trech run` log), **Run summary**, **Emits** and
-**Scale ladder**.
+The bottom dock tabs are **Console** (the streamed `trech run` log), **Engine trace** (above),
+**Run summary**, **Emits** and **Scale ladder**.
 Run summary groups what the engine recorded for the loaded run — determinism mode and seed
 (a `predictive` run is flagged: its inferred results are not strict Geant4 tallies), physics list
 and config hash, Geant4's primary tallies (each fraction with a labelled binomial sampling error),

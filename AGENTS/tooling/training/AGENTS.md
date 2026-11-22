@@ -170,7 +170,11 @@ the orchestrator passes each run's provenance `config_hash`, so replays never st
 every key present; their plan is the v3 `network` block reduced to `[in, out, activation]` lists.
 Structures are canonical: a uniform per-layer spelling normalizes to `{width, depth,
 activation}` so identities predating per-layer plans are unchanged. `tools/ml/lib/` is Node-only.
-`load.js` evaluates definition files in a `vm` sandbox with a time limit. `store.js` is the
+`load.js` evaluates definition files in a `vm` sandbox with a time limit. The sandbox has
+`TRECH_TRACE`, `TRECH_LOG` and `console` from [`js/trech_trace.js`](../../../js/trech_trace.js)
+`createTrace` (level from `$TRECH_TRACE`, default info; warn/error always kept); the result's
+`logs` keeps one text line per record (the pre-trace format for plain `console.log`) and `records`
+the `trech_trace_v1` objects. `store.js` is the
 **only writer** of `trech_model_registry_v1`, with a lock and atomic index; `recordValidation`
 keeps validator reports under `validations/` and the verdict on the checkpoint. `orchestrate.js`
 spawns `trech_torch.train_surrogate` / `evolve_structure` / `validate_model` and registers their

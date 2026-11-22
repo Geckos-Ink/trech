@@ -142,6 +142,51 @@ test('the loader isolates files, reports error lines and times out runaway code'
   assert.match(noRequire.errors[0].message, /require is not defined/);
 });
 
+test('definition files log through TRECH_TRACE, TRECH_LOG and console in the loader', () => {
+  const dir = tmp();
+  const file = write(dir, 'logged.model.js', [
+    'const lib = TRECH_INCLUDE("trech_trace.js").channel("glass");  // host-neutral include: returns the host API',
+    'lib.info("widths", { w: 8 });',
+    'lib.debug("hidden at info");',
+    'TRECH_TRACE.warn("careful");',
+    'TRECH_LOG("note", { k: 1 });',
+    'console.log("plain", 2);',
+    'const n = TRECH_TRACE.span("plan", () => 3);',
+    'TRECH_ML.defineModel({name: "g", inputs: ["a"], outputs: ["y"], structure: {family: "linear"}});',
+  ].join('\n'));
+  fs.copyFileSync(path.join(__dirname, '..', '..', '..', 'js', 'trech_trace.js'), path.join(dir, 'trech_trace.js'));
+  const previous = process.env.TRECH_TRACE;
+  delete process.env.TRECH_TRACE;
+  try {
+    const s = summarize(evaluate(file));
+    assert.equal(s.ok, true, JSON.stringify(s.errors));
+    eq(s.logs, ['widths {"w":8}', 'warn: careful', 'note {"k":1}', 'plain 2']);
+    eq(s.records.map((r) => [r.level, r.cat, r.msg, r.severity || '']),
+      [['info', 'glass', 'widths', ''], ['info', 'script', 'careful', 'warn'], ['info', 'scenario', 'note', ''], ['info', 'console', 'plain 2', '']]);
+    process.env.TRECH_TRACE = 'debug:glass';
+    const d = summarize(evaluate(file));
+    eq(d.records.map((r) => r.msg), ['widths', 'hidden at info', 'careful'], 'category filter; warn always kept');
+  } finally {
+    if (previous === undefined) delete process.env.TRECH_TRACE; else process.env.TRECH_TRACE = previous;
+  }
+});
+
+test('plain Node gets the same TRECH_TRACE API from js/trech_trace.js', () => {
+  const lib = path.join(__dirname, '..', '..', '..', 'js', 'trech_trace.js');
+  const dir = tmp();
+  const out = path.join(dir, 'trace.jsonl');
+  const run = spawnSync(process.execPath, ['-e', `const T = require(${JSON.stringify(lib)});
+    const c = T.channel("atomic"); c.info("solved", { n: 3 }); c.trace("hidden"); c.count("x", 2);
+    T.authored("fallback_law"); process.stdout.write(JSON.stringify({ level: T.level(), host: T.host, s: T.summary(), v: c.span("s", () => 5) }));`],
+  { env: Object.assign({}, process.env, { TRECH_TRACE: 'debug', TRECH_TRACE_FILE: out, TRECH_TRACE_STDERR: '0' }), encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  const result = JSON.parse(run.stdout);
+  eq(result, { level: 'debug', host: 'node', s: { counters: { 'atomic.x': 2 }, authored: { fallback_law: 1 } }, v: 5 });
+  const records = fs.readFileSync(out, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  eq(records.map((r) => [r.schema, r.level, r.cat, r.msg]),
+    [['trech_trace_v1', 'info', 'atomic', 'solved'], ['trech_trace_v1', 'debug', 'authored', 'fallback_law'], ['trech_trace_v1', 'debug', 'atomic', 's']]);
+});
+
 test('store registers typed versions and refuses structure conflicts', () => {
   const ml = library();
   const dir = tmp();

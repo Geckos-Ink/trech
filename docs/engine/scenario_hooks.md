@@ -285,7 +285,10 @@ tracking action only when one of them is registered.
   that the value about to be used comes from a law the scenario wrote, such as a fallback after
   a `null` engine result. Each law is counted in the run attribution summary. Both return
   `undefined` and do nothing while tracing is off. They never change results, RNG or emits.
-  `TRECH_LOG(message, data?)` is the evaluation-time form of `ctx.log`.
+  `TRECH_LOG(message, data?)` is the evaluation-time form of `ctx.log`. For levels, channels,
+  counters, spans and `console`, use the global
+  [`TRECH_TRACE` API](engine_trace.md#log-from-any-javascript-trech_trace-and-console), which
+  works both at evaluation time and in hooks.
 - `ctx.materials`: when `materialProbe.enable` is active, named Geant4 material probes plus
   `.list` (density, electron density, element number densities, mean excitation energy,
   radiation length). This is serialized engine data, not a Geant4 object binding.

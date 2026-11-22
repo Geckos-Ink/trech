@@ -7,7 +7,7 @@ Layout (industry-standard editor shape):
     │ Code editor  │        (wgpu)             │              │
     └──────────────┴───────────────────────────┴──────────────┘
     │              Timeline                                    │
-    │   Console · Run summary · Emits (tabbed)                 │
+    │   Console · Engine trace · Run summary · Emits (tabbed)  │
     └──────────────────────────────────────────────────────────┘
 
 The window owns the engine bridge objects (locator + runner + lab session) and the current
@@ -53,6 +53,7 @@ from ..cascade import build_scale_ladder
 from ..spectra import is_spectrum_mode
 from .cascade import ScaleLadderPanel
 from .console import Console
+from .trace_log import TraceLogPanel
 from .emits import EmitInspector
 from .inspector import Inspector
 from .outliner import Outliner
@@ -102,6 +103,7 @@ class StudioWindow(QMainWindow):
         self._spectrum_job = SpectrumTrainingJob(settings.repo_root, self)
         self.models = ModelsPanel(settings.repo_root, settings.model_store, self)
         self.console = Console(self)
+        self.trace_log = TraceLogPanel(self)
         self.run_summary = RunSummaryPanel(self)
         self.emit_inspector = EmitInspector(self)
         self.scale_ladder = ScaleLadderPanel(self)
@@ -133,6 +135,8 @@ class StudioWindow(QMainWindow):
         console_dock = self._add_dock("Console", self.console, Qt.BottomDockWidgetArea)
         self._console_dock = console_dock
         self.splitDockWidget(timeline_dock, console_dock, Qt.Vertical)
+        trace_dock = self._add_dock("Engine trace", self.trace_log, Qt.BottomDockWidgetArea)
+        self._trace_dock = trace_dock
         summary_dock = self._add_dock("Run summary", self.run_summary, Qt.BottomDockWidgetArea)
         emits_dock = self._add_dock("Emits", self.emit_inspector, Qt.BottomDockWidgetArea)
         ladder_dock = self._add_dock("Scale ladder", self.scale_ladder, Qt.BottomDockWidgetArea)
@@ -140,7 +144,8 @@ class StudioWindow(QMainWindow):
         self._script_docks = {"options": options_dock, "scenario": self._code_dock,
                               "processes": processes_dock, "emits": emits_dock,
                               "scale_ladder": ladder_dock}
-        self.tabifyDockWidget(console_dock, summary_dock)
+        self.tabifyDockWidget(console_dock, trace_dock)
+        self.tabifyDockWidget(trace_dock, summary_dock)
         self.tabifyDockWidget(summary_dock, emits_dock)
         self.tabifyDockWidget(emits_dock, ladder_dock)
         self.tabifyDockWidget(ladder_dock, processes_dock)
@@ -256,6 +261,8 @@ class StudioWindow(QMainWindow):
         self._runner.stderr_line.connect(self.console.log_stderr)
         self._runner.finished.connect(self._on_run_finished)
         self._runner.failed.connect(lambda msg: self.console.log_stderr(f"run failed: {msg}"))
+        self._runner.finished.connect(lambda _code, _out: self.trace_log.finish())
+        self._live_lab.stopped.connect(lambda _code: self.trace_log.finish())
         self._live_lab.info.connect(self.console.log_info)
         self._live_lab.error.connect(lambda msg: self.console.log_stderr(f"live lab: {msg}"))
         self._live_lab.batch_finished.connect(lambda result: self.console.log_info(describe_batch(result)))
@@ -428,6 +435,10 @@ class StudioWindow(QMainWindow):
         self._loaded_run = result
         self._sync_model_browser()
         self._loaded_output_dir = output_dir
+        # An opened run's engine trace (a run still being followed keeps its live feed).
+        trace_file = self.trace_log.trace_path(output_dir)
+        if trace_file.exists() and not self.trace_log.is_following():
+            self.trace_log.load_file(trace_file)
         self.outliner.set_resolution_marks(geometry_resolution_marks(result))
         self._configure_scene_editing()
         self.processes.set_streams(result.emits)
@@ -874,7 +885,9 @@ class StudioWindow(QMainWindow):
         if not self._refresh_scenario_parameters(experiment, preserve_values=True):
             return
         out_dir = self.settings.output_root / f"studio_lab_{experiment.stem}_{uuid.uuid4().hex[:8]}"
-        self._live_lab.start(experiment, self.scenario_options.values(), out_dir)
+        if self._live_lab.start(experiment, self.scenario_options.values(), out_dir,
+                                extra_args=self.trace_log.command_args(out_dir)):
+            self.trace_log.begin(out_dir, f"live lab {experiment.name}")
 
     def _run_scenario(self) -> None:
         if not self._engine.available:
@@ -895,10 +908,13 @@ class StudioWindow(QMainWindow):
 
         out_dir = self.settings.output_root / f"studio_{experiment.stem}_{uuid.uuid4().hex[:8]}"
         self.console.log_info(f"running {experiment.name} -> {out_dir}")
-        self._runner.run(
+        started = self._runner.run(
             experiment, out_dir, extra_args=(self.scenario_options.command_args() + self._chemistry_command_args() +
-                                             self.adaptive_controls.command_args())
+                                             self.adaptive_controls.command_args() +
+                                             self.trace_log.command_args(out_dir))
         )
+        if started:
+            self.trace_log.begin(out_dir, experiment.name)
 
     def _on_run_finished(self, exit_code: int, output_dir: Path) -> None:
         if exit_code == 0:

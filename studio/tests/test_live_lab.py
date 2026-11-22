@@ -79,8 +79,9 @@ class _FakeSession(QObject):
     def is_active(self):
         return self.active
 
-    def start(self, scenario, params, output_dir, watch):
-        self.started_with = {"scenario": scenario, "params": list(params), "watch": watch}
+    def start(self, scenario, params, output_dir, watch, extra_args=()):
+        self.started_with = {"scenario": scenario, "params": list(params), "watch": watch,
+                             "extra_args": list(extra_args)}
         self.scenario = Path(scenario).resolve()
         self.active = True
         return True

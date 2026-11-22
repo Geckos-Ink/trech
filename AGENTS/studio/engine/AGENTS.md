@@ -25,6 +25,10 @@ or every scenario/backend compatibility. Each probe is synchronous with a three-
 Relative paths are normalized at `EngineLocation` construction before subprocess cwd changes.
 Missing/nonexecutable explicit choices report their path without fallback. Tests: `test_engine_locator.py`.
 `runner.py` (`EngineRunner`, `RunResult`) runs `trech run` and returns the output dir.
+`LabSession.start(..., extra_args)` / `LiveScenarioLab.start(..., extra_args)` append arguments as
+given (the Engine trace panel's `--trace`). `trace_feed.py` (Qt-free) builds `--trace` arguments
+and tails `trech_trace.jsonl` incrementally (partial last line kept, restart on truncation or a
+replaced file).
 
 ##### [`studio/trech_studio/engine/outputs.py`](../../../studio/trech_studio/engine/outputs.py) · [`parameters.py`](../../../studio/trech_studio/engine/parameters.py) · [`lab.py`](../../../studio/trech_studio/engine/lab.py) · [`live_lab.py`](../../../studio/trech_studio/engine/live_lab.py)
 

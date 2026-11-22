@@ -83,9 +83,20 @@ struct Scope {
   long long previousStep_;
 };
 
-// Writes one record when `enabled(level, category)`. `data` may be null.
+// Writes one record when `enabled(level, category)`. `data` may be null. A `severity` of
+// "warn" or "error" is stamped on the record; when the level or category is not recorded, such a
+// record is printed on stderr instead (`TRECH js warn: ...`), so a script's warnings are never silently lost.
 void record(Level level, std::string_view category, std::string_view message,
-            nlohmann::json data = nullptr);
+            nlohmann::json data = nullptr, std::string_view severity = {});
+
+// Named counters a script increments (TRECH_TRACE.count); listed in the summary as `counters`.
+void countScript(std::string_view name, double amount);
+
+// Timed spans (TRECH_TRACE.span). begin returns an opaque id (0 when the category is off);
+// end writes one debug record with the wall-clock duration. The duration only ever reaches the
+// trace file, never the script, so a span cannot feed wall time back into a run.
+std::uint64_t spanBegin(std::string_view category, std::string_view name);
+void spanEnd(std::uint64_t id, nlohmann::json data = nullptr);
 
 // Attribution counters for the run summary (kept at every level above Off).
 void countCall(std::string_view call, std::string_view outcome);

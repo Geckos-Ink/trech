@@ -66,7 +66,14 @@ are pure (no Qt) and unit-tested headless. `settings.py` holds app settings.
 
 [`outliner.py`](../../../studio/trech_studio/ui/outliner.py), [`inspector.py`](../../../studio/trech_studio/ui/inspector.py),
 [`code_editor.py`](../../../studio/trech_studio/ui/code_editor.py) (JS editor + Run), [`console.py`](../../../studio/trech_studio/ui/console.py)
-(log stream only), [`run_summary.py`](../../../studio/trech_studio/ui/run_summary.py) (sectioned run header from
+(log stream only), [`trace_log.py`](../../../studio/trech_studio/ui/trace_log.py) (**Engine trace** bottom tab,
+2026-11-22: its Level/Categories become `--trace`/`--trace-file` for the next run and live lab via
+`command_args`; `begin`/`poll`/`finish` tail `<output>/trech_trace.jsonl` through the Qt-free
+[`engine/trace_feed.py`](../../../studio/trech_studio/engine/trace_feed.py) `TraceTail`; display-only
+`TraceFilter` (level, categories, search; summary and warn/error always shown); the summary's
+`verdict` goes to the banner; Level/Categories persist in `QSettings("TRECH","Studio")` under
+`trace/*`; an opened output dir loads its trace; tests `studio/tests/test_trace_log.py` incl. a real
+engine run), [`run_summary.py`](../../../studio/trech_studio/ui/run_summary.py) (sectioned run header from
 `studio/trech_studio/run_summary.py`), [`emits.py`](../../../studio/trech_studio/ui/emits.py) (tag-filtered hook-emit browser;
 payload arrays are truncated for **display** with a note, and "Show on timeline" maps the n-th emit
 of the played tag to the n-th emitted frame's own time — the timeline stays the only clock),

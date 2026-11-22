@@ -35,6 +35,14 @@ Read the root principles and the parent handbook first; then open only the subca
   present and do nothing while off. `loadDeclaredModels` reports each model as loaded or missing.
   Both JS engines compile the same code (template function pointers, no `JS_NewCFunctionData`,
   which the V8 shim lacks).
+- **Script logging API (2026-11-22).** `installTraceHelpers` (constructor, after the value
+  helpers) registers the `__TRECH_TRACE_*` primitives (`RECORD`, `ENABLED`, `LEVEL`, `COUNT`,
+  `SPAN_BEGIN`/`SPAN_END`, `AUTHORED`) and evaluates `kTrechTraceBootstrap`, which builds the frozen
+  `TRECH_TRACE` (channels, levels, `warn`/`error` severity, `enabled`, `count`, `span`, `level`,
+  `authored`, `host: "trech"`) and replaces `console` on both engines (category `console`). The
+  primitives return only undefined, booleans, the level name or an opaque span id; durations stay
+  in the trace. `trech_engine_trace` runs the API scenario on QuickJS and, in a V8 build, on V8
+  and requires identical records (minus span durations and the file path) and emits.
 
 - **Dispatch trust counts remain separate.** `HookDispatchReport.starvedCount` and
   `scaleMismatchCount` count successful evaluations across all five inference APIs, independently

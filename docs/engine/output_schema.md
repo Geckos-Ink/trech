@@ -1130,6 +1130,7 @@ only. It is not part of provenance and does not enter the config hash. Each line
 | `level` | string | `info`, `debug`, `trace` or `summary`. |
 | `cat` | string | Category: `trace`, `run`, `model`, `hook`, `scenario`, `authored`, `arbiter`, an inference entry point (`predict`, `cascade`, `evolve`, `react`, `interact`, `lift`, `detectDomains`, `learnDomains`, `evolveField`) or `summary`. |
 | `msg` | string | A short description, the hook name, or the law name for `authored`. |
+| `severity` | string | `warn` or `error` for script warnings (`TRECH_TRACE.warn/error`, `console.warn/error`); absent otherwise. |
 | `hook`, `event`, `step` | string, integer, integer | The hook invocation that wrote the record (omitted outside a hook, or when not applicable). |
 | `data` | object | The record's payload, described below. |
 
@@ -1151,12 +1152,15 @@ Payloads:
   and when graded `arbitrated_rmse`, `oracle_rmse`, `method_rmse`. A leader change (info) has
   `from`, `to`, `policy`, `methods`.
 - `scenario`: the `data` passed to `ctx.log` / `TRECH_LOG`; `authored`: the `detail`.
+- `script`, `console` and channel categories (`TRECH_TRACE.channel(name)`): the `data` passed.
+  A span record has `{span, duration_ms, data?}`.
 - `summary` (always the last line): `totals{calls, engine_backed, emits,
   emits_without_inference, authored_reports, <outcome>...}`, `calls{<call>:{<outcome>:n,
   total}}`, `hooks{<hook>:{invocations, invocations_with_engine, engine_calls,
   engine_backed_calls, emits, emits_without_inference}}`, `authored{<law>:n}`,
   `models{<name>:"loaded"|"missing"}`, `models_missing` when any, `suppressed_records` when a
-  category reached its cap, and a plain-language `verdict`.
+  category reached its cap, `counters{<channel>.<name>:n}` when a script counted, and a
+  plain-language `verdict`.
 
 ## trech_event_scores.jsonl
 

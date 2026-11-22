@@ -6319,6 +6319,157 @@ static void setInferenceFunction(JSContext* ctx, JSValueConst contextObj, int le
                     JS_NewCFunction(ctx, traced ? &jsTracedCall<Inner, Call> : Inner, Call, length));
 }
 
+// ---- TRECH_TRACE: the script logging and tracing API ----------------------------------------
+// The same functions exist in every host that evaluates TRECH JavaScript: QuickJS and V8 (this
+// host code, shared by both engines), the Node model-definition loader (tools/ml/lib/load.js)
+// and plain Node through js/trech_trace.js. Nothing here returns engine state, wall time or
+// anything a script could feed back into a result: every primitive returns undefined, a boolean,
+// the configured level name or an opaque span id.
+
+static trech::trace::Level traceLevelArg(JSContext* ctx, int argc, JSValueConst* argv, int index) {
+  const std::string name = traceStringArg(ctx, argc, argv, index, "info");
+  try {
+    const auto level = trech::trace::parseLevel(name);
+    return level == trech::trace::Level::Off ? trech::trace::Level::Info : level;
+  } catch (const std::exception&) {
+    return trech::trace::Level::Info;
+  }
+}
+
+// __TRECH_TRACE_RECORD(level, category, message, data?, severity?)
+static JSValue jsTraceRecord(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  const auto level = traceLevelArg(ctx, argc, argv, 0);
+  const std::string category = traceStringArg(ctx, argc, argv, 1, "script");
+  const std::string severity = argc > 4 && !JS_IsUndefined(argv[4]) ? traceStringArg(ctx, argc, argv, 4, "") : "";
+  const bool loud = severity == "warn" || severity == "error";
+  if (!loud && !trech::trace::enabled(level, category)) return JS_UNDEFINED;
+  trech::trace::record(level, category, traceStringArg(ctx, argc, argv, 2, ""),
+                       traceLogPayload(ctx, argc, argv, 3), severity);
+  return JS_UNDEFINED;
+}
+
+// __TRECH_TRACE_ENABLED(level, category) -> boolean: lets a script skip building a payload.
+static JSValue jsTraceEnabled(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  return JS_NewBool(ctx, trech::trace::enabled(traceLevelArg(ctx, argc, argv, 0),
+                                               traceStringArg(ctx, argc, argv, 1, "script")));
+}
+
+// __TRECH_TRACE_LEVEL() -> "off" | "summary" | "info" | "debug" | "trace"
+static JSValue jsTraceLevel(JSContext* ctx, JSValueConst, int, JSValueConst*) {
+  return JS_NewString(ctx, trech::trace::levelName(trech::trace::options().level));
+}
+
+// __TRECH_TRACE_COUNT(name, amount)
+static JSValue jsTraceCount(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  if (!trech::trace::active()) return JS_UNDEFINED;
+  double amount = 1.0;
+  if (argc > 1 && JS_IsNumber(argv[1])) JS_ToFloat64(ctx, &amount, argv[1]);
+  trech::trace::countScript(traceStringArg(ctx, argc, argv, 0, "unnamed"), amount);
+  return JS_UNDEFINED;
+}
+
+// __TRECH_TRACE_SPAN_BEGIN(category, name) -> opaque id (0 when not recorded)
+static JSValue jsTraceSpanBegin(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  if (!trech::trace::active()) return JS_NewInt32(ctx, 0);
+  const auto id = trech::trace::spanBegin(traceStringArg(ctx, argc, argv, 0, "script"),
+                                          traceStringArg(ctx, argc, argv, 1, "span"));
+  return JS_NewFloat64(ctx, static_cast<double>(id));
+}
+
+// __TRECH_TRACE_SPAN_END(id, data?)
+static JSValue jsTraceSpanEnd(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  double id = 0.0;
+  if (argc < 1 || !JS_IsNumber(argv[0]) || JS_ToFloat64(ctx, &id, argv[0]) != 0 || id <= 0.0) {
+    return JS_UNDEFINED;
+  }
+  trech::trace::spanEnd(static_cast<std::uint64_t>(id), traceLogPayload(ctx, argc, argv, 1));
+  return JS_UNDEFINED;
+}
+
+static constexpr const char* kTrechTraceBootstrap = R"JS(
+(function(global) {
+  var record = global.__TRECH_TRACE_RECORD;
+  var enabled = global.__TRECH_TRACE_ENABLED;
+  function text(value) {
+    if (typeof value === "string") return value;
+    if (value === undefined) return "undefined";
+    if (value !== null && typeof value === "object") {
+      try { return JSON.stringify(value); } catch (e) { return String(value); }
+    }
+    return String(value);
+  }
+  function channel(category) {
+    category = String(category === undefined ? "script" : category);
+    function at(level, severity) {
+      return function(message, data) { record(level, category, text(message), data, severity); };
+    }
+    var api = {
+      category: category,
+      info: at("info", ""),
+      log: at("info", ""),
+      debug: at("debug", ""),
+      trace: at("trace", ""),
+      warn: at("info", "warn"),
+      error: at("info", "error"),
+      enabled: function(level) { return enabled(level === undefined ? "info" : String(level), category); },
+      count: function(name, amount) {
+        global.__TRECH_TRACE_COUNT(category + "." + String(name), amount === undefined ? 1 : Number(amount));
+      },
+      span: function(name, fn, data) {
+        if (typeof fn !== "function") throw new TypeError("TRECH_TRACE.span(name, fn) needs a function");
+        var id = global.__TRECH_TRACE_SPAN_BEGIN(category, String(name));
+        try { return fn(); } finally { global.__TRECH_TRACE_SPAN_END(id, data); }
+      }
+    };
+    return api;
+  }
+  var root = channel("script");
+  root.channel = function(category) { return Object.freeze(channel(category)); };
+  root.level = function() { return global.__TRECH_TRACE_LEVEL(); };
+  root.authored = function(law, detail) { global.__TRECH_TRACE_AUTHORED(law, detail); };
+  root.host = "trech";
+  global.TRECH_TRACE = Object.freeze(root);
+  // console.* routes into the trace (category "console") on QuickJS and V8 alike, so a script
+  // logs the same way in Node, in the browser and in TRECH. warn/error reach stderr even with
+  // the trace off.
+  function consoleAt(level, severity) {
+    return function() {
+      var parts = [];
+      for (var i = 0; i < arguments.length; i++) parts.push(text(arguments[i]));
+      record(level, "console", parts.join(" "), undefined, severity);
+    };
+  }
+  global.console = Object.freeze({
+    log: consoleAt("info", ""), info: consoleAt("info", ""), debug: consoleAt("debug", ""),
+    trace: consoleAt("trace", ""), warn: consoleAt("info", "warn"), error: consoleAt("info", "error")
+  });
+})(globalThis);
+)JS";
+
+static void installTraceHelpers(JSContext* ctx) {
+  JSValue global = JS_GetGlobalObject(ctx);
+  JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_RECORD", JS_NewCFunction(ctx, jsTraceRecord, "__TRECH_TRACE_RECORD", 5));
+  JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_ENABLED", JS_NewCFunction(ctx, jsTraceEnabled, "__TRECH_TRACE_ENABLED", 2));
+  JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_LEVEL", JS_NewCFunction(ctx, jsTraceLevel, "__TRECH_TRACE_LEVEL", 0));
+  JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_COUNT", JS_NewCFunction(ctx, jsTraceCount, "__TRECH_TRACE_COUNT", 2));
+  JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_SPAN_BEGIN", JS_NewCFunction(ctx, jsTraceSpanBegin, "__TRECH_TRACE_SPAN_BEGIN", 2));
+  JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_SPAN_END", JS_NewCFunction(ctx, jsTraceSpanEnd, "__TRECH_TRACE_SPAN_END", 2));
+  JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_AUTHORED", JS_NewCFunction(ctx, jsTraceAuthored, "__TRECH_TRACE_AUTHORED", 2));
+  JS_FreeValue(ctx, global);
+  JSValue result = JS_Eval(ctx, kTrechTraceBootstrap, std::strlen(kTrechTraceBootstrap),
+                           "<TRECH_TRACE>", JS_EVAL_TYPE_GLOBAL);
+  if (JS_IsException(result)) {
+    JSValue exc = JS_GetException(ctx);
+    const char* msg = JS_ToCString(ctx, exc);
+    std::string err = msg ? msg : "TRECH_TRACE bootstrap failed";
+    if (msg) JS_FreeCString(ctx, msg);
+    JS_FreeValue(ctx, exc);
+    JS_FreeValue(ctx, result);
+    throw std::runtime_error(err);
+  }
+  JS_FreeValue(ctx, result);
+}
+
 JsRuntime::JsRuntime() : impl_(new Impl) {
   impl_->rt = JS_NewRuntime();
   impl_->ctx = JS_NewContext(impl_->rt);
@@ -6347,6 +6498,7 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
   JS_FreeValue(impl_->ctx, global);
   installFlowHelpers(impl_->ctx);
   installValueHelpers(impl_->ctx);
+  installTraceHelpers(impl_->ctx);
 }
 
 JsRuntime::~JsRuntime() {

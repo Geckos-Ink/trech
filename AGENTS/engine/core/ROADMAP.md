@@ -19,12 +19,30 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R3 · Engine trace adoption: the trace sees a `null` engine result but not the authored law the scenario runs next. Add `ctx.authored(law)` at every residual-law fallback in the migration ledger (scenario purity report), then cross-check the static ledger against runtime `authored` counts per scenario in the validation suite. ([engine trace](#engine-trace-2026-11-22))
 - **P2** · R4 · Engine trace depth: attribution is per hook invocation, not per emitted value (an invocation with one engine call and one unreported authored law counts as engine-backed). Carry value-level origin (lineage) into emit records, and trace the inner decisions of `RivalArbitration` (evolve/react/cascade/interact rivals), cascade stages and `ctx.evolve` operator routing as their own categories instead of only the `trace`-level result digest. ([engine trace](#engine-trace-2026-11-22))
 - **P2** · R1 · Engine trace and provenance: record the trace summary (or its path and digest) in `run_end` provenance when tracing is on, and split the summary per `trech lab` batch (today one summary covers the session); keep it out of the config hash. ([engine trace](#engine-trace-2026-11-22))
-- **P2** · R6 · Studio engine trace: a launch option that passes `--trace`, and a panel that shows the attribution summary and the `emits_without_inference` hooks of a run beside its playback (today Studio only inherits `TRECH_TRACE`). ([engine trace](#engine-trace-2026-11-22))
+- **P2** · R6 · Studio engine trace residuals: link a trace row to its emit/timeline frame (`hook`+`event` → Emits tab), add a per-hook attribution view of the summary (`emits_without_inference` per hook), and change the level of a running live lab (today it applies from the next start). No committed reference capture of the panel yet. ([script logging and Studio panel](#script-logging-and-studio-trace-panel-2026-11-22))
+- **P2** · R3 · Script logging adoption: the shared `js/` libraries and scenario companions do not use `TRECH_TRACE` channels yet; give each library a channel (process runtime, domain learning, chemistry, foam, water MD) at its authored-law and fallback points, next to the `ctx.authored` adoption above. ([script logging and Studio panel](#script-logging-and-studio-trace-panel-2026-11-22))
 - **P3** · R5 · Engine trace Geant4 categories: physics list/process registration, per-run process tallies and geometry resolution as `geant4` trace records, so the base-of-truth side of a run is as visible as the inference side. ([engine trace](#engine-trace-2026-11-22))
 - **P2** · R1 · Runtime (non-`onInit`) hooks cannot patch config, so ignored-override reporting covers `onInit` only; decide whether later hooks may patch at all before extending it. (dated records below)
 - **P2** · R5 · Sweep the three PubChem-dependent scenarios (`beaker_water_n_pentane`, its Studio variant, `testscenario_h2o_electrolysis_combustion`) through inspect/type/unknown-key checks once a PubChem cache is present. (dated records below)
 
 ## Delivery records
+
+<a name="script-logging-and-studio-trace-panel-2026-11-22"></a>
+
+- [x] Script logging API and Studio Engine trace panel (2026-11-22). JavaScript now logs through
+  one API in every host: the global `TRECH_TRACE` (`info`/`log`/`debug`/`trace`/`warn`/`error`,
+  `channel(category)`, `enabled`, `count`, `span`, `level`, `authored`) and a `console` routed into
+  the trace, installed by the JS host for QuickJS and V8 alike; the Node model loader
+  (`tools/ml/lib/load.js`, `logs` + `records`) and plain Node (`js/trech_trace.js`, configured by
+  `TRECH_TRACE*`). `Trace` gained severities (warn/error reach stderr when not recorded), script
+  counters, spans and per-record flushing. Studio's bottom dock has an **Engine trace** tab that
+  requests the level/categories for the next run or live lab and tails `trech_trace.jsonl` live,
+  with display filtering and the attribution verdict. Verification: `trech_engine_trace` (script
+  API, console formatting, counters, spans, `enabled()` guard, off-mode stderr, and QuickJS vs V8
+  identical records and emits in the V8 build); `node --test tools/ml/test/ml.test.js` 22/22 (loader
+  and plain-Node API); Studio `test_trace_log.py` (tail, filter, panel request/filters/banner/settings,
+  a real `trech run` followed live), `test_live_lab.py`, `test_ui_panels.py`; offscreen
+  `StudioWindow` smoke with the panel on a Briggs–Rauscher trace. Residuals queued above.
 
 <a name="engine-trace-2026-11-22"></a>
 

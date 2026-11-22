@@ -4,6 +4,9 @@
 // Definition files are host-neutral JavaScript (the same source can be TRECH_INCLUDE'd by a
 // scenario), so they get only what QuickJS scenarios get from this library: TRECH_ML,
 // TRECH_INCLUDE and TRECH_READ_JSON relative to the including file. No require/process/fs.
+// TRECH_TRACE, TRECH_LOG and console log into the result: `logs` (one text line each, as
+// before) and `records` (trech_trace_v1 objects). The level is $TRECH_TRACE's, else info;
+// warn/error are always kept.
 // Every evaluation and every call back into authored functions runs under a time limit, so a
 // half-typed loop in Studio's live editor cannot hang the inspector.
 const fs = require('node:fs');
@@ -11,6 +14,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const LIB = path.resolve(__dirname, '../../../js/trech_ml.js');
+const { createTrace } = require('../../../js/trech_trace.js');
 const DEFAULT_TIMEOUT_MS = 2000;
 
 function locate(error, filename) {
@@ -25,10 +29,27 @@ function evaluate(file, options = {}) {
   const filename = path.resolve(file);
   const source = options.source !== undefined ? options.source : fs.readFileSync(filename, 'utf8');
   const logs = [];
+  const records = [];
   const stack = [filename];
+  const keep = (rec) => {
+    records.push(rec);
+    logs.push((rec.severity ? rec.severity + ': ' : '') + rec.msg + (rec.data !== undefined ? ' ' + JSON.stringify(rec.data) : ''));
+  };
+  let spec = { level: 'info', categories: [] };
+  try {
+    if (process.env.TRECH_TRACE) spec = createTrace().parseSpec(process.env.TRECH_TRACE);
+  } catch (error) { /* an invalid $TRECH_TRACE keeps the info default */ }
+  const trace = createTrace({ level: spec.level === 'off' || spec.level === 'summary' ? 'info' : spec.level,
+    categories: spec.categories, host: 'node-vm', sink: keep, loud: keep });
+  const words = (args) => args.map((a) => (typeof a === 'string' ? a : (() => {
+    try { return JSON.stringify(a); } catch (e) { return String(a); }
+  })())).join(' ');
+  const out = trace.channel('console');
   const context = vm.createContext({
-    console: { log: (...a) => logs.push(a.map(String).join(' ')), warn: (...a) => logs.push(a.map(String).join(' ')),
-      error: (...a) => logs.push(a.map(String).join(' ')) }
+    TRECH_TRACE: trace,
+    TRECH_LOG: (message, data) => trace.channel('scenario').info(message, data),
+    console: { log: (...a) => out.info(words(a)), info: (...a) => out.info(words(a)), debug: (...a) => out.debug(words(a)),
+      trace: (...a) => out.trace(words(a)), warn: (...a) => out.warn(words(a)), error: (...a) => out.error(words(a)) }
   });
   const run = (code, name) => vm.runInContext(code, context, { filename: name, timeout });
   context.TRECH_INCLUDE = (relative) => {
@@ -44,7 +65,7 @@ function evaluate(file, options = {}) {
   };
   run(fs.readFileSync(LIB, 'utf8'), LIB);
   const ml = context.TRECH_ML;
-  const result = { file: filename, ok: true, definitions: [], searches: [], errors: [], logs, ml, context, timeout };
+  const result = { file: filename, ok: true, definitions: [], searches: [], errors: [], logs, records, ml, context, timeout };
   try {
     run(source, filename);
   } catch (error) {
@@ -90,7 +111,7 @@ function summarize(loaded) {
   });
   return { schema: 'trech_ml_inspection_v1', file: loaded.file, ok: loaded.ok && searches.every((s) => !s.candidate_error),
     definitions: plain(loaded.definitions), searches, errors: loaded.errors.concat(searches.filter((s) => s.candidate_error)
-      .map((s) => ({ message: s.candidate_error, line: null, column: null }))), logs: loaded.logs };
+      .map((s) => ({ message: s.candidate_error, line: null, column: null }))), logs: loaded.logs, records: loaded.records };
 }
 
 // A sandbox with just TRECH_ML, for operations that need the library but no definition file.

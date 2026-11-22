@@ -72,14 +72,36 @@ globalThis.TRECH_HOOKS = {
 )JS";
 }
 
+// The script API: TRECH_TRACE levels, channels, counters, spans, enabled(), console routing.
+constexpr const char* kApiScenario = R"JS(
+const lib = TRECH_TRACE.channel("glass_model");
+lib.info("library loaded", { version: 2 });
+console.log("eval", 1, { a: [1, 2] });
+globalThis.TRECH_CONFIG = { run: { nEvents: 1, seed: 3 }, determinism: { mode: "strict" } };
+globalThis.TRECH_HOOKS = {
+  onEventEnd(ctx) {
+    const v = TRECH_TRACE.span("solve", () => 6 * 7, { step: 1 });
+    if (TRECH_TRACE.enabled("debug")) TRECH_TRACE.debug("debug payload", { v });
+    TRECH_TRACE.trace("fine detail", { v });
+    TRECH_TRACE.warn("viscosity clamped", { at: 1 });
+    lib.count("calls");
+    lib.count("calls", 2);
+    console.debug("console debug");
+    console.error("console error");
+    ctx.emit("v", { v, level: TRECH_TRACE.level(), host: TRECH_TRACE.host });
+  },
+};
+)JS";
+
 struct Transcript {
   std::string config;
   std::vector<std::string> emits;
 };
 
-Transcript runScenario(const std::filesystem::path& script) {
+Transcript runScenario(const std::filesystem::path& script,
+                       trech::JsEngine engine = trech::JsRuntime::defaultEngine()) {
   Transcript t;
-  trech::JsRuntime js;
+  trech::JsRuntime js(engine);
   t.config = js.evalExperimentAndGetConfigJson(script.string());
   const auto cfg = nlohmann::json::parse(t.config);
   for (int event = 0; event < 2; ++event) {
@@ -230,7 +252,74 @@ int main() {
          "the category filter drops other categories");
   expect(countRecords(filtered, "summary") == 1, "the summary is never filtered");
 
+  // Script API on every available engine; V8 must write the same records as QuickJS.
+  const auto apiScript = fixture.path() / "api.js";
+  write(apiScript, kApiScenario);
+  std::vector<std::vector<nlohmann::json>> perEngine;
+  std::vector<std::string> emitsPerEngine;
+  for (const auto engine : {trech::JsEngine::QuickJs, trech::JsEngine::V8}) {
+    if (!trech::JsRuntime::engineAvailable(engine)) continue;
+    trech::trace::Options api;
+    api.level = trech::trace::Level::Debug;
+    api.path = (fixture.path() / (engine == trech::JsEngine::V8 ? "api_v8.jsonl" : "api_qjs.jsonl")).string();
+    trech::trace::configure(api);
+    const auto t = runScenario(apiScript, engine);
+    const auto summary = trech::trace::summary();
+    expect(summary.contains("counters") && summary.at("counters").value("glass_model.calls", 0.0) == 6.0,
+           "channel counters are summed over both events: " + summary.dump());
+    trech::trace::finish();
+    auto records = readTrace(api.path);
+    std::string emits;
+    for (const auto& e : t.emits) emits += e + "\n";
+    emitsPerEngine.push_back(emits);
+    expect(emits.find("\"level\":\"debug\"") != std::string::npos && emits.find("\"host\":\"trech\"") != std::string::npos,
+           "TRECH_TRACE.level()/host reach the script: " + emits);
+    std::size_t lib = 0, console = 0, span = 0, warn = 0, traceLevel = 0, debugPayload = 0;
+    for (auto& r : records) {
+      const auto cat = r.value("cat", std::string());
+      if (cat == "trace") r["data"].erase("path");  // each engine writes its own file
+      if (cat == "glass_model" && r.value("msg", std::string()) == "library loaded") ++lib;
+      if (cat == "console") ++console;
+      if (r.value("msg", std::string()) == "solve") {
+        ++span;
+        expect(r.at("data").at("span") == "solve" && r.at("data").at("duration_ms").is_number() &&
+                   r.at("data").at("data").at("step") == 1 && r.at("hook") == "onEventEnd",
+               "span record: " + r.dump());
+        r["data"].erase("duration_ms");  // the only wall-clock field; engines differ there
+      }
+      if (r.value("severity", std::string()) == "warn") ++warn;
+      if (r.value("msg", std::string()) == "fine detail") ++traceLevel;
+      if (r.value("msg", std::string()) == "debug payload") ++debugPayload;
+      if (cat == "console" && r.value("level", std::string()) == "info" && r.value("msg", std::string()).rfind("eval", 0) == 0) {
+        expect(r.at("msg") == "eval 1 {\"a\":[1,2]}", "console formats like Node: " + r.dump());
+      }
+    }
+    expect(lib == 1, "channel info at evaluation time");
+    expect(console == 5, "console.log at evaluation and debug/error per event are recorded (got " + std::to_string(console) + ")");
+    expect(span == 2 && warn == 2 && debugPayload == 2, "span, warn and enabled()-guarded debug records per event");
+    expect(traceLevel == 0, "a trace-level call is not recorded at debug level");
+    perEngine.push_back(std::move(records));
+  }
+  if (perEngine.size() == 2) {
+    for (std::size_t i = 0; i < std::max(perEngine[0].size(), perEngine[1].size()); ++i) {
+      const auto q = i < perEngine[0].size() ? perEngine[0][i].dump() : std::string("<none>");
+      const auto v = i < perEngine[1].size() ? perEngine[1][i].dump() : std::string("<none>");
+      if (q != v) {
+        expect(false, "V8 writes the same trace records as QuickJS; first difference:\n  quickjs: " + q +
+                          "\n  v8:      " + v);
+        break;
+      }
+    }
+    expect(emitsPerEngine[0] == emitsPerEngine[1], "V8 and QuickJS emit the same values");
+  }
+
+  // Off: no file, the API is silent, warn/error still reach stderr, results unchanged.
   trech::trace::configure({});
+  {
+    const auto t = runScenario(apiScript);
+    expect(t.emits.size() == 2 && t.emits[0].find("\"level\":\"off\"") != std::string::npos,
+           "TRECH_TRACE.level() is off when tracing is off");
+  }
   if (failures) {
     std::cerr << failures << " engine trace check(s) failed\n";
     return 1;

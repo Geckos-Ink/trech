@@ -137,6 +137,9 @@ The observation-only engine trace (2026-11-22): a process-wide, mutex-guarded ve
   atomic load when off), `Scope` (thread-local hook/event/step stamp), `record`, the counters
   `countCall`/`countHook`/`countAuthored`/`countModel`, `digest`, `summary` (with a
   plain-language `verdict`) and `finish` (summary record + stderr table; idempotent).
+  `record(..., severity)` stamps `warn`/`error` and sends such a record to stderr when its level
+  or category is not recorded; `countScript` (summary `counters`); `spanBegin`/`spanEnd` (debug
+  record with `duration_ms`). The file is flushed per record for live readers (Studio).
   `configureTraceFromOptions` in [`RunOptions.cpp`](../../../src/core/RunOptions.cpp) resolves CLI
   over environment and defaults the file to `<output>/trech_trace.jsonl`; `main` configures it for
   `run`/`lab` only and a scope guard calls `finish` however the command ends.

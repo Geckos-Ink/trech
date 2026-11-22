@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
@@ -71,7 +71,7 @@ class LiveScenarioLab(QObject):
         return self.session.is_active()
 
     def start(self, scenario: Path, values: Dict[str, Any], output_dir: Path,
-              events: Optional[int] = None) -> bool:
+              events: Optional[int] = None, extra_args: Sequence[str] = ()) -> bool:
         """Start the session with the Options panel's current values and run one batch."""
         if self.is_active():
             self.error.emit("a live lab is already running; stop it first")
@@ -85,7 +85,7 @@ class LiveScenarioLab(QObject):
         self._pending = {}
         self._emit_offset = 0
         if not self.session.start(scenario=Path(scenario), params=params,
-                                  output_dir=self.output_dir, watch=True):
+                                  output_dir=self.output_dir, watch=True, extra_args=extra_args):
             return False
         self.info.emit(f"live lab started: {Path(scenario).name} -> {self.output_dir}")
         return self.batch()

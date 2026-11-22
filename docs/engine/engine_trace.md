@@ -61,7 +61,8 @@ Each level includes everything below it.
 
 `run`, `model`, `hook`, `scenario`, `authored`, `arbiter`, and one per inference entry point:
 `predict`, `cascade`, `evolve`, `react`, `interact`, `lift`, `detectDomains`, `learnDomains`,
-`evolveField`. The category filter limits the records written. It never limits the summary
+`evolveField`. Script records use `script`, `console` or the name of a
+[`TRECH_TRACE.channel`](#log-from-any-javascript-trech_trace-and-console). The category filter limits the records written. It never limits the summary
 counters, and the summary record is always written.
 
 Each category writes at most 20000 records. Records beyond that are counted under
@@ -116,6 +117,65 @@ onEventEnd(ctx) {
 These reports come from the scenario's own declaration. The [scenario purity report](../validation/TRECH_current_scenarios_purity.md)
 remains the static audit of authored laws in the source. The trace adds what actually ran.
 
+## Log from any JavaScript: `TRECH_TRACE` and `console`
+
+Scenarios, companions, domain libraries and model definitions log through one global API. The
+API is the same under QuickJS, under V8, in the Node model-definition loader (`trech-ml
+inspect`, Studio's Models panel) and in plain Node:
+
+```js
+const log = TRECH_TRACE.channel("glass_model");   // records in category "glass_model"
+log.info("library loaded", { version: 2 });       // info level
+log.debug("plan", { layers: 3 });                 // debug level
+log.trace("per-element detail", { i, v });        // trace level
+log.warn("viscosity clamped", { at: T });         // info level, severity "warn"
+log.error("no fit", { reason });                  // info level, severity "error"
+if (log.enabled("trace")) log.trace("expensive", build());   // skip building costly payloads
+log.count("solves");                              // summed in the run summary as glass_model.solves
+const v = log.span("solve", () => solve(x));      // debug record with its wall-clock duration
+TRECH_TRACE.info("…");                            // the default channel, category "script"
+TRECH_TRACE.authored("arrhenius_viscosity");      // same as ctx.authored
+TRECH_TRACE.level();                              // "off", "summary", "info", "debug" or "trace"
+console.log("plain", 2, { a: 1 });                // category "console", formatted like Node
+```
+
+| Function | Level, category | Note |
+| --- | --- | --- |
+| `info`/`log`, `debug`, `trace` | as named; the channel's category | `data` is digested (about 2 KB). |
+| `warn`, `error` | info; `severity` set | If the level or category is not recorded, the message goes to stderr instead (`TRECH js warn: …`). It is never lost. |
+| `enabled(level?)` | — | Whether a record at that level and category would be written. |
+| `count(name, amount = 1)` | summary `counters` | Named per channel: `<category>.<name>`. |
+| `span(name, fn, data?)` | debug | Returns `fn()`. The duration is written only to the trace and never returned to the script. |
+| `channel(category)` | — | A logger with its own category, which you can filter with `--trace debug:<category>`. |
+| `console.log/info/debug/trace/warn/error` | info/info/debug/trace/info+warn/info+error, `console` | Replaces QuickJS's missing console and V8's silent one, so both engines behave the same. |
+
+**Determinism.** None of these functions returns engine state or wall time to the script, apart
+from `level()` and `enabled()`. Use those two only to decide whether to log, never to change
+physics. Results, RNG and emits are the same with the trace on or off.
+QuickJS and V8 write the same records. `trech_engine_trace` checks this, ignoring only the
+span durations.
+
+**Hosts.**
+
+- In `trech` (QuickJS or V8), the engine installs `TRECH_TRACE` and `console`, and
+  `TRECH_TRACE.host` is `"trech"`.
+- In the Node model loader ([`tools/ml/lib/load.js`](../../tools/ml/lib/load.js)), records go
+  into the inspection result. `logs` holds one text line per record and `records` holds the
+  objects. The level comes from `$TRECH_TRACE` and defaults to `info`.
+- In plain Node, `require("js/trech_trace.js")` installs the same API. Records go to
+  `TRECH_TRACE_FILE` as JSONL, or to stderr.
+- [`js/trech_trace.js`](../../js/trech_trace.js) is host-neutral. Inside `trech`,
+  `TRECH_INCLUDE("trech_trace.js")` returns the engine's object, so a library can include it
+  without checking which host it runs in.
+
+## Watch it live in Studio
+
+The **Engine trace** tab in Studio's bottom dock asks the engine for the level and categories
+you choose, and shows records as they are written. Records written with the functions above
+appear there under their categories. When the run ends, the panel shows the attribution
+verdict. See [the Studio guide](../../studio/README.md#engine-trace-panel). The engine flushes
+every record so that a live reader sees it right away.
+
 ## Example: read a trace
 
 ```sh
@@ -139,9 +199,6 @@ The record format is in the [output schema](output_schema.md#trech_tracejsonl).
 - Geant4 transport itself (steps, processes) and the inner stages of `ctx.evolve` and
   `ctx.cascade` are not traced separately. Their per-stage metadata appears in the result digest
   at `trace` level.
-- Studio does not show the trace yet. If you start Studio with `TRECH_TRACE` set, the `trech`
-  processes it launches inherit the setting. Each run then writes `trech_trace.jsonl` in its
-  output directory.
 - In a `trech lab` session, one summary covers the whole session. The summary is not split per
   batch.
 
