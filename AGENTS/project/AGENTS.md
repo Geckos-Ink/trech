@@ -39,7 +39,11 @@ Read the root principles and the parent handbook first; then open only the subca
   record is not tracking: copy it into the queue in the same change. A new P1 also goes on the
   [implementation route](../ROADMAP.md#p1-items-by-route-step); work owned elsewhere gets a
   one-line pointer, not a second copy. When an item lands, delete it from the queue and the
-  route and add the dated delivery record below the queue. Pick work from P1 first.
+  route and add the dated delivery record below the queue. Pick work from P1 first; when no task is named,
+  pick it from the [roadmap 12 implementations to do bucket](../../AGENTS.md#the-roadmap-12-implementations-to-do-bucket)
+  (5 P1 · 4 P2 · 3 P3, drawn at random across the project). A change that lands a bucket item
+  draws its successor with `scripts/draw_roadmap_bucket.py --draw <key>` in the same change,
+  and any change to a queue runs `scripts/draw_roadmap_bucket.py --check`.
 - **Implementation changes the owning source.** Engine work requires C++ changes under
   [`src/`](../../src) (high priority); Studio work changes Python/WGSL under
   [`studio/trech_studio/`](../../studio/trech_studio). Documentation-only updates do not count as

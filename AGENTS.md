@@ -17,6 +17,42 @@ Cross-component tasks follow each affected branch. [The full tree index](AGENTS/
 | Tools: builds/dependencies, training/data, media, validation | [Tooling handbook](AGENTS/tooling/AGENTS.md) | [Tooling roadmap](AGENTS/tooling/ROADMAP.md) |
 | Project: workflow, shared status, north star, long-term structure | [Project handbook](AGENTS/project/AGENTS.md) | [Project roadmap](AGENTS/project/ROADMAP.md) |
 
+## The roadmap 12 implementations to do bucket
+
+When no task is named and you choose the next roadmap implementation, take it from this bucket
+rather than from whichever queue you happen to be reading. The bucket keeps the choice spread
+across the whole project: it holds **5 high (P1), 4 medium (P2) and 3 low (P3)** items, drawn at
+random from every leaf roadmap's **Priority queue** ([keys](AGENTS/ROADMAP.md#priority-keys)),
+with no two slots from the same roadmap. Gated items and one-line pointers to another queue are
+never drawn.
+
+- **The owning queue stays the source of truth.** A slot only points to an item; read the full
+  item and its detail link in the owning roadmap before starting.
+- **Replace a slot in the change that completes it.** When the item lands and leaves its queue,
+  draw its successor at the same priority with
+  `python3 scripts/draw_roadmap_bucket.py --draw P1` (or `P2`, `P3`) and put the printed row in
+  the freed slot. Never hand-pick a successor: the random draw is what keeps the distribution
+  even. Redraw a slot the same way if its item is re-keyed, gated or turned into a pointer. A
+  partly delivered item that is still queued keeps its slot.
+- **Keep it valid.** `python3 scripts/draw_roadmap_bucket.py --check` confirms each slot is still
+  an open item at its key, and that the 5/4/3 split and one-slot-per-roadmap rule hold. A slot's
+  text must be a verbatim prefix of its queue item. Run the check in any change that edits a roadmap queue.
+
+| # | Key | Route | Owning queue | Item |
+| --- | --- | --- | --- | --- |
+| 1 | **P1** | R6 | [studio/authoring](AGENTS/studio/authoring/ROADMAP.md#priority-queue) | Complete the `SceneModel → scenario .js` round-trip for source dependencies and volume hierarchy. |
+| 2 | **P1** | R2 | [scenarios/spectra](AGENTS/scenarios/spectra/ROADMAP.md#priority-queue) | Particle-trained atomic rung: feed Geant4 material/atomic response (mean excitation energy, photo-absorption) as atomic inputs and re-grade the cascade ablation. |
+| 3 | **P1** | R2 | [scenarios/fluids](AGENTS/scenarios/fluids/ROADMAP.md#priority-queue) | A particle-derived (Geant4-trained) water operator that freezes, replacing the literature mW potential |
+| 4 | **P1** | R2 | [scenarios/chemistry](AGENTS/scenarios/chemistry/ROADMAP.md#priority-queue) | Next learned lift: geometry/charge/isotope-conditioned electronic and bond response trained on Geant4 particle/ionization histories |
+| 5 | **P1** | R3 | [scenarios/migrations](AGENTS/scenarios/migrations/ROADMAP.md#priority-queue) | Row 6 remainder — osmosis (efflux promoted 2026-07-26). |
+| 6 | **P2** | R3 | [engine/inference](AGENTS/engine/inference/ROADMAP.md#priority-queue) | Closed-loop deployment of learned-domain operators beyond the furnace thermal law |
+| 7 | **P2** | R5 | [tooling/validation](AGENTS/tooling/validation/ROADMAP.md#priority-queue) | Strict-config coverage: rerun the three unchecked PubChem invocations with a cache. |
+| 8 | **P2** | R6 | [scenarios/references](AGENTS/scenarios/references/ROADMAP.md#priority-queue) | JS workflow execution: editable training/harvest/inference jobs with provenance, progress/cancellation and safe model activation. |
+| 9 | **P2** | R3 | [tooling/training](AGENTS/tooling/training/ROADMAP.md#priority-queue) | Next set-network users: efflux/foam parcel operators, an MPNN where neighbour-of-neighbour structure matters, a conservative set operator through `ctx.interact`. |
+| 10 | **P3** | R2 | [engine/precision](AGENTS/engine/precision/ROADMAP.md#priority-queue) | Evolutionary model search beyond uniform MLP width/depth (DAGs, activations, cross-family discovery) |
+| 11 | **P3** | R4 | [studio/workspace](AGENTS/studio/workspace/ROADMAP.md#priority-queue) | Automatic accuracy/convergence control (needs engine error estimates) |
+| 12 | **P3** | R3 | [scenarios/processes](AGENTS/scenarios/processes/ROADMAP.md#priority-queue) | Coupled thermal/latent energy, mass transport and 3D solution state |
+
 ## Maintenance and task workflow
 
 - Check `git status`, preserve unrelated changes, and find the owning source and focused tests before editing. Verify handbook claims against current code.

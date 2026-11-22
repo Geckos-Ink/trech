@@ -4,6 +4,13 @@
 
 Planning, funding discussion drafts and historical notes. The active implementation backlog lives in the repository’s categorized AGENTS roadmaps; the original trech-roadmap.md is reference-only.
 
+To keep the next piece of work evenly spread across the project, the root
+[`AGENTS.md`](../../AGENTS.md#the-roadmap-12-implementations-to-do-bucket) holds a bucket of 12
+open roadmap items: 5 high (P1), 4 medium (P2) and 3 low (P3) priority, drawn at random with no two
+from the same roadmap. When one lands, its slot is refilled by another random draw at the same
+priority. For example, `python3 scripts/draw_roadmap_bucket.py --draw P2` prints a replacement row,
+and `python3 scripts/draw_roadmap_bucket.py --check` confirms every slot is still open.
+
 ## Keeping the documentation current
 
 When you change TRECH’s code or how the project works, update the documentation in the
