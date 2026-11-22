@@ -7,6 +7,9 @@ namespace trech {
 namespace {
 
 // One TRT collide-and-stream step with Guo forcing. Returns false on a nonphysical cell.
+// Lean pair (optional, for validation): Trech.Methods.Lattice (formal/Trech/Methods/Lattice.lean)
+// proves the collision and streaming below conserve mass under the hypotheses that
+// tests/test_formal_laws.cpp checks (velocity moments, opp involution, src bijection).
 bool flowStep(LatticeFlowView& v, const double* gxField, const double* gyField,
               const double* gzField, const LatticeCoupling& c, double& peak) {
   const std::size_t F = v.cells, Q = v.set.q;

@@ -169,6 +169,7 @@ AnalyticCheckResult evaluateBeerLambert(const AnalyticCheckConfig& check,
   const double energyG4 = result.energyMeV * MeV;
   const G4ParticleDefinition* particle = resolveParticle(result.particle);
   fillAttenuationBreakdown(result, energyG4, particle, material, calc);
+  // Lean pair (optional, for validation): Trech.Laws.Attenuation (formal/Trech/Laws/Attenuation.lean).
   result.predictedValue = std::exp(-result.muTotalPerMm * result.pathLengthMm);
   result.available = true;
 

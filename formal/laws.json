@@ -1,0 +1,59 @@
+{
+  "schema": "trech_formal_laws_v1",
+  "note": "Law pairs: a classic C++/JS implementation (the running path) and its optional Lean definition (validation). tests/test_formal_law_pairs.py checks that both sides exist and cite each other; tests/test_formal_laws.cpp runs the classic conformance checks. Lean proofs are checked only by the opt-in trech_formal_lean_build CTest (TRECH_ENABLE_LEAN_CHECK).",
+  "laws": [
+    {
+      "id": "compton.transfer_within_edge",
+      "role": "reference",
+      "statement": "For eps >= 0 and -1 <= cos(theta) <= 1, the electron's share T/E = 1 - 1/(1 + eps(1 - cos theta)) lies in [0, 2 eps / (1 + 2 eps)], with the edge reached at back-scatter.",
+      "lean": {
+        "file": "formal/Trech/Laws/Compton.lean",
+        "declarations": [
+          "Trech.Laws.Compton.transferFraction_nonneg",
+          "Trech.Laws.Compton.transferFraction_le_edge",
+          "Trech.Laws.Compton.transferFraction_backscatter"
+        ]
+      },
+      "classic": [
+        {"path": "include/trech/sim/KleinNishina.hpp", "cites": "Trech.Laws.Compton"},
+        {"path": "js/trech_formal_laws.js", "cites": "Trech.Laws.Compton"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["compton.transfer_within_edge", "compton.edge_at_backscatter", "compton.cpp_js_ratio", "compton.cpp_js_edge"]}
+    },
+    {
+      "id": "attenuation.memoryless",
+      "role": "reference",
+      "statement": "Beer-Lambert survival S(x) = exp(-mu x) satisfies S(x + y) = S(x) S(y), S(0) = 1, 0 < S <= 1 for mu, x >= 0, and decreases with path length.",
+      "lean": {
+        "file": "formal/Trech/Laws/Attenuation.lean",
+        "declarations": [
+          "Trech.Laws.Attenuation.survival_add",
+          "Trech.Laws.Attenuation.survival_le_one",
+          "Trech.Laws.Attenuation.survival_antitone"
+        ]
+      },
+      "classic": [
+        {"path": "src/sim/AnalyticCrossCheck.cpp", "cites": "Trech.Laws.Attenuation"},
+        {"path": "js/trech_formal_laws.js", "cites": "Trech.Laws.Attenuation"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["attenuation.memoryless"]}
+    },
+    {
+      "id": "lattice.collision_conserves_mass",
+      "role": "method_property",
+      "statement": "The two-relaxation-time collision keeps a cell's summed populations when the equilibrium carries the same mass, a zero-sum source keeps it, and pull streaming along a bijection of the links keeps the lattice total.",
+      "lean": {
+        "file": "formal/Trech/Methods/Lattice.lean",
+        "declarations": [
+          "Trech.Methods.Lattice.relaxTRT_sum_eq",
+          "Trech.Methods.Lattice.sum_add_zero_source",
+          "Trech.Methods.Lattice.stream_sum_eq"
+        ]
+      },
+      "classic": [
+        {"path": "src/core/LatticeKinetic.cpp", "cites": "Trech.Methods.Lattice"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["lattice.velocity_moments", "lattice.opposite_involution", "lattice.streaming_bijection", "lattice.collision_conserves_mass"]}
+    }
+  ]
+}

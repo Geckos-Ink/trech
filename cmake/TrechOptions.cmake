@@ -20,6 +20,10 @@ option(TRECH_ENABLE_V8 "Build the V8 JavaScript backend (needs an already-built 
 set(TRECH_DEFAULT_JS_ENGINE "quickjs" CACHE STRING "Default JavaScript engine (quickjs or v8; v8 needs TRECH_ENABLE_V8)")
 set_property(CACHE TRECH_DEFAULT_JS_ENGINE PROPERTY STRINGS quickjs v8)
 option(TRECH_ENABLE_V8_PROBE "Build the optional standalone V8 compile/code-cache probe" OFF)
+# Optional Lean proof check of formal/ (docs/engine/formal_laws.md). OFF: Lean is never needed.
+# ON needs an installed `lake` matching formal/lean-toolchain, and building the package compiles
+# the imported Mathlib modules unless their cache was fetched (heavy).
+option(TRECH_ENABLE_LEAN_CHECK "Register a CTest entry that builds the optional Lean law package (needs lake)" OFF)
 option(TRECH_ENABLE_ATOMIC_RESEARCH "Build the standalone atomic research JS launcher using an installed Node/V8 runtime" OFF)
 
 set(CMAKE_CXX_STANDARD 17)

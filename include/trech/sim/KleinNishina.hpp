@@ -8,6 +8,10 @@
 // These are CLASSICAL closed-form references ("physics for comparison"): the
 // check compares them to the energy loss Geant4 actually samples for a primary
 // photon's first Compton interaction. They never drive transport.
+//
+// Lean pair (optional, for validation): Trech.Laws.Compton in
+// formal/Trech/Laws/Compton.lean states and proves 0 <= T/E <= comptonEdgeFraction for
+// these formulas; tests/test_formal_laws.cpp checks this classic code against it.
 
 #include <algorithm>
 #include <cmath>

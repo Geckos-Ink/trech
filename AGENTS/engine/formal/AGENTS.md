@@ -6,10 +6,14 @@ Related owners: [Builds and dependencies](../../tooling/dependencies/AGENTS.md) 
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
-**Maturity: route opened 2026-11-22, nothing implemented in the engine; Lean is optional.**
-Only the two source checkouts, the pull script and the Mathlib declaration search exist. No
-Lean code is built, linked or run by TRECH, no config field exists, and no result is
-Lean-checked. Classic C++/JavaScript implementations stay the running path (see the first rule). The plan and
+**Maturity (2026-11-22): first law pairs landed on the classic side; Lean is optional and
+uncompiled.** Three pairs exist ([`formal/laws.json`](../../../formal/laws.json)): Compton
+kinematics, Beer–Lambert attenuation and lattice mass conservation. Their classic C++/JS code
+is checked against each Lean statement by `trech_formal_laws`, and the pair links by
+`trech_formal_law_pairs`. The Lean files in [`formal/`](../../../formal) have **not been
+compiled** (no toolchain; gated), so no proof is verified yet. No config field, provenance
+field or run output carries a law check. Classic C++/JavaScript implementations stay the
+running path (see the first rule). The plan and
 every open item are in the [roadmap](ROADMAP.md#priority-queue). User guide:
 [`docs/engine/formal_laws.md`](../../../docs/engine/formal_laws.md).
 
@@ -106,6 +110,18 @@ conservation, exponential attenuation from a constant interaction rate, energy c
   regression run against the unpatched build, and the owner's go-ahead. Any rebuild of Geant4
   for a patch is a heavy, gated build.
 
+## Points to keep stable
+
+- **Float tolerances are stated, not hidden.** `attenuation.memoryless` holds exactly over `ℝ`
+  but `exp(-μ(x+y))` and `exp(-μx)·exp(-μy)` differ by about 2 ulp in doubles (2.3e-16
+  relative seen on macOS arm64), so the check allows 2e-15 relative and an exact-equality
+  negative control shows the gap. The lattice check allows 1e-13 relative over 300 steps (2.1e-14
+  seen). Tighten a tolerance only with evidence; never loosen one to make a check pass.
+- **Hypothesis checks matter as much as invariants.** `relaxTRT_sum_eq` assumes `∑ feq = ∑ f`,
+  which the classic kernel gets from the velocity-set moments; `stream_sum_eq` assumes `src` is a
+  bijection, which moving-wall and anti-bounce-back links break (they are not conservative by
+  design). A new lattice configuration that should conserve mass must pass these checks.
+
 ## Current pins
 
 The TRECH git tree records the revisions (`git submodule status thirds/lean4 thirds/mathlib4`).
@@ -120,3 +136,10 @@ that release candidate, so a from-source toolchain build must check out the tag 
 | [`scripts/pull_lean.sh`](../../../scripts/pull_lean.sh) | Fast-forward both checkouts, print heads, check the toolchain Mathlib expects. |
 | [`scripts/lean_mathlib_search.py`](../../../scripts/lean_mathlib_search.py) | Grep Mathlib declaration headers (`theorem`, `lemma`, `def`, `structure`, …) by regex. |
 | [`docs/engine/formal_laws.md`](../../../docs/engine/formal_laws.md) | User guide: what the route is for, how to pull and search, what is not done yet. |
+| [`formal/`](../../../formal) | Lake package `trech_formal` (Mathlib by path from `thirds/mathlib4`, `lean-toolchain` copied from it): `Trech/Laws/Compton.lean`, `Trech/Laws/Attenuation.lean`, `Trech/Methods/Lattice.lean`. |
+| [`formal/laws.json`](../../../formal/laws.json) | `trech_formal_laws_v1` pair manifest: id, role, statement, Lean file + declarations, classic sources and the namespace each cites, conformance checks. |
+| [`include/trech/core/FormalLaws.hpp`](../../../include/trech/core/FormalLaws.hpp) · [`src/core/FormalLaws.cpp`](../../../src/core/FormalLaws.cpp) | `trech::formal::LawCheck` and the physics-agnostic classic checks: `checkConservedTotal` (Neumaier sums), `checkWithinBounds`, `checkProbabilityVector`, `checkAgreement`, and the hypothesis checks `checkPermutation`, `checkInvolution`, `checkVelocityMoments`. `toJson()` records `lean_status: "not_checked_by_this_check"`. In `trech_core`; nothing in the engine calls them yet. |
+| [`js/trech_formal_laws.js`](../../../js/trech_formal_laws.js) | `TRECH_FORMAL_LAWS` (QuickJS, V8, Node): classic `compton` and `attenuation` references for validation companions, each naming its Lean declaration, the same check contract as C++ (`role: "validation"`), and `checkComptonBounds`/`checkAttenuationMemoryless`. Calls are reported as authored laws in the engine trace. |
+| [`tests/test_formal_laws.cpp`](../../../tests/test_formal_laws.cpp) | CTest `trech_formal_laws`: classic C++ and JS against each statement, hypothesis checks on a periodic D2Q9 lattice driven through `advanceLattice` with a body force, bit-identical C++/JS Compton values (`-ffp-contract=off`), and a negative control per check kind. |
+| [`tests/test_formal_law_pairs.py`](../../../tests/test_formal_law_pairs.py) | CTest `trech_formal_law_pairs`: each Lean file declares its listed theorems, has no `sorry`, cites its classic sources; each classic source cites the Lean namespace; `formal/lean-toolchain` equals Mathlib's. |
+| `TRECH_ENABLE_LEAN_CHECK` | Opt-in (OFF) CMake option registering `trech_formal_lean_build` (`lake build` in `formal/`, heavy). |

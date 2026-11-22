@@ -18,12 +18,13 @@ Standing constraint for every item: Lean stays optional. Each law keeps its clas
 implementation as the running path, with the Lean definition beside it for validation
 ([rule](AGENTS.md#rules)).
 
-- **P1** · R8 · Law-pair contract. Specify how a classic implementation and its Lean definition are paired: the naming convention (Lean namespace `Trech.Laws.*` / `Trech.Methods.*` ↔ classic source path), the roles (`invariant`, `method_property`, `reference`, `validation`), the conformance record (inputs, tolerance, result, skip reason when Lean is absent), and the provenance fields (declaration, module hash, toolchain, Mathlib revision), conditionally serialized. Design document plus a schema draft first; no engine field before it is reviewed. ([detail](#route-opened--2026-11-22))
-- **P1** · R8 · First law inventory. List the laws and invariants TRECH already computes classically (lattice mass/momentum conservation, probability normalisation in `ctx.react`, the arbiter's prequential scoring, energy conservation in recorded Geant4 steps, the analytic cross-checks), mark which Mathlib already covers (`scripts/lean_mathlib_search.py`), and pick the first two pairs to formalise. ([detail](#route-opened--2026-11-22))
-- **P2** · R8 · Lean project skeleton: a `formal/` Lake package requiring Mathlib from `thirds/mathlib4` by path, pinned to Mathlib's `lean-toolchain`, with the first two law pairs and an optional CTest entry that skips when `lake` is absent. Blocked by the toolchain gate below. ([detail](#route-opened--2026-11-22))
+- **P1** · R8 · Law-pair contract, second half. The manifest (`trech_formal_laws_v1`), the `LawCheck` record and the citation rule landed 2026-11-22. Still open: provenance fields for a run that performs a law check (declaration, Lean module hash, toolchain, Mathlib revision), conditionally serialized, and where a validation companion's JS law-check records go in the outputs. Design first; no engine field before review. ([detail](#first-law-pairs--2026-11-22))
+- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation. Next candidates: probability normalisation and nonnegativity of `ctx.react` transition outputs, the arbiter's prequential score as a proper scoring rule, energy conservation in recorded Geant4 secondaries, and the scalar lattice's conservation under zero-flux walls. Search Mathlib first for each. ([detail](#first-law-pairs--2026-11-22))
+- **gated** · R8 · Compile `formal/`: the three Lean files are written against the pinned Mathlib's lemma names but have never been built. Needs the toolchain gate below, then `lake exe cache get && lake build`; fix any proof that fails and record the verified revision. Until then no Lean statement counts as proved. ([detail](#first-law-pairs--2026-11-22))
+- **P2** · R8 · Call the classic checks from the engine: run `checkVelocityMoments`, `checkInvolution` and `checkPermutation` when a lattice is built (cheap, once), and expose the JS checks to validation companions' recorded output, without changing physics, RNG or emits. ([detail](#first-law-pairs--2026-11-22))
 - **P2** · R8 · Conformance harness: a Lean reference evaluator (`@[export]` C symbols linked behind an opt-in `TRECH_ENABLE_LEAN`, default OFF, or a separate `lake exe` fed JSON) that checks the classic kernel on sampled or recorded inputs offline. Measure its cost; it never runs per step in production and never changes physics, RNG or emits. ([detail](#route-opened--2026-11-22))
 - **P2** · R8 · Hardware acceleration contract: Lean compiles to scalar CPU code, so accelerated kernels (C++ SIMD, LibTorch, GPU) stay the compute path. Define how a proof about an algorithm's model transfers to its accelerated implementation (shared algorithm spec, sampled conformance, documented reduction-order and fused-operation differences). ([detail](#route-opened--2026-11-22))
-- **P2** · R8 · Scenario side: a `.validation.js` companion cites a Lean law next to its classic JS reference and records both verdicts. Never from the physics script, never on the decision path. ([detail](#route-opened--2026-11-22))
+- **P2** · R8 · Scenario side: a `.validation.js` companion uses `TRECH_FORMAL_LAWS` next to its own classic reference and records both verdicts (the library exists; no companion uses it yet). Never from the physics script, never on the decision path. ([detail](#route-opened--2026-11-22))
 - **P3** · R8 · Reals vs floats: bridge Mathlib's `ℝ` theorems to IEEE-754 kernels with stated error bounds, interval arithmetic or a rounding-model proof; until then label every Lean verdict as covering the real-valued statement only. ([detail](#route-opened--2026-11-22))
 - **P3** · R8 · Better Mathlib search once built: `exact?`/`apply?`/Loogle-style queries in place of the grep, so equivalent statements under other names are found. ([detail](#route-opened--2026-11-22))
 - **P3** · R5 · Geant4 secondary track: Lean statements of Geant4's basic laws (two-body kinematics, the Compton relation from four-momentum conservation, exponential attenuation, energy conservation in `SampleSecondaries`), attached through derived classes in shadow mode (inheritance preferred; `patches/geant4/` only for non-virtual code). Observation first; any replacement needs byte parity or a validated tolerance, a regression against the unpatched build and the owner's go-ahead. ([detail](AGENTS.md#geant4-secondary-track))
@@ -41,3 +42,21 @@ implementation as the running path, with the Lean definition beside it for valid
 - [x] Handbook rules: Lean optional, classic + Lean pairs, Mathlib first, building gated, Lean
   off the decision path and off the hot path, reals vs floats, Geant4 secondary track.
 - [ ] Nothing is built, linked or run; every item above is open.
+
+## First law pairs — 2026-11-22
+
+- [x] `formal/` Lake package (Mathlib by path, `lean-toolchain` = Mathlib's `v4.37.0-rc1`) with
+  `Trech.Laws.Compton` (T/E within [0, edge], equality at back-scatter), `Trech.Laws.Attenuation`
+  (survival multiplicative, in (0, 1], decreasing) and `Trech.Methods.Lattice` (TRT collision,
+  zero-sum source and bijective streaming conserve the total). Mathlib lemma names were checked
+  against `thirds/mathlib4` `6ebcce3733`; the files were **not compiled**.
+- [x] Classic side: `trech::formal` checks in `trech_core`, `js/trech_formal_laws.js`, Lean
+  citations in `KleinNishina.hpp`, `AnalyticCrossCheck.cpp` and `LatticeKinetic.cpp` (comments
+  only; no behaviour change), `formal/laws.json`.
+- [x] Tests: `trech_formal_laws` (all pairs pass; negative controls fail as intended; C++ and
+  QuickJS Compton values bit-identical) and `trech_formal_law_pairs`. Opt-in
+  `TRECH_ENABLE_LEAN_CHECK` registers `trech_formal_lean_build`.
+- [x] Finding: the attenuation identity is exact over `ℝ` but off by ~2 ulp in doubles; the
+  check states a 2e-15 relative tolerance and an exact-equality negative control records the gap.
+- [ ] Open: compiling the Lean files (gated), provenance fields, engine call sites and the
+  next inventory items, all queued above.

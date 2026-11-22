@@ -8,9 +8,11 @@ statement written in Lean (a *theorem*) is accepted only with a proof that Lean'
 [Mathlib](https://github.com/leanprover-community/mathlib4) is the community library of
 mathematics written in Lean, from real analysis to linear algebra and probability.
 
-**Status (2026-11-22): the route is open, nothing runs yet.** The repository holds the two
-source checkouts and two helper scripts. TRECH does not build, link or run Lean, no scenario
-uses it, and no result is Lean-checked. The open work is in the
+**Status (2026-11-22): three law pairs exist; the Lean side is not compiled yet.** The
+classic code of each pair is checked against its Lean statement by an ordinary test, without
+Lean. The Lean files have never been built (no toolchain is installed; building it is a
+separate, gated step), so **none of their proofs counts as verified yet**. TRECH does not
+link or run Lean, and no run output records a law check. The open work is in the
 [formal-laws roadmap](../../AGENTS/engine/formal/ROADMAP.md#priority-queue).
 
 ## What it is for
@@ -49,6 +51,42 @@ Two further limits keep Lean in its place:
 
 Lean-stated physical laws follow the same rule as any closed-form law in TRECH: they are
 validation references, fed from Geant4's own data, and never decide how a system is predicted.
+
+## The first law pairs
+
+[`formal/laws.json`](../../formal/laws.json) lists each pair: an id, a plain statement, the
+Lean file and theorems, and the classic sources.
+
+| Pair | Lean (`formal/`) | Classic code | What is checked without Lean |
+| --- | --- | --- | --- |
+| Compton kinematics | `Trech.Laws.Compton`: the electron's share `T/E` lies between 0 and the Compton edge `2ε/(1+2ε)`, and equals the edge at back-scatter | `include/trech/sim/KleinNishina.hpp`, `js/trech_formal_laws.js` | 410 (energy, angle) samples respect the bound; the C++ and JavaScript values are bit-identical |
+| Beer–Lambert attenuation | `Trech.Laws.Attenuation`: survival `exp(-μx)` multiplies over consecutive paths, stays in (0, 1] and decreases with path length | `src/sim/AnalyticCrossCheck.cpp`, `js/trech_formal_laws.js` | `S(x+y)` against `S(x)·S(y)` on 20 path pairs, within a stated float tolerance |
+| Lattice mass conservation | `Trech.Methods.Lattice`: the collision keeps a cell's mass if the equilibrium does, a zero-sum source keeps it, streaming along a bijection keeps the total | `src/core/LatticeKinetic.cpp` | the theorems' hypotheses (velocity-set moments, opposite-direction table, streaming map) and the total mass over 300 forced steps on a periodic lattice |
+
+The attenuation row shows why the real-versus-float caveat matters. Over the reals,
+`exp(-μ(x+y)) = exp(-μx)·exp(-μy)` exactly. In doubles the two sides differ by about two units
+in the last place, so the check states a tolerance of `2e-15` relative, and a second check
+that demands exact equality fails on purpose to keep that gap visible.
+
+Run the checks (both are part of the normal CTest suite):
+
+```bash
+ctest --test-dir build/rel -R trech_formal
+```
+
+The output lists each check with its Lean declaration, sample count, largest error and verdict.
+Checks named `negative_control` are meant to fail: they prove each check can catch a violation.
+
+A validation companion can use the same classic references:
+
+```js
+TRECH_INCLUDE("../../../js/trech_formal_laws.js");
+const checks = TRECH_FORMAL_LAWS.checkComptonBounds([0.5, 1.3], [-1, 0, 1], 1e-15);
+// each record: {law, lean_declaration, lean_status: "not_checked_by_this_check", role: "validation", passed, ...}
+```
+
+To compile the Lean files, see [`formal/README.md`](../../formal/README.md); configuring with
+`-DTRECH_ENABLE_LEAN_CHECK=ON` adds the `trech_formal_lean_build` test.
 
 ## Get and update the sources
 

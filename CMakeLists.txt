@@ -14,6 +14,7 @@ add_library(trech_core
   src/core/ScalarField.cpp
   src/core/LatticeKinetic.cpp
   src/core/LatticeContinuum.cpp
+  src/core/FormalLaws.cpp
   src/core/LabSession.cpp
   src/core/SimulationBudget.cpp
   src/core/Provenance.cpp

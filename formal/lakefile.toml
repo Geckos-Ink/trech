@@ -1,0 +1,12 @@
+# TRECH formal laws: optional Lean 4 definitions beside the classic C++/JS implementations.
+# Mathlib comes from the pinned reference checkout; run scripts/pull_lean.sh first.
+# Building this package compiles the imported Mathlib modules (heavy; see formal/README.md).
+name = "trech_formal"
+defaultTargets = ["Trech"]
+
+[[require]]
+name = "mathlib"
+path = "../thirds/mathlib4"
+
+[[lean_lib]]
+name = "Trech"

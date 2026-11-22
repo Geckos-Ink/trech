@@ -81,6 +81,22 @@ add_executable(test_field_evolution test_field_evolution.cpp)
 target_link_libraries(test_field_evolution PRIVATE trech_ml)
 add_test(NAME trech_field_evolution COMMAND test_field_evolution)
 
+add_executable(test_formal_laws test_formal_laws.cpp)
+target_link_libraries(test_formal_laws PRIVATE trech_js)
+target_compile_definitions(test_formal_laws PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
+  # C++ and JavaScript classic laws are compared bit for bit: no fused multiply-add here.
+  target_compile_options(test_formal_laws PRIVATE -ffp-contract=off)
+endif()
+add_test(NAME trech_formal_laws COMMAND test_formal_laws)
+if (TRECH_ENABLE_LEAN_CHECK)
+  find_program(TRECH_LAKE_EXECUTABLE NAMES lake REQUIRED)
+  add_test(NAME trech_formal_lean_build COMMAND "${TRECH_LAKE_EXECUTABLE}" build
+           WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/formal")
+else()
+  message(STATUS "Lean law proofs not checked (TRECH_ENABLE_LEAN_CHECK=OFF); classic checks still run")
+endif()
+
 add_executable(test_klein_nishina test_klein_nishina.cpp)
 target_include_directories(test_klein_nishina PRIVATE ${PROJECT_SOURCE_DIR}/include)
 add_test(NAME trech_klein_nishina COMMAND test_klein_nishina)
@@ -243,6 +259,10 @@ if (Python3_Interpreter_FOUND)
   add_test(
     NAME trech_validation_offline
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_validation_offline.py
+  )
+  add_test(
+    NAME trech_formal_law_pairs
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_formal_law_pairs.py
   )
   add_test(
     NAME trech_js_law_audit
