@@ -13,3 +13,13 @@
 [submodule "thirds/v8"]
 	path = thirds/v8
 	url = https://chromium.googlesource.com/v8/v8.git
+[submodule "thirds/lean4"]
+	path = thirds/lean4
+	url = https://github.com/leanprover/lean4.git
+	branch = master
+	shallow = true
+[submodule "thirds/mathlib4"]
+	path = thirds/mathlib4
+	url = https://github.com/leanprover-community/mathlib4.git
+	branch = master
+	shallow = true

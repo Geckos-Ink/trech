@@ -16,6 +16,7 @@ dated record below, and queue its residuals in the same change.
 - **P3** · R7 · Torch cross-platform/accelerator validation and production-model parity/performance. ([detail](#dependency-checkout-refresh--2026-10-27))
 - **P3** · R7 · Node research host installation/relocation and Windows execution. ([detail](#installed-nodev8-atomic-research-host))
 - **gated** · R5 · Rebuild/install Geant4 11.5 and rebuild TRECH, then CTest and physics regression; then a real `TRECH_ENABLE_DNA_CHEM` build, G4EMLOW 9.0 and the revalidation list (heavy build: needs an explicit go-ahead). ([detail](#dependency-checkout-refresh--2026-10-27))
+- **gated** · R8 · Lean toolchain and Mathlib: install Mathlib's `lean-toolchain` with elan, or build `thirds/lean4` at that tag (fetch the tag first; the shallow `master` checkout is newer), then `lake exe cache get` (several GB) or a full Mathlib build. Heavy: needs an explicit go-ahead. Unblocks the [formal-laws queue](../../engine/formal/ROADMAP.md#priority-queue).
 - **gated** · R7 · From-source V8: run `scripts/build_v8.sh` for the pinned `thirds/v8` (heavy: several GB of dependencies and a long compile; needs an explicit go-ahead), then configure with `TRECH_V8_BUILD_DIR` and rerun the V8 CTest set. Only Homebrew V8 15.9.128.11 is validated. ([detail](#v8-for-the-javascript-backend--2026-11-21))
 
 ## V8 for the JavaScript backend — 2026-11-21

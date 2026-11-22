@@ -47,7 +47,7 @@ through held-out Geant4 runs.
 | Topic | Contains |
 | --- | --- |
 | [Architecture](architecture/README.md) | Runtime data flow, source ownership and original design notes. |
-| [Engine and APIs](engine/README.md) | CLI and lab, hooks, output schema, precision, Geant4 and JavaScript backends. |
+| [Engine and APIs](engine/README.md) | CLI and lab, hooks, output schema, precision, Geant4 and JavaScript backends, optional Lean formal laws. |
 | [Inference and models](inference/README.md) | Cascades, group hierarchies, response domains, model formats and training. |
 | [Scenarios and processes](scenarios/README.md) | Runnable examples, authoring, reusable processes and physical comparisons. |
 | [Studio and visualization](studio/README.md) | Playback, editing, Chemistry workspace and refraction. |

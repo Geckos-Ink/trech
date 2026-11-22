@@ -39,6 +39,7 @@ later step regress an earlier contract.
 - **R5 Geant4 base, anti-degeneration and validation** — the precise base itself, its diagnostics and the regression suite.
 - **R6 Studio: observe and edit the cascade** — viewer/client work that makes recorded results legible and editable.
 - **R7 Platform and backends** — Torch, V8, dependency builds and performance.
+- **R8 Formal laws (Lean)** — optional Lean 4 definitions and proofs beside the classic C++/JS implementations, checked against Mathlib first, used only for validation; later, Geant4's basic laws through derived classes.
 - **RX Research tracks** — long-horizon work outside the route (atomic stability, QM references).
 
 ### P1 items by route step
@@ -71,12 +72,18 @@ later step regress an earlier contract.
 - Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab` and `simulate` streams snapshots back (engine reinitialization is a runtime P1). — [studio/authoring](studio/authoring/ROADMAP.md#priority-queue)
 - Complete the `SceneModel → scenario .js` round-trip for source dependencies and volume hierarchy. — [studio/authoring](studio/authoring/ROADMAP.md#priority-queue)
 
+**R8 Formal laws (Lean)**
+
+- Law-pair contract: naming, roles, conformance record and provenance for a classic implementation and its optional Lean definition. — [engine/formal](engine/formal/ROADMAP.md#priority-queue)
+- First law inventory: the laws and invariants TRECH computes classically, what Mathlib already covers, and the first two pairs to formalise. — [engine/formal](engine/formal/ROADMAP.md#priority-queue)
+
 ### Gated items (need a go-ahead)
 
 - Research sponsorship: scope a pilot observable/domain with named owners, validate credit allocations and staffing/compute estimates, establish partner interest (owner decisions, not agent work). — [project](project/ROADMAP.md#priority-queue)
 - Calibrated microscope-scale interface data (no calibrated 3D sequence is bundled; external data needed). — [scenarios/processes](scenarios/processes/ROADMAP.md#priority-queue)
 - NaCl and aerodynamics quantitative validation need independent external anchors (concentration/evaporation data; shock/flow data) before any learned phase/continuum lift. — [scenarios/references](scenarios/references/ROADMAP.md#priority-queue)
 - V8 backend landed 2026-11-21 (Homebrew V8, macOS arm64): validate the from-source monolith (`scripts/build_v8.sh`, heavy) and other platforms, then decide whether V8 becomes the default engine. — [engine/runtime](engine/runtime/ROADMAP.md#priority-queue), [tooling/dependencies](tooling/dependencies/ROADMAP.md#priority-queue)
+- Lean toolchain (Mathlib's `lean-toolchain`, via elan or `thirds/lean4` at that tag) and the Mathlib build or cache download (heavy). Owner decisions: a physics-specific Lean reference library, and when Lean may stop being optional. — [engine/formal](engine/formal/ROADMAP.md#priority-queue), [tooling/dependencies](tooling/dependencies/ROADMAP.md#priority-queue)
 - Native screenshots of the Models and Spectra docks (media gates). — [studio/workspace](studio/workspace/ROADMAP.md#priority-queue)
 - Rebuild/install Geant4 11.5 and rebuild TRECH, then CTest and physics regression; then a real `TRECH_ENABLE_DNA_CHEM` build, G4EMLOW 9.0 and the revalidation list (heavy build: needs an explicit go-ahead). — [tooling/dependencies](tooling/dependencies/ROADMAP.md#priority-queue)
 - Recapture media that predate fixes (Briggs–Rauscher and MR-tissues geometry, aerodynamics/NaCl beam origin) and refresh historical native screenshots deliberately (media gates). — [tooling/media](tooling/media/ROADMAP.md#priority-queue)

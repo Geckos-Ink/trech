@@ -13,6 +13,7 @@
 | JavaScript host and live lab | [AGENTS.md](runtime/AGENTS.md) | [ROADMAP.md](runtime/ROADMAP.md) |
 | Geant4 transport and diagnostics | [AGENTS.md](simulation/AGENTS.md) | [ROADMAP.md](simulation/ROADMAP.md) |
 | Lattice methods and field-evolution arbitration (`ctx.evolveField`) | [AGENTS.md](lattice/AGENTS.md) | [ROADMAP.md](lattice/ROADMAP.md) |
+| Formal laws and Lean verification (optional) | [AGENTS.md](formal/AGENTS.md) | [ROADMAP.md](formal/ROADMAP.md) |
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 

@@ -29,12 +29,13 @@ The [implementation route](AGENTS/ROADMAP.md#implementation-route) orders these 
 2. Replace authored evolution laws with learned, validated engine operators through the [migration contract](AGENTS/engine/operators/migration/ROADMAP.md), [prerequisites](AGENTS/engine/operators/prerequisites/ROADMAP.md) and [scenario ledger](AGENTS/scenarios/migrations/ROADMAP.md). Reference solvers stay labelled comparisons.
 3. Reduce [simulation degeneration](AGENTS/engine/simulation/optics/ROADMAP.md), preserve strict replay and provenance, and quantify the gap to independent truth.
 4. Make the cascade observable and editable in [Studio](AGENTS/studio/ROADMAP.md), while displaying only recorded results and clearly labelled representation choices.
+5. Reinforce the validation math with [formal Lean definitions](AGENTS/engine/formal/ROADMAP.md) beside the classic implementations (Lean stays optional; Mathlib is checked first; accelerated kernels stay the compute path), and later attach Lean statements to Geant4's basic laws through derived classes.
 
 ## Find the owning workstream
 
 | Work area | Context and source ownership | Plan and gaps |
 | --- | --- | --- |
-| Engine: core, JS host, inference, operators, Geant4, precision | [Engine handbook](AGENTS/engine/AGENTS.md) | [Engine roadmap](AGENTS/engine/ROADMAP.md) |
+| Engine: core, JS host, inference, operators, Geant4, precision, optional Lean formal laws | [Engine handbook](AGENTS/engine/AGENTS.md) | [Engine roadmap](AGENTS/engine/ROADMAP.md) |
 | Scenarios: bundles, processes, chemistry, fluids, CNT, MRI | [Scenario handbook](AGENTS/scenarios/AGENTS.md) | [Scenario roadmap](AGENTS/scenarios/ROADMAP.md) |
 | Studio: layers, panels, engine bridge, rendering, editing, export | [Studio handbook](AGENTS/studio/AGENTS.md) | [Studio roadmap](AGENTS/studio/ROADMAP.md) |
 | Tools: builds/dependencies, training/data, media, validation | [Tooling handbook](AGENTS/tooling/AGENTS.md) | [Tooling roadmap](AGENTS/tooling/ROADMAP.md) |

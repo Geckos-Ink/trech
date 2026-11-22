@@ -11,7 +11,7 @@ Cross-component tasks follow each affected branch. [The full tree index](AGENTS/
 
 | Work area | Context and source ownership | Plan and gaps |
 | --- | --- | --- |
-| Engine: core, JS host, inference, operators, Geant4, precision, lattice methods and field-evolution arbitration | [Engine handbook](AGENTS/engine/AGENTS.md) | [Engine roadmap](AGENTS/engine/ROADMAP.md) |
+| Engine: core, JS host, inference, operators, Geant4, precision, lattice methods, field-evolution arbitration and optional Lean formal laws | [Engine handbook](AGENTS/engine/AGENTS.md) | [Engine roadmap](AGENTS/engine/ROADMAP.md) |
 | Scenarios: bundles, processes, chemistry, fluids, CNT, MRI | [Scenario handbook](AGENTS/scenarios/AGENTS.md) | [Scenario roadmap](AGENTS/scenarios/ROADMAP.md) |
 | Studio: layers, panels, engine bridge, rendering, editing, export | [Studio handbook](AGENTS/studio/AGENTS.md) | [Studio roadmap](AGENTS/studio/ROADMAP.md) |
 | Tools: builds/dependencies, training/data, media, validation | [Tooling handbook](AGENTS/tooling/AGENTS.md) | [Tooling roadmap](AGENTS/tooling/ROADMAP.md) |
@@ -32,6 +32,7 @@ Cross-component tasks follow each affected branch. [The full tree index](AGENTS/
 - Run relevant checks and report tests run/skipped and remaining gaps. Documentation-only work needs link/reference checks; engine work follows the CTest/validation guidance and Studio work its focused pytest coverage.
 - Never implicitly trigger heavy dependency builds or bumps. Preserve the [reference-media gates](AGENTS/tooling/media/AGENTS.md) and [dependency rules](AGENTS/tooling/dependencies/AGENTS.md).
 - `thirds/evolvo` is first-party, lightweight Python and the exception to that rule. Every time a task uses it (for Torch, V8 or Geant4 work alike), first fast-forward it with `git -C thirds/evolvo pull --ff-only`. When the task needs a general-purpose Evolvo change, implement or fix it in `thirds/evolvo` itself, following its own `AGENTS.md`. Commit it on Evolvo's `main` with no co-author trailer, then commit the new submodule pointer in TRECH (see the [Evolvo workflow](AGENTS/tooling/dependencies/AGENTS.md)).
+- `thirds/lean4` and `thirds/mathlib4` are pulled before every use (`scripts/pull_lean.sh`); building them stays gated. Lean is optional for now: laws keep their classic C++/JS implementation, with a Lean definition beside it for validation, and Mathlib is searched before any theorem is declared ([formal-laws handbook](AGENTS/engine/formal/AGENTS.md)).
 
 TRECH is a **C++/Geant4 simulation and learning toolkit**: experiments are authored in
 **JavaScript** (QuickJS, or V8 in a `TRECH_ENABLE_V8` build), which computes and composes a config that is handed as JSON to a

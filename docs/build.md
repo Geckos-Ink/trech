@@ -63,5 +63,11 @@ cmake --build --preset rel
 Add `-DTRECH_DEFAULT_JS_ENGINE=v8` to make V8 the default of that binary. The
 [V8 backend guide](engine/v8.md) explains selection, results and limits.
 
+## Optional: Lean and Mathlib sources
+
+`thirds/lean4` and `thirds/mathlib4` hold the sources for the [formal-laws route](engine/formal_laws.md).
+The TRECH build never uses them, and a normal clone does not need them. To fetch or update
+them, run `scripts/pull_lean.sh`; it clones them shallowly if missing and builds nothing.
+
 Continue with the [first experiment](first_run.md) or
 [install the Studio client](../studio/README.md).
