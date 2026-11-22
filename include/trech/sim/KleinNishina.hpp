@@ -12,6 +12,8 @@
 // Lean pair (optional, for validation): Trech.Laws.Compton in
 // formal/Trech/Laws/Compton.lean states and proves 0 <= T/E <= comptonEdgeFraction for
 // these formulas; tests/test_formal_laws.cpp checks this classic code against it.
+// Trech.Laws.TwoBody (formal/Trech/Laws/TwoBody.lean) derives scatteredEnergyRatio itself from
+// four-momentum conservation; the same test checks that its kinematics conserve momentum.
 
 #include <algorithm>
 #include <cmath>

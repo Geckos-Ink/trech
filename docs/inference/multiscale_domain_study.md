@@ -224,9 +224,36 @@ features. The low ARI shows that the transport response subdivides each fate cla
 is too coarse for the transport law.
 
 Before the warm-start fix, the seed-102 run did not finish in three hours. With the fix, the
-training runs took 341 s and 268 s, and each held-out evaluation took 240 s. Efflux has no
-`deploy` mode yet, so these are prequential results on a declared trajectory, not closed-loop
-results.
+training runs took 341 s and 268 s, and each held-out evaluation took 240 s. These are
+prequential results on a declared trajectory.
+
+**Closed loop (2026-11-22).** With `learn_domains=deploy` the frozen learner, published as
+`data/efflux_domain_learner/transport.json`, *drives* the bath: each tick it predicts every
+particle's new velocity and displacement, and the transport operator runs only on a copy, from
+the same state and random kicks, as a shadow. Because the learner then moves particles to places
+the operator never put them, errors could compound; the per-third RMSE shows whether they do.
+
+| Seed (6,000 ticks) | Shadow RMSE velocity / position per tick (pooled law) | By third, position | Final waste inside, operator → deploy | Retained inside | Verdict |
+| --- | --- | --- | ---: | --- | --- |
+| default (held out) | 0.00225 / 0.0145 (0.0163 / ≥ 0.0361) | 0.0144 / 0.0179 / 0.0074 | 2 → 3 | 30 / 30 | 11/11 |
+| 201 (held out) | 0.00225 / 0.0152 | 0.0166 / 0.0148 / 0.0119 | 4 → 4 | 29 (operator) / 30 | 10/11 |
+
+The error does not grow over the run. The clearance half-life differs by 75 and 54 ticks
+(tolerance 600). The waste-inside series of the two runs differ by up to 12 packets at the
+default seed, because a membrane crossing draws from the hook RNG, so once a particle reaches the
+membrane at a different tick the two runs follow different random draws. At seed 201 the failing
+check is the operator's: the operator-driven run let one essential molecule cross. The deploy
+run is 20× slower than the operator (237 s against 12 s). To reproduce:
+
+```bash
+trech run examples/scenarios/testscenario_efflux/testscenario_efflux.js \
+  --param learn_domains='"deploy"' \
+  --param domain_learner_model='"data/efflux_domain_learner/transport.json"' \
+  --output build/out_efflux_learned_deploy
+```
+
+The suite case `efflux_domain_learner_deploy_closed_loop` grades that run against the default
+operator run `out_efflux`.
 
 ## Training and deploying specialists
 

@@ -66,6 +66,7 @@ Lean file and theorems, and the classic sources.
 | --- | --- | --- | --- |
 | Compton kinematics | `Trech.Laws.Compton`: the electron's share `T/E` lies between 0 and the Compton edge `2ε/(1+2ε)`, and equals the edge at back-scatter | `include/trech/sim/KleinNishina.hpp`, `js/trech_formal_laws.js` | 410 (energy, angle) samples respect the bound; the C++ and JavaScript values are bit-identical |
 | Energy balance of a recorded step | `Trech.Laws.EnergyBalance`: a step conserves energy when `E_pre + Q = E_post + ΣT_i + d` (its residual is zero); with no rest mass released (`Q = 0`) the outgoing particle and every secondary carry at most `E_pre`, and balanced steps telescope along a track | `include/trech/sim/EnergyBalance.hpp`, read in `src/sim/SteppingAction.cpp` | 410 Compton steps formed as Geant4's free-electron model forms them, a gamma conversion with `Q = −2 m_e c²` and a 41-step track close within `1e-12` relative; a step that drops its electron fails on purpose. In a Geant4 run the engine records the same check on every first Compton scatter |
+| Compton from four-momentum | `Trech.Laws.TwoBody`: if a photon scatters off an electron at rest and energy and momentum are both conserved (the electron ending on its mass shell), then `m(E − E′) = E E′ − k·k′`, which is the Compton relation `E′(m + E(1 − cos θ)) = m E` | `include/trech/sim/KleinNishina.hpp` (the relation), `include/trech/sim/EnergyBalance.hpp` (momentum balance) | 410 scatters whose electron is built the way Geant4's model builds it (direction from the photon momenta, magnitude from its energy) conserve momentum within `1e-12`; a scattered energy 1% off fails on purpose. In a Geant4 run the engine records the momentum balance as the theorem's hypothesis check |
 | Beer–Lambert attenuation | `Trech.Laws.Attenuation`: survival `exp(-μx)` multiplies over consecutive paths, stays in (0, 1] and decreases with path length | `src/sim/AnalyticCrossCheck.cpp`, `js/trech_formal_laws.js` | `S(x+y)` against `S(x)·S(y)` on 20 path pairs, within a stated float tolerance |
 | Lattice mass conservation | `Trech.Methods.Lattice`: the collision keeps a cell's mass if the equilibrium does, a zero-sum source keeps it, streaming along a bijection keeps the total | `src/core/LatticeKinetic.cpp` | the theorems' hypotheses (velocity-set moments, opposite-direction table, streaming map) and the total mass over 300 forced steps on a periodic lattice |
 | Scalar lattice conservation | `Trech.Methods.Lattice.advectedEquilibrium_sum`: the advection-diffusion equilibrium carries the cell's value, so with the same collision and streaming theorems a scalar lattice with closed (zero-flux) walls keeps its total | `src/core/LatticeKinetic.cpp`, `src/core/LatticeContinuum.cpp` | the engine's own hypothesis checks on a walled lattice with an obstacle, and the scalar total over 400 advected steps; a Dirichlet wall (which adds scalar by design) is the counter-example |
@@ -174,9 +175,19 @@ divided by the largest of those energies, as the engine check `energy.step_balan
 `1e-12`) and as `measured_max_energy_balance_residual` in the analytic check. Nothing else in
 the run changes: on 2026-11-22 a 20,000-event run differed from the previous build's output only
 in these new fields and the new engine record in `law_checks`. That run read 16,423 scatters with a largest residual of `4.2e-17`, so
-Geant4's sampled Compton steps close to rounding. The family gate adds
-`energy_balance_measured`, `energy_balance_closure`, `engine_laws_recorded` and
-`engine_laws_hold`. To see it:
+Geant4's sampled Compton steps close to rounding.
+
+The same scatters also check momentum, `k = k′ + p`: the photon's momentum before equals the
+photon's after plus the electron's. That is the hypothesis from which `Trech.Laws.TwoBody` proves
+the Compton relation, so the record says `kind: "hypothesis"`. It is checked only on scatters
+whose products are all tracks, because an electron absorbed on the spot takes momentum the step
+record does not list. The tolerance is stated per scatter: the electron's momentum is computed
+from `T = E − E′`, which loses digits when the transfer is small, so the bound grows like
+`√(m / 2T)`. A flat `1e-12` fails at `ε = 10⁻⁴` (2.7e-12), and the conformance test keeps that
+failure as a negative control. On 2026-11-22, 16,420 of 16,423 scatters were checked (three
+deposited their electron), with a largest residual of `3.7e-15`. The family gate adds
+`energy_balance_measured`, `energy_balance_closure`, `momentum_balance_measured`,
+`engine_laws_recorded` (at least two) and `engine_laws_hold`. To see it:
 
 ```bash
 trech run examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js \
@@ -196,7 +207,7 @@ python3 scripts/check_lean_laws.py
 ```
 
 The last command builds the package and prints one line per theorem with the axioms it uses,
-ending with `26/26 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
+ending with `28/28 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
 an added axiom makes it fail. Add `--report build/lean_audit.json` to also save the audit
 as JSON: the Lean version, toolchain and Mathlib revision, the SHA-256 hash of `laws.json` and
 of every Lean file, one combined hash of all of them, and each theorem's axioms. A run reads it

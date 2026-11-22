@@ -4,13 +4,14 @@ TRECH_PARAMETERS({
   label: "Learn response domains", group: "Inference",
   description: "learn = the engine grows unlabelled response domains of the transport operator " +
                "(ctx.learnDomains) from its own per-particle outputs, graded prequentially against a " +
-               "pooled law; evaluate = a frozen learner (domain_learner_model) is graded on this run. " +
-               "Operator physics only; the bath is unchanged.",
-  default: "off", choices: ["off", "learn", "evaluate"]
+               "pooled law; evaluate = a frozen learner (domain_learner_model) is graded on this run; " +
+               "both leave the bath unchanged. deploy = the frozen learner drives the particle " +
+               "transport in place of the operator, which runs on a copy as a shadow. Operator physics only.",
+  default: "off", choices: ["off", "learn", "evaluate", "deploy"]
 }, {type: "choice"}); },
 "domain_learner_model": function() { return {
   type: "string", default: "", group: "Inference", label: "Domain learner state",
-  description: "trech_domain_learner_v1 state: warm start for learn, the frozen model for evaluate. " +
+  description: "trech_domain_learner_v1 state: warm start for learn, the frozen model for evaluate and deploy. " +
                "Repository-relative unless absolute."
 }; },
 "physics_source": function() { return Object.assign({}, {

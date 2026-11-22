@@ -442,7 +442,9 @@ class BundleFamilyExports(unittest.TestCase):
                  "measured_cos_theta_histogram": [5, 5], "cos_theta_histogram_entries": 10,
                  "cos_theta_histogram_chi2": 0.5, "cos_theta_histogram_dof": 1,
                  "cos_theta_z_score": -0.4, "klein_nishina_mean_cos_theta": 0.3187,
-                 "measured_mean_cos_theta": 0.3168, "measured_max_kinematic_residual": 3e-16}
+                 "measured_mean_cos_theta": 0.3168, "measured_max_kinematic_residual": 3e-16,
+                 "energy_balance_samples": 10, "measured_max_energy_balance_residual": 4e-17,
+                 "momentum_balance_samples": 9, "measured_max_momentum_balance_residual": 4e-15}
         old = os.environ.get("TRECH_BIN")
         os.environ["TRECH_BIN"] = str(_trech())
         try:
@@ -450,14 +452,21 @@ class BundleFamilyExports(unittest.TestCase):
                 run = Path(tmp) / cases.RUN_ANALYTIC_COMPTON
                 run.mkdir()
                 law = {"origin": "validation", "law": "compton.transfer_within_edge", "passed": True}
-                laws = [law, dict(law, law="compton.edge_at_backscatter")]
+                engine = {"origin": "engine", "law": "energy.step_balance", "passed": True}
+                laws = [law, dict(law, law="compton.edge_at_backscatter"),
+                        engine, dict(engine, law="compton.momentum_balance")]
                 for patch, status, failed, recorded in (
                         ({}, "pass", None, laws),
                         ({"transfer_histogram_chi2": 30.0}, "fail", "spectrum_shape_p", laws),
                         ({"measured_max_transfer_fraction": 0.73}, "fail", "edge_respected", laws),
                         ({"cos_theta_histogram_entries": 9}, "fail", "angular_entries_match_samples", laws),
-                        ({}, "fail", "formal_laws_hold", [laws[0], dict(laws[1], passed=False)]),
-                        ({}, "fail", "formal_laws_recorded", [])):
+                        ({}, "fail", "formal_laws_hold", [laws[0], dict(laws[1], passed=False)] + laws[2:]),
+                        ({}, "fail", "formal_laws_recorded", laws[2:]),
+                        ({"energy_balance_samples": 9}, "fail", "energy_balance_measured", laws),
+                        ({"measured_max_energy_balance_residual": 1e-9}, "fail", "energy_balance_closure", laws),
+                        ({"momentum_balance_samples": 0}, "fail", "momentum_balance_measured", laws),
+                        ({}, "fail", "engine_laws_hold", laws[:3] + [dict(laws[3], passed=False)]),
+                        ({}, "fail", "engine_laws_recorded", laws[:3])):
                     row = dict(check, **patch)
                     _write_jsonl(run / "trech_scores.jsonl",
                                  [{"phase": "run_end", "n_events": 10, "analytic_checks": [row],

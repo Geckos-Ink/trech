@@ -139,6 +139,47 @@ void energyBalancePairs() {
   }
 }
 
+void twoBodyPairs() {
+  // Trech.Laws.TwoBody.compton_relation: the classic scatteredEnergyRatio must give kinematics
+  // that conserve three-momentum when the electron is built the way Geant4's free-electron model
+  // builds it: direction (E k - E' k').unit(), magnitude sqrt(T (T + 2 m)) with T = E - E'.
+  namespace eb = trech::sim::energy_balance;
+  const double me = 0.51099895;
+  std::vector<double> residuals, wrong, zeros, tolerances;
+  auto residualFor = [&](double eps, double c, double ratioScale) {
+    const double e = eps * me;
+    const double post = kn::scatteredEnergyRatio(eps, c) * e * ratioScale;
+    const double s = std::sqrt(std::max(0.0, 1.0 - c * c));
+    const eb::Momentum k = {0.0, 0.0, e}, kp = {post * s, 0.0, post * c};
+    const double t = e - post;
+    double dx = k[0] - kp[0], dy = k[1] - kp[1], dz = k[2] - kp[2];
+    const double norm = std::sqrt(dx * dx + dy * dy + dz * dz);
+    const double pe = std::sqrt(std::max(0.0, t * (t + 2.0 * me)));
+    if (norm > 0.0) { dx *= pe / norm; dy *= pe / norm; dz *= pe / norm; }
+    return eb::relativeMomentumResidual(k, kp, {{dx, dy, dz}});
+  };
+  std::vector<double> flat;
+  for (double eps : kEps)
+    for (double c : cosGrid()) {
+      residuals.push_back(residualFor(eps, c, 1.0));
+      wrong.push_back(residualFor(eps, c, 1.01));
+      zeros.push_back(0.0);
+      const double e = eps * me;
+      tolerances.push_back(eb::momentumRoundingBound(e - kn::scatteredEnergyRatio(eps, c) * e, me));
+      flat.push_back(eb::kRelativeTolerance);
+    }
+  expect(formal::checkWithinBounds("compton.momentum_balance", "Trech.Laws.TwoBody.compton_relation",
+                                   residuals, zeros, tolerances, 0.0));
+  // The rounding model is needed: a flat 1e-12 misses at eps = 1e-4 (2.7e-12 measured), where
+  // the electron's energy is a tiny difference of two photon energies.
+  expect(formal::checkWithinBounds("compton.momentum_flat_tolerance_negative_control", "", residuals, zeros,
+                                   flat, 0.0),
+         false);
+  // A scattered energy 1% off the relation leaves momentum unbalanced.
+  expect(formal::checkWithinBounds("compton.momentum_negative_control", "", wrong, zeros, tolerances, 0.0),
+         false);
+}
+
 void attenuationPairs() {
   // Trech.Laws.Attenuation.survival_add on the classic std::exp(-mu x) of the beer_lambert check.
   const double mu = 0.0707;  // 1/mm, any positive coefficient
@@ -622,6 +663,7 @@ int main() {
   try {
     comptonPairs();
     energyBalancePairs();
+    twoBodyPairs();
     attenuationPairs();
     latticePairs();
     scalarLatticePairs();

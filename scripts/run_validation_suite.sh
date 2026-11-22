@@ -389,6 +389,12 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" trech_run examples/scenarios/testscenario_efflux/testscenario_efflux.js \
       --events "${N_EVENTS_EFFLUX}" --param physics_source='"reference"' \
       --output "${RUNS_DIR}/out_efflux_reference" >/dev/null 2>&1
+    echo "  - testscenario_efflux driven by the frozen learned-domain transport law (closed loop)"
+    rm -rf "${RUNS_DIR}/out_efflux_learned_deploy"
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" trech_run examples/scenarios/testscenario_efflux/testscenario_efflux.js \
+      --events "${N_EVENTS_EFFLUX}" --param learn_domains='"deploy"' \
+      --param domain_learner_model='"data/efflux_domain_learner/transport.json"' \
+      --output "${RUNS_DIR}/out_efflux_learned_deploy" >/dev/null 2>&1
 
     echo "  - beaker_water_n_pentane (Geant4+structure cascade -> layers, colour, evaporation)"
     echo "    PubChem structures (${PUBCHEM_MODE}) -> ${PUBCHEM_CACHE}"

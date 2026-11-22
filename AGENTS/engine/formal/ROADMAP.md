@@ -18,7 +18,7 @@ Standing constraint for every item: Lean stays optional. Each law keeps its clas
 implementation as the running path, with the Lean definition beside it for validation
 ([rule](AGENTS.md#rules)).
 
-- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Added declared `ctx.react` count conservation, antisymmetric `ctx.interact` exchange and the energy balance of recorded Geant4 Compton steps. Next: relativistic two-body kinematics (the Compton relation from four-momentum conservation, checked against the recorded electron direction). Search Mathlib first. ([detail](#geant4-step-energy-balance-2026-11-22))
+- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Added declared `ctx.react` count conservation, antisymmetric `ctx.interact` exchange, the energy balance of recorded Geant4 Compton steps and the Compton relation from four-momentum conservation (momentum balance checked on recorded steps). Next: the `ctx.evolve` integrator (an explicit step within declared bounds stays within them, and a rate-only update is linear in `dt`). Search Mathlib first. ([detail](#compton-from-four-momentum-2026-11-22))
 - **P2** · R8 · Energy balance on every recorded step: today `energy.step_balance` reads only a primary photon's first Compton scatter. Extend it to every process and generation with the rest-mass term `Q` (gamma conversion `−2 m_e c²`, positron annihilation, nuclear reactions from Geant4's mass table), behind the same observe-only contract and only in runs that ask for it. ([detail](#geant4-step-energy-balance-2026-11-22))
 - **P2** · R8 · Conformance harness: a Lean reference evaluator (`@[export]` C symbols linked behind an opt-in `TRECH_ENABLE_LEAN`, default OFF, or a separate `lake exe` fed JSON) that checks the classic kernel on sampled or recorded inputs offline. Measure its cost; it never runs per step in production and never changes physics, RNG or emits. ([detail](#route-opened--2026-11-22))
 - **P2** · R8 · Hardware acceleration contract: Lean compiles to scalar CPU code, so accelerated kernels (C++ SIMD, LibTorch, GPU) stay the compute path. Define how a proof about an algorithm's model transfers to its accelerated implementation (shared algorithm spec, sampled conformance, documented reduction-order and fused-operation differences). ([detail](#route-opened--2026-11-22))
@@ -30,6 +30,26 @@ implementation as the running path, with the Lean definition beside it for valid
 - **P3** · R5 · Geant4 secondary track: Lean statements of Geant4's basic laws (two-body kinematics, the Compton relation from four-momentum conservation, exponential attenuation, energy conservation in `SampleSecondaries`), attached through derived classes in shadow mode (inheritance preferred; `patches/geant4/` only for non-virtual code). Observation first; any replacement needs byte parity or a validated tolerance, a regression against the unpatched build and the owner's go-ahead. ([detail](AGENTS.md#geant4-secondary-track))
 - **gated** · R8 · Owner decision: whether to add a physics-specific Lean library (for example PhysLean) as a further reference checkout, so physical laws are also checked against it before being declared.
 - **gated** · R8 · Owner decision: when (if ever) Lean stops being optional for a given path.
+
+## Compton from four-momentum (2026-11-22)
+
+- [x] `Trech.Laws.TwoBody`: `compton_invariant` (`m(E − E′) = E E′ − ⟪k, k′⟫` from energy and
+  momentum conservation and the electron's mass shell, over any real inner-product space) and
+  `compton_relation` (the angle form). No Compton or four-momentum statement in Mathlib;
+  `norm_sub_sq_real` does the vector step. Audit 28/28.
+- [x] Classic side: `scatteredEnergyRatio` (`KleinNishina.hpp`) is the relation; the new
+  `relativeMomentumResidual` (`EnergyBalance.hpp`) checks the theorem's momentum hypothesis on
+  each first Compton scatter whose products are all tracks (photon survives, nothing deposited)
+  and records the engine check `compton.momentum_balance` (`kind: hypothesis`).
+- [x] Stated float bound `momentumRoundingBound`: the electron momentum comes from `T = E − E′`,
+  so its rounding grows like `√(m / 2T)`. At `ε = 10⁻⁴` the flat `1e-12` misses (2.7e-12
+  measured, 1.6e-12 predicted by the model); a negative control keeps that visible.
+- Verification: Debug CTest 80/80. A 20,000-event Geant4 run checked 16,420 of 16,423 scatters
+  (three deposited their electron on the spot) with a largest residual of 3.7e-15 against a
+  largest bound of 1.09e-12, output otherwise unchanged. Family gate 25/25.
+- Found while landing it: the previous change's new Compton family checks were not reflected in
+  the `trech_scenario_contracts` fixture (the CTest run preceded the companion edit). The fixture
+  now carries the fields and covers each new failure.
 
 ## Geant4 step energy balance (2026-11-22)
 

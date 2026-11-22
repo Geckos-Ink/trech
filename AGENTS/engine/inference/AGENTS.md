@@ -316,8 +316,9 @@ x/y/z + OU velocity, 64 hidden, R²min=0.9993 — its learned OU memory γ must 
 a 0.005 γ error doubled 3D clearance) and `efflux_crossing_operator.json` (`ctx.react`, R²=0.9827) remove the membrane
 efflux transport/crossing laws from its normal JS path. Both scenarios default to `operator`;
 their `reference` sources are audit-only distilled teachers, and their generic paired gates require
-zero OOD plus exact run-level inference accounting. `testscenario_efflux` `learn_domains=learn|evaluate`
-(operator physics only) runs `ctx.learnDomains` on the transport operator's own inputs (position,
+zero OOD plus exact run-level inference accounting. `testscenario_efflux` `learn_domains=learn|evaluate|deploy`
+(operator physics only; `deploy` lets the frozen learner in `data/efflux_domain_learner/` drive
+the transport with the operator as a shadow, graded by `efflux_domain_learner_deploy_closed_loop`) runs `ctx.learnDomains` on the transport operator's own inputs (position,
 radius, velocity, mass, permeant/cleared flags, unit innovations) and outputs (new velocity,
 pre-bound displacement rates). With 13 features the budget picks an affine basis, so the learner
 approximates the smooth SiLU operator piecewise; agreement is reported against

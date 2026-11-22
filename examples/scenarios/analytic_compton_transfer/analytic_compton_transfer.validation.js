@@ -21,7 +21,7 @@ TRECH_VALIDATIONS["analytic_compton_transfer"] = {
     }
   ],
   "family_case": "analytic_compton_transfer_cross_check",
-  "family_summary": "Klein-Nishina mean transfer within tolerance and |z| < 4; max sampled transfer within [0.98, 1] x the Compton edge; binned u = T/T_max and cos(theta) spectra complete with chi-square p >= 0.001; <cos theta> |z| < 4; energy-angle closure residual <= 1e-9; every first scatter's Geant4 energy balance E = E' + sum T_secondary + deposit closes to <= 1e-12 relative (engine law check energy.step_balance); the classic Compton reference's Lean-pair checks recorded in law_checks all pass.",
+  "family_summary": "Klein-Nishina mean transfer within tolerance and |z| < 4; max sampled transfer within [0.98, 1] x the Compton edge; binned u = T/T_max and cos(theta) spectra complete with chi-square p >= 0.001; <cos theta> |z| < 4; energy-angle closure residual <= 1e-9; every first scatter's Geant4 energy balance E = E' + sum T_secondary + deposit closes to <= 1e-12 relative (engine law check energy.step_balance) and, where every product is a track, its momentum balance closes within the stated rounding bound (compton.momentum_balance, the hypothesis of Trech.Laws.TwoBody); the classic Compton reference's Lean-pair checks recorded in law_checks all pass.",
   "family_checks": [
     {"id": "checks_present", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer]", "aggregate": "count", "op": "ge", "expected": 1},
     {"id": "all_available", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer].available", "aggregate": "all", "op": "eq", "expected": true},
@@ -45,7 +45,8 @@ TRECH_VALIDATIONS["analytic_compton_transfer"] = {
     {"id": "formal_laws_hold", "phase": "run_end", "field": "law_checks[?origin=validation].passed", "aggregate": "all", "op": "eq", "expected": true},
     {"id": "energy_balance_measured", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer]", "derive": {"fn": "difference", "args": ["energy_balance_samples", "primaries_compton_first"]}, "aggregate": "max_abs", "op": "eq", "expected": 0},
     {"id": "energy_balance_closure", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer].measured_max_energy_balance_residual", "aggregate": "max", "op": "le", "expected": 1e-12},
-    {"id": "engine_laws_recorded", "phase": "run_end", "field": "law_checks[?origin=engine]", "aggregate": "count", "op": "ge", "expected": 1},
+    {"id": "momentum_balance_measured", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer].momentum_balance_samples", "aggregate": "min", "op": "gt", "expected": 0},
+    {"id": "engine_laws_recorded", "phase": "run_end", "field": "law_checks[?origin=engine]", "aggregate": "count", "op": "ge", "expected": 2},
     {"id": "engine_laws_hold", "phase": "run_end", "field": "law_checks[?origin=engine].passed", "aggregate": "all", "op": "eq", "expected": true}
   ],
   "physics_status": "configuration_or_transport",

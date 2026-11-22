@@ -115,12 +115,14 @@ public:
   // distribution) and kinematicResidual is |E'/E - 1/(1+eps(1-cos theta))|, the
   // free-electron energy-angle closure. All Compton arguments are ignored for
   // other subtypes; a non-finite cosTheta leaves the angular tallies untouched.
-  // energyBalanceResidual is the scatter's relative energy-balance residual
-  // (sim/EnergyBalance.hpp); NaN means it was not measured.
+  // energyBalanceResidual and momentumResidual are the scatter's relative energy- and
+  // momentum-balance residuals (sim/EnergyBalance.hpp); NaN means not measured.
+  // momentumTolerance is that scatter's stated rounding bound (momentumRoundingBound).
   void AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction,
                                   G4int transferBin, G4double cosTheta,
                                   G4double kinematicResidual,
-                                  G4double energyBalanceResidual);
+                                  G4double energyBalanceResidual,
+                                  G4double momentumResidual, G4double momentumTolerance);
   // Record the final state of a primary's first photonuclear absorption (called
   // in addition to AddPrimaryFirstInteraction for fHadronInelastic).
   void AddPhotonuclearFinalState(const PhotonuclearFinalState& state);
@@ -278,6 +280,11 @@ private:
   G4Accumulable<G4int> comptonEnergyBalanceCount_;
   G4Accumulable<G4int> comptonEnergyBalanceViolations_;
   G4Accumulable<G4double> comptonEnergyBalanceResidualMax_;
+  // Same for the momentum balance (only scatters whose products are all tracks).
+  G4Accumulable<G4int> comptonMomentumBalanceCount_;
+  G4Accumulable<G4int> comptonMomentumBalanceViolations_;
+  G4Accumulable<G4double> comptonMomentumBalanceResidualMax_;
+  G4Accumulable<G4double> comptonMomentumBalanceToleranceMax_;
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> comptonFirstCosHistogram_;
   // First photonuclear absorptions: final-state counts, conservation residuals
   // (max |.| merges), the two-body ejectile-edge excess and a neutron

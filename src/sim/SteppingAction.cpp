@@ -351,14 +351,38 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
               // mass is released, Q = 0): E = E' + sum T_secondary + local deposit
               // (sim/EnergyBalance.hpp, Lean pair Trech.Laws.EnergyBalance). Observation only.
               double energyBalanceResidual = std::numeric_limits<double>::quiet_NaN();
+              // Momentum balance k = k' + p (hypothesis of Trech.Laws.TwoBody), only for a
+              // scatter whose products are all tracks: the photon survives and nothing was
+              // deposited on the spot (a below-threshold electron carries unrecorded momentum).
+              double momentumResidual = std::numeric_limits<double>::quiet_NaN();
+              double momentumTolerance = sim::energy_balance::kRelativeTolerance;
               if (subType == fComptonScattering) {
                 const double preKE = step->GetPreStepPoint()->GetKineticEnergy();
                 if (preKE > 0.0) {
                   std::vector<double> secondaryKE;
+                  std::vector<sim::energy_balance::Momentum> secondaryP;
                   if (const auto* secondaries = step->GetSecondaryInCurrentStep()) {
                     secondaryKE.reserve(secondaries->size());
                     for (const auto* secondary : *secondaries) {
                       secondaryKE.push_back(secondary->GetKineticEnergy());
+                      const auto p = secondary->GetMomentum();
+                      secondaryP.push_back({p.x(), p.y(), p.z()});
+                    }
+                  }
+                  if (!secondaryP.empty() && postPoint->GetKineticEnergy() > 0.0 &&
+                      step->GetTotalEnergyDeposit() == 0.0) {
+                    const auto pre = step->GetPreStepPoint()->GetMomentum();
+                    const auto post = postPoint->GetMomentum();
+                    momentumResidual = sim::energy_balance::relativeMomentumResidual(
+                        {pre.x(), pre.y(), pre.z()}, {post.x(), post.y(), post.z()}, secondaryP);
+                    // Rounding bound from the lightest-energy massive product (the electron).
+                    for (const auto* secondary : *step->GetSecondaryInCurrentStep()) {
+                      const double mass = secondary->GetDefinition()->GetPDGMass();
+                      if (mass > 0.0) {
+                        momentumTolerance = std::max(
+                            momentumTolerance, sim::energy_balance::momentumRoundingBound(
+                                                   secondary->GetKineticEnergy(), mass));
+                      }
                     }
                   }
                   energyBalanceResidual = sim::energy_balance::relativeResidual(
@@ -381,7 +405,8 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
               }
               runAction->AddPrimaryFirstInteraction(subType, transferFraction, transferBin,
                                                     cosTheta, kinematicResidual,
-                                                    energyBalanceResidual);
+                                                    energyBalanceResidual, momentumResidual,
+                                                    momentumTolerance);
               if (subType == fHadronInelastic &&
                   track->GetDefinition() == G4Gamma::Definition()) {
                 runAction->AddPhotonuclearFinalState(analysePhotonuclearFinalState(step));

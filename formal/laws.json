@@ -57,6 +57,23 @@
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["energy.step_balance", "energy.post_le_pre", "energy.conversion_balance", "energy.track_released_sum"]}
     },
     {
+      "id": "compton.four_momentum",
+      "role": "reference",
+      "statement": "For a photon (|k| = E) scattering off an electron of mass m at rest into a photon (|k'| = E') and an electron on its mass shell (Ee^2 = |p|^2 + m^2), energy and momentum conservation give m (E - E') = E E' - k.k', i.e. E' (m + E (1 - cos theta)) = m E.",
+      "lean": {
+        "file": "formal/Trech/Laws/TwoBody.lean",
+        "declarations": [
+          "Trech.Laws.TwoBody.compton_invariant",
+          "Trech.Laws.TwoBody.compton_relation"
+        ]
+      },
+      "classic": [
+        {"path": "include/trech/sim/KleinNishina.hpp", "cites": "Trech.Laws.TwoBody"},
+        {"path": "include/trech/sim/EnergyBalance.hpp", "cites": "Trech.Laws.TwoBody"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["compton.momentum_balance"]}
+    },
+    {
       "id": "lattice.collision_conserves_mass",
       "role": "method_property",
       "statement": "The two-relaxation-time collision keeps a cell's summed populations when the equilibrium carries the same mass, a zero-sum source keeps it, and pull streaming along a bijection of the links keeps the lattice total.",

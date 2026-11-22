@@ -110,7 +110,7 @@ Performance source: [`docs/validation/validation_report.json`](validation_report
 | [polyurethane_foam](#polyurethane_foam) | **C** ⚠ | `operator_partial` | 50% | 3 / 3 | 5.1 | 2×dist 2×hand | nano→meso→macro | 2 pass |
 | [spectrum_prediction](#spectrum_prediction) | **M** ⚠ | `no_active_material_law` | 100% | 2 / 0 | 0.0 | — | atomic→nano | none recorded |
 | [surrogate_generic_demo](#surrogate_generic_demo) | **B** | `no_active_material_law` | 100% | 2 / 0 | 0.0 | 1×anchor | atomic | 1 pass |
-| [testscenario_efflux](#testscenario_efflux) | **B** | `operator_backed` | 50% | 2 / 2 | 1.5 | 2×dist | micro | 2 pass |
+| [testscenario_efflux](#testscenario_efflux) | **B** | `operator_backed` | 50% | 2 / 2 | 1.4 | 2×dist | micro | 2 pass |
 | [testscenario_h2o_electrolysis_combustion](#testscenario_h2o_electrolysis_combustion) | **B** | `operator_backed` | 25% | 1 / 3 | 6.3 | 1×dist | meso | 2 pass |
 | [testscenario_magnetic_resonance](#testscenario_magnetic_resonance) | **E** | `reference_only` | 0% | 0 / 4 | 1.9 | — | — | 1 pass |
 | [testscenario_magnetic_resonance_brain](#testscenario_magnetic_resonance_brain) | **E** | `reference_only` | — | 0 / 0 | 0.0 | — | — | 1 pass |
@@ -1523,7 +1523,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Inference sites: 2 (`evolve` 1, `react` 1) · law-shaped math: 2 · inference share: 50%
-- Embedded coefficients: 15 in 972 code lines (1.5/100) · top-level literals: 23 · geometry math: 10
+- Embedded coefficients: 15 in 1040 code lines (1.4/100) · top-level literals: 23 · geometry math: 13
 - Geant4 fact reads: 0 · seeded RNG draws: 6 · hooks: yes
 - Comparison-only (excluded): 2 law-shaped sites in comparison code; functions `eventFactsWithReferenceActivation`, `referenceAdvectionVelocity`, `referenceStepCleared`, `referenceStepInside`, `referenceStepRandomVelocity`
 - Inherited from modules: `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients

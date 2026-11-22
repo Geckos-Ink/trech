@@ -37,7 +37,8 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Domain routing beyond glass from sand: route a second family (lava lamp wax/carrier, membrane efflux) and measure routing domains from particle-derived rows rather than from the scenario's own labelled harvest; let elements outside every envelope queue a Geant4 experiment plan and a `trech arch` job for the uncovered regime. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element or per-pair group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit. `ctx.interact` now routes pairs by their own context; also let it compose pair kinds from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Particle-derived teachers for the online domain learner. `ctx.learnDomains` now learns dynamically changing operator responses (furnace thermal law, lamp parcels, efflux transport), but every teacher is an authored or distilled operator. Feed Geant4-derived rows (CHNO observer, atomic tables) and grade the learned domains against held-out Geant4 runs. Expose the TorchScript specialist index in engine traces and turn recurring uncovered regimes into experiment requests. ([detail](#online-response-domain-learning-2026-11-18))
-- **P2** · R3 · Closed-loop deployment of learned-domain operators beyond the furnace thermal law: chemistry (`ctx.react` hazards), the lamp parcel dynamics and efflux transport, each behind a paired observer gate. Measure compounding error over long horizons, not only per-step error. Efflux has no `deploy` mode yet, and its learner saturated the 24-domain capacity, so decide whether capacity should grow with evidence or whether merges should be stricter. ([detail](#online-response-domain-learning-2026-11-18))
+- **P2** · R3 · Closed-loop deployment of learned-domain operators beyond the furnace thermal law and efflux transport (landed 2026-11-22): chemistry (`ctx.react` hazards) and the lamp parcel dynamics, each behind a paired observer gate, with compounding error measured over long horizons, not only per step. The efflux learner saturated the 24-domain capacity: decide whether capacity should grow with evidence or whether merges should be stricter. ([detail](#efflux-closed-loop-deployment-2026-11-22))
+- **P3** · R3 · `study_domain_learning.py` still marks efflux `deploy: False` and compares only furnace observers, so efflux deploy runs are graded by the suite case alone. Make the campaign's observers per scenario and run the deploy pass for efflux. ([detail](#efflux-closed-loop-deployment-2026-11-22))
 - **P2** · R4 · Calibrate the learner's `predictionStd`: the ±1.96σ interval covers 99% of rows in-run but 70–88% under transfer (furnace 1820 K, lamp 318 K), while on the efflux held-out seed it over-covers (~99.5%, bands too wide); add per-domain conformal half-widths from held-out calls and carry them into a deployed state. ([detail](#online-response-domain-learning-2026-11-18))
 - **P2** · R3 · The two-pass furnace learner (2026-11-20) fixed the 1820 K deploy (+2.3 K mean, minimum fusion +1.9 K, case 10/10). At held-out 1560 K the first glass forms 6 ticks early (27 vs 33; operator tolerance 3), where the one-pass learner matched exactly, and the minimum fusion temperature sits at +4.8 K against 5 K. Grade a 1560 K deploy in the suite, and reduce the early-fusion bias without training on a held-out point. ([detail](#furnace-learner-bias-fixed-by-a-two-pass-campaign-2026-11-20))
 - **P3** · R2 · Catch-all domains (wide boxes mixing materials whose laws agree in-sample) transfer poorly; split on joint-support density or a learned membership model, not only on in-sample error. The lava-lamp frame-scale response remains a weak case (velocity 13% worse than pooled inside the training range). ([detail](#online-response-domain-learning-2026-11-18))
@@ -254,6 +255,28 @@ dated record below, and queue its residuals in the same change.
   The existing routing and evolution tests are unchanged.
 - Residuals (queued above): `ctx.react`, `ctx.interact` and `ctx.predict` paths; no scenario
   with overlapping rivals; intermediates are not arbitrated; arbiters are not exported.
+
+## Efflux closed-loop deployment (2026-11-22)
+
+- [x] `testscenario_efflux` `learn_domains=deploy`: the frozen learner
+  (`data/efflux_domain_learner/transport.json`, published from the 2026-11-18 campaign on seeds
+  101 and 102 with `publish_domain_learner.py`) predicts each particle's new velocity and
+  displacement rate and drives the bath; the transport operator runs on a copy from the same
+  state and noise as a shadow, never applied. Particles with no finite prediction are counted
+  `untouched`. The summary's `domain_learning.shadow` carries per-step RMSE (position and
+  velocity), maxima and the RMSE per run third; `inference.transport_driver` names the driver.
+- [x] Suite case `efflux_domain_learner_deploy_closed_loop` (run `out_efflux_learned_deploy`)
+  pairs it with the operator-driven `out_efflux`. Thresholds were set before the runs: shadow
+  RMSE below the pooled law's held-out RMSE, no growth from the first to the last third, every
+  operator tolerance on the clearance observables, every scenario check.
+- Results (6,000 ticks, 2026-11-22). Default seed: 11/11, 339,396 particle-steps all predicted,
+  shadow RMSE velocity 0.00225 (pooled 0.0163) and position 0.0145 per tick (pooled ≥ 0.0361), by
+  third 0.0144 / 0.0179 / 0.0074 (position) and 0.00223 / 0.00232 / 0.00221 (velocity), final
+  waste 2 → 3, half-life gap 75 ticks (tolerance 600), largest waste-series gap 12 packets
+  (reported). Seed 201: the same shadow figures, but 10/11, because the operator-driven run itself
+  let one essential molecule cross (29/30 retained); the deployed run kept 30/30. That operator
+  failure is queued in the [migrations roadmap](../../scenarios/migrations/ROADMAP.md#priority-queue).
+  A deploy run takes 237 s against 12 s for the operator.
 
 ## Online response-domain learning (2026-11-18)
 

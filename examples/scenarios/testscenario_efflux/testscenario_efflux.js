@@ -62,8 +62,8 @@ const LEARNER_STATE = domainLearnerModel
 if (learnDomains !== "off" && physicsSource !== "operator") {
   throw new Error("learn_domains needs physics_source=operator (it learns the operator's response)");
 }
-if (learnDomains === "evaluate" && !LEARNER_STATE) {
-  throw new Error("learn_domains=evaluate needs domain_learner_model");
+if ((learnDomains === "evaluate" || learnDomains === "deploy") && !LEARNER_STATE) {
+  throw new Error("learn_domains=" + learnDomains + " needs domain_learner_model");
 }
 
 const TRANSPORT_MODEL = "efflux_transport_operator";
@@ -499,6 +499,74 @@ function learnTransport(ctx, state, start, aux, after, rates) {
   }
 }
 
+// --- closed-loop deployment (learn_domains=deploy) ------------------------------
+// A frozen learner (ctx.learnDomains, warm start + frozen) predicts each particle's new velocity
+// and displacement rate from the same per-particle features and unit innovations the operator
+// receives, and those predictions DRIVE the bath. The transport operator runs on a copy as a
+// shadow and is never applied: the per-step gap measures the learner against the operator from
+// the learner's own (deployed) state, and the gap by run third shows whether it compounds.
+// Particles with no finite prediction keep their state and are counted as untouched.
+const DEPLOY_TARGETS = ["set_rvx", "set_rvy", "set_rvz", "d_x_dt", "d_y_dt", "d_z_dt"];
+
+function deployTransport(ctx, state, fields, aux, shadow) {
+  const n = fields.x.length;
+  const radius = new Float64Array(n);
+  for (let i = 0; i < n; i += 1) {
+    radius[i] = Math.sqrt(fields.x[i] * fields.x[i] + fields.y[i] * fields.y[i] + fields.z[i] * fields.z[i]);
+  }
+  const report = ctx.learnDomains({
+    name: "efflux_transport_deployed",
+    time: state.tick * SCENARIO.dt,
+    features: {
+      x: fields.x, y: fields.y, z: fields.z, radius, rvx: fields.rvx, rvy: fields.rvy, rvz: fields.rvz,
+      mass_u: aux.mass_u, permeant: aux.permeant, cleared: aux.cleared,
+      noise_x: aux.noise_x, noise_y: aux.noise_y, noise_z: aux.noise_z
+    },
+    options: { warm_start: LEARNER_STATE, frozen: true },
+    report: "summary"
+  });
+  if (!report) throw new Error("learn_domains=deploy requires determinism.mode=predictive");
+  const d = state.deploy;
+  const third = Math.min(2, Math.floor(3 * (state.tick - 1) / TOTAL_TICKS));
+  const phase = d.phases[third];
+  const half = SCENARIO.domainHalfSize;
+  for (let i = 0; i < n; i += 1) {
+    const p = DEPLOY_TARGETS.map((t) => report.predictions[t] ? report.predictions[t][i] : null);
+    if (p.some((v) => v === null || !Number.isFinite(v))) { d.untouched += 1; continue; }
+    fields.rvx[i] = p[0]; fields.rvy[i] = p[1]; fields.rvz[i] = p[2];
+    // The same bath bounds the engine applies to the operator's x/y/z fields.
+    fields.x[i] = Math.min(half, Math.max(-half, fields.x[i] + p[3] * SCENARIO.dt));
+    fields.y[i] = Math.min(half, Math.max(-half, fields.y[i] + p[4] * SCENARIO.dt));
+    fields.z[i] = Math.min(half, Math.max(-half, fields.z[i] + p[5] * SCENARIO.dt));
+    d.applied += 1;
+    for (const k of ["x", "y", "z", "rvx", "rvy", "rvz"]) {
+      const e = fields[k][i] - shadow[k][i];
+      const group = k.charAt(0) === "r" ? "velocity" : "position";
+      d.sq[group] += e * e;
+      phase.sq[group] += e * e;
+      d.maxAbs[group] = Math.max(d.maxAbs[group], Math.abs(e));
+    }
+    phase.n += 1;
+  }
+  d.calls += 1;
+  d.elements += n;
+  d.extrapolated += Number(report.extrapolated || 0);
+}
+
+function deploySummary(state) {
+  const d = state.deploy;
+  const rmse = (sq, count) => ({ position: Math.sqrt(sq.position / Math.max(3 * count, 1)),
+                                 velocity: Math.sqrt(sq.velocity / Math.max(3 * count, 1)) });
+  return {
+    calls: d.calls, element_steps: d.elements, applied: d.applied, untouched: d.untouched,
+    extrapolated: d.extrapolated,
+    // Per component and element-step: learner minus the shadow operator from the same state.
+    rmse: rmse(d.sq, d.applied),
+    max_abs: d.maxAbs,
+    rmse_by_third: d.phases.map((ph) => Object.assign({ element_steps: ph.n }, rmse(ph.sq, ph.n)))
+  };
+}
+
 function evolveParticlesWithOperator(ctx, state) {
   const particles = state.particles;
   const fields = { x: [], y: [], z: [], rvx: [], rvy: [], rvz: [] };
@@ -522,12 +590,16 @@ function evolveParticlesWithOperator(ctx, state) {
     aux.noise_y.push(boundedGaussian01(ctx.rng));
     aux.noise_z.push(boundedGaussian01(ctx.rng));
   }
-  const start = learnDomains !== "off"
+  const deploying = learnDomains === "deploy";
+  const start = learnDomains !== "off" && !deploying
     ? Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v.slice()])) : null;
+  // Under deploy the operator advances a copy (the shadow); the learner advances the bath.
+  const operatorState = deploying
+    ? Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v.slice()])) : fields;
   const report = ctx.evolve({
     dt: SCENARIO.dt,
     fields: TRANSPORT_FIELDS,
-    state: fields,
+    state: operatorState,
     aux,
     context: transportContext(),
     // The role selects the operator; no kind label is forced. The model's element_kind is a
@@ -542,6 +614,7 @@ function evolveParticlesWithOperator(ctx, state) {
       report.selection.selectedModels.indexOf(TRANSPORT_MODEL) < 0) {
     throw new Error("physics_source=operator requires the efflux transport ctx.evolve model");
   }
+  if (deploying) deployTransport(ctx, state, fields, aux, operatorState);
   for (let i = 0; i < particles.length; i += 1) {
     particles[i].x = fields.x[i];
     particles[i].y = fields.y[i];
@@ -751,6 +824,10 @@ function ensureState(ctx) {
     ctx.state.transportInferences = 0;
     ctx.state.crossingInferences = 0;
     ctx.state.operatorOutOfDomain = 0;
+    const zeroSq = () => ({ position: 0, velocity: 0 });
+    ctx.state.deploy = { calls: 0, elements: 0, applied: 0, untouched: 0, extrapolated: 0,
+                         sq: zeroSq(), maxAbs: zeroSq(),
+                         phases: [0, 1, 2].map(() => ({ n: 0, sq: zeroSq() })) };
     ctx.state.crossingDraws = 0;
     ctx.state.crossingTransitions = 0;
     ctx.state.transportReport = null;
@@ -941,10 +1018,13 @@ globalThis.TRECH_HOOKS = {
       domain_learning: learnDomains === "off" ? undefined : {
         mode: learnDomains,
         note: "Transport-operator response domains learned online by ctx.learnDomains from the " +
-              "operator's own inputs and outputs; no compartment or class is read. Prequential " +
-              "(predict-then-learn) error against a pooled single-domain law on the same particles.",
+              "operator's own inputs and outputs; no compartment or class is read. learn/evaluate: " +
+              "prequential (predict-then-learn) error against a pooled single-domain law on the same " +
+              "particles. deploy: a frozen learner drives the bath; the transport operator runs on a " +
+              "copy as a shadow, never applied.",
         learner_state: domainLearnerModel || null,
-        online: state.learning ? TRECH_DOMAIN_LEARNING.finish(state.learning) : null
+        online: state.learning ? TRECH_DOMAIN_LEARNING.finish(state.learning) : null,
+        shadow: learnDomains === "deploy" ? deploySummary(state) : null
       },
       operator_vs_reference: {
         schema: "trech_operator_reference_pair_v1",
@@ -1005,6 +1085,8 @@ globalThis.TRECH_HOOKS = {
       },
       inference: {
         source: physicsSource,
+        // Which law advanced the bath: the transport operator, or (deploy) the frozen learner.
+        transport_driver: learnDomains === "deploy" ? "learned_domains" : physicsSource,
         fidelity: physicsSource === "operator" ? "distilled" : "reference",
         transport_model: physicsSource === "operator" ? TRANSPORT_MODEL : null,
         crossing_model: physicsSource === "operator" ? CROSSING_MODEL : null,

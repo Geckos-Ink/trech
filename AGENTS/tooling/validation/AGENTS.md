@@ -62,6 +62,11 @@ They feed two cases in `cases.py`:
   ≤ 1.5 K, every element-step must be predicted, and the scenario's own checks must pass. The
   mean and maximum temperature gaps are reported but not gated. It passes 10/10 with the two-pass
   learner (2026-11-20; mean +2.3 K, minimum fusion +1.86 K).
+- `efflux_domain_learner_deploy_closed_loop`: the frozen efflux learner drives the particle
+  transport (`out_efflux_learned_deploy`), paired with `out_efflux`. Every particle-step must be
+  predicted, the shadow RMSE must beat the pooled law's held-out RMSE and must not grow from the
+  first to the last third, the clearance observables must meet the operator tolerances and the
+  scenario checks must pass. Passes 11/11 at the default seed (2026-11-22).
 
 The full campaign (training, freezing, specialists, held-out evaluate/deploy, NumPy parity) is
 `tools/torch/study_domain_learning.py --scenario furnace|lamp|efflux`. A published learner carries

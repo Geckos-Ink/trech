@@ -24,8 +24,10 @@
 #include "trech/core/FormalLaws.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <vector>
 
 namespace trech {
@@ -56,6 +58,44 @@ inline double relativeResidual(double preKineticEnergy, double restMassReleased,
   }
   if (scale == 0.0) return 0.0;
   return std::abs(formal::compensatedSum(terms.data(), terms.size())) / scale;
+}
+
+// Momentum balance of the same step, the hypothesis `k = k' + p` of the Lean pair
+// Trech.Laws.TwoBody (formal/Trech/Laws/TwoBody.lean), which derives the Compton relation from
+// four-momentum conservation: |p_pre - p_post - sum p_i| over the largest momentum magnitude
+// among the terms, per Cartesian component with Neumaier sums, the largest component reported.
+// It holds only where every product is recorded as a track: a particle absorbed on the spot
+// (an electron below the production threshold) carries momentum the step record drops, so
+// callers check steps whose products are all tracks. NaN when any input is not finite.
+using Momentum = std::array<double, 3>;
+
+inline double relativeMomentumResidual(const Momentum& pre, const Momentum& post,
+                                       const std::vector<Momentum>& secondaries) {
+  double scale = 0.0;
+  auto magnitude = [](const Momentum& v) { return std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); };
+  for (const Momentum* v : {&pre, &post}) scale = std::max(scale, magnitude(*v));
+  for (const auto& v : secondaries) scale = std::max(scale, magnitude(v));
+  double worst = 0.0;
+  for (std::size_t axis = 0; axis < 3; ++axis) {
+    std::vector<double> terms = {pre[axis], -post[axis]};
+    for (const auto& v : secondaries) terms.push_back(-v[axis]);
+    for (const double t : terms) {
+      if (!std::isfinite(t)) return std::nan("");
+    }
+    worst = std::max(worst, std::abs(formal::compensatedSum(terms.data(), terms.size())));
+  }
+  return scale == 0.0 ? 0.0 : worst / scale;
+}
+
+// Stated tolerance for relativeMomentumResidual on a scatter that hands kinetic energy T to a
+// particle of mass m. Its momentum sqrt(T (T + 2m)) is formed from T = E - E', which carries a
+// rounding error of a few ulp of E; for T << m that error grows by sqrt(m / 2T) relative to E
+// (for a photon: 1 / (eps sqrt(2 (1 - cos theta)))). The bound is kRelativeTolerance plus eight
+// times that rounding model; it says how far doubles can miss the real-valued Lean statement.
+inline double momentumRoundingBound(double kineticEnergy, double mass) {
+  if (!(kineticEnergy > 0.0) || !(mass > 0.0)) return kRelativeTolerance;
+  return kRelativeTolerance +
+         8.0 * std::numeric_limits<double>::epsilon() * std::sqrt(mass / (2.0 * kineticEnergy));
 }
 
 }  // namespace energy_balance

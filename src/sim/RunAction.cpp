@@ -527,6 +527,10 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       comptonEnergyBalanceCount_(0),
       comptonEnergyBalanceViolations_(0),
       comptonEnergyBalanceResidualMax_(0.0, G4MergeMode::kMaximum),
+      comptonMomentumBalanceCount_(0),
+      comptonMomentumBalanceViolations_(0),
+      comptonMomentumBalanceResidualMax_(0.0, G4MergeMode::kMaximum),
+      comptonMomentumBalanceToleranceMax_(0.0, G4MergeMode::kMaximum),
       photonuclearFinalStateCount_(0),
       photonuclearTargetUnmatchedCount_(0),
       photonuclearNeutronCount_(0),
@@ -643,6 +647,10 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(comptonEnergyBalanceCount_);
   manager->Register(comptonEnergyBalanceViolations_);
   manager->Register(comptonEnergyBalanceResidualMax_);
+  manager->Register(comptonMomentumBalanceCount_);
+  manager->Register(comptonMomentumBalanceViolations_);
+  manager->Register(comptonMomentumBalanceResidualMax_);
+  manager->Register(comptonMomentumBalanceToleranceMax_);
   comptonFirstCosHistogram_.reserve(sim::klein_nishina::kCosThetaHistogramBins);
   for (int bin = 0; bin < sim::klein_nishina::kCosThetaHistogramBins; ++bin) {
     comptonFirstCosHistogram_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
@@ -1033,6 +1041,24 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
     }
     formal::recordRunCheck(check, "engine");
   }
+  const G4int momentumBalanceSamples = comptonMomentumBalanceCount_.GetValue();
+  if (energyBalanceChecked && momentumBalanceSamples > 0) {
+    // Hypothesis of Trech.Laws.TwoBody: the recorded scatter conserves three-momentum.
+    formal::LawCheck check;
+    check.law = "compton.momentum_balance";
+    check.leanDeclaration = "Trech.Laws.TwoBody.compton_relation";
+    check.kind = "hypothesis";
+    check.samples = static_cast<std::size_t>(momentumBalanceSamples);
+    check.violations = static_cast<std::size_t>(comptonMomentumBalanceViolations_.GetValue());
+    check.maxAbsError = comptonMomentumBalanceResidualMax_.GetValue();
+    // Per-scatter rounding bound (momentumRoundingBound); the largest one used is reported.
+    check.tolerance = comptonMomentumBalanceToleranceMax_.GetValue();
+    check.passed = check.violations == 0;
+    if (!check.passed) {
+      check.detail = "first-Compton step: p_pre != p_post + sum p_secondary (relative, per component)";
+    }
+    formal::recordRunCheck(check, "engine");
+  }
   // Law checks performed since the previous run end (engine lattices, validation companions;
   // onRunEnd already ran). Written only when there are any, so other runs keep their bytes.
   const nlohmann::json lawChecks = formal::takeRunChecks();
@@ -1335,6 +1361,10 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         entry["energy_balance_samples"] = energyBalanceSamples;
         entry["measured_max_energy_balance_residual"] =
             energyBalanceSamples > 0 ? comptonEnergyBalanceResidualMax_.GetValue() : 0.0;
+        // Momentum balance k = k' + p of the scatters whose products are all tracks.
+        entry["momentum_balance_samples"] = momentumBalanceSamples;
+        entry["measured_max_momentum_balance_residual"] =
+            momentumBalanceSamples > 0 ? comptonMomentumBalanceResidualMax_.GetValue() : 0.0;
         entry["cos_theta_histogram_bins"] = static_cast<int>(cosProbabilities.size());
         entry["klein_nishina_cos_theta_bin_probabilities"] = cosProbabilities;
         entry["measured_cos_theta_histogram"] = comptonCosHistogram;
@@ -2043,7 +2073,9 @@ void TrechRunAction::AddPrimaryTrackLength(G4double stepLength) {
 void TrechRunAction::AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction,
                                                 G4int transferBin, G4double cosTheta,
                                                 G4double kinematicResidual,
-                                                G4double energyBalanceResidual) {
+                                                G4double energyBalanceResidual,
+                                                G4double momentumResidual,
+                                                G4double momentumTolerance) {
   primariesFirstInteractionCount_ += 1;
   if (emSubType == fPhotoElectricEffect) {
     primariesPhotoelectricFirstCount_ += 1;
@@ -2056,6 +2088,18 @@ void TrechRunAction::AddPrimaryFirstInteraction(G4int emSubType, G4double transf
       }
       if (energyBalanceResidual > comptonEnergyBalanceResidualMax_.GetValue()) {
         comptonEnergyBalanceResidualMax_ = energyBalanceResidual;  // per-thread; kMaximum merge
+      }
+    }
+    if (!std::isnan(momentumResidual)) {
+      comptonMomentumBalanceCount_ += 1;
+      if (!(momentumResidual <= momentumTolerance)) {
+        comptonMomentumBalanceViolations_ += 1;
+      }
+      if (momentumTolerance > comptonMomentumBalanceToleranceMax_.GetValue()) {
+        comptonMomentumBalanceToleranceMax_ = momentumTolerance;  // per-thread; kMaximum merge
+      }
+      if (momentumResidual > comptonMomentumBalanceResidualMax_.GetValue()) {
+        comptonMomentumBalanceResidualMax_ = momentumResidual;  // per-thread; kMaximum merge
       }
     }
     comptonFirstTransferSum_ += transferFraction;

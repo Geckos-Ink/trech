@@ -35,6 +35,7 @@ RUN_PASCAL = "out_pascal"
 RUN_OSMOTIC = "out_osmotic"
 RUN_EFFLUX = "out_efflux"
 RUN_EFFLUX_REFERENCE = "out_efflux_reference"
+RUN_EFFLUX_DEPLOY = "out_efflux_learned_deploy"
 RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
 RUN_GLASS_FROM_SAND = "out_glass_from_sand"
 RUN_GLASS_FROM_SAND_REFERENCE = "out_glass_from_sand_reference"
@@ -5703,6 +5704,91 @@ class GlassDomainLearnerDeployHeldOut(ValidationCase):
                    "metrology. Conduction and chemistry stay declared."])
 
 
+class EffluxDomainLearnerDeploy(ValidationCase):
+    """A frozen learned-domain transport law drives the efflux bath in closed loop."""
+
+    name = "efflux_domain_learner_deploy_closed_loop"
+    category = "biology"
+    model = "data/efflux_domain_learner/transport.json"
+    # Held-out RMSE of the pooled single-domain law on seed 201 (2026-11-18 campaign,
+    # transport.build_record.json): the learner must beat it in closed loop, per step.
+    pooled_velocity_rmse = 0.0163
+    pooled_position_rate_rmse = 0.0361  # smallest of the three components (d_z_dt)
+    description = (
+        "testscenario_efflux at its default seed (never used for learning; the learner saw seeds "
+        "101 and 102) with learn_domains=deploy: the committed frozen learner predicts every "
+        "particle's velocity and displacement from the operator's own inputs and drives the bath, "
+        "naming no compartment or particle class. The transport operator runs on a copy as a "
+        "shadow from the learner's state each tick. Every particle-step must be predicted; the "
+        "per-step shadow RMSE must beat the pooled law's held-out RMSE (velocity 0.0163, position "
+        "0.0361 per tick) and must not grow from the first to the last third of the 6,000 ticks; "
+        "the clearance observables (final waste inside, retained inside, fitted half-life and "
+        "R^2) must stay within the scenario's operator tolerances of the operator-driven run; and "
+        "every scenario check must pass. The largest gap between the two runs' waste series is "
+        "reported, not gated: the membrane crossings draw from the hook RNG, so the two runs "
+        "diverge stochastically once any particle reaches the membrane at a different tick."
+    )
+
+    def required_runs(self) -> List[str]:
+        return [RUN_EFFLUX, RUN_EFFLUX_DEPLOY]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        for name in self.required_runs():
+            if _need_run(ctx, name) is None:
+                return _skip(self.name, self.description, self.category, name)
+        operator = _last_emit_payload(_need_run(ctx, RUN_EFFLUX), "efflux_summary") or {}
+        deployed = _last_emit_payload(_need_run(ctx, RUN_EFFLUX_DEPLOY), "efflux_summary") or {}
+        learning = deployed.get("domain_learning") or {}
+        shadow = learning.get("shadow") or {}
+        o_block = operator.get("operator_vs_reference") or {}
+        d_block = deployed.get("operator_vs_reference") or {}
+        tolerances = o_block.get("tolerances") or {}
+        o_obs, d_obs = o_block.get("observables") or {}, d_block.get("observables") or {}
+        checks: Dict[str, bool] = {}
+        gaps: Dict[str, float] = {}
+        for key, limit in sorted(tolerances.items()):
+            name, _kind = key.rsplit("_", 1)
+            ref, val = o_obs.get(name), d_obs.get(name)
+            if not isinstance(ref, (int, float)) or not isinstance(val, (int, float)):
+                checks[key] = False
+                continue
+            gaps[key] = round(abs(val - ref), 6)
+            checks[key] = abs(val - ref) <= float(limit)
+        rmse = shadow.get("rmse") or {}
+        thirds = shadow.get("rmse_by_third") or []
+        checks["deploy_mode"] = learning.get("mode") == "deploy" and \
+            (deployed.get("inference") or {}).get("transport_driver") == "learned_domains"
+        checks["every_particle_step_predicted"] = shadow.get("untouched") == 0 and \
+            (shadow.get("applied") or 0) > 0 and shadow.get("applied") == shadow.get("element_steps")
+        checks["shadow_velocity_rmse_beats_pooled"] = (rmse.get("velocity") or 1e9) <= self.pooled_velocity_rmse
+        checks["shadow_position_rmse_beats_pooled"] = (rmse.get("position") or 1e9) <= self.pooled_position_rate_rmse
+        if len(thirds) == 3 and all(t.get("element_steps") for t in (thirds[0], thirds[2])):
+            for group in ("velocity", "position"):
+                checks[f"{group}_error_does_not_compound"] = thirds[2][group] <= thirds[0][group]
+        else:
+            checks["error_by_third_present"] = False
+        checks["scenario_checks_pass"] = bool(deployed.get("validation")) and all(deployed["validation"].values())
+        series_o = {p["t"]: p["n"] for p in operator.get("series") or []}
+        series_d = {p["t"]: p["n"] for p in deployed.get("series") or []}
+        common = sorted(set(series_o) & set(series_d))
+        series_gap = max((abs(series_o[t] - series_d[t]) for t in common), default=None)
+        ok = all(checks.values())
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(checks.values())}/{len(checks)} shadow RMSE v={rmse.get('velocity')} "
+                     f"x={rmse.get('position')}; waste {o_obs.get('final_waste_inside')}->"
+                     f"{d_obs.get('final_waste_inside')}, max series gap {series_gap}"),
+            measured={"checks": checks, "gaps": gaps, "shadow": shadow, "max_waste_series_gap": series_gap,
+                      "series_points_compared": len(common)},
+            expected={"tolerances": tolerances, "pooled_velocity_rmse": self.pooled_velocity_rmse,
+                      "pooled_position_rate_rmse": self.pooled_position_rate_rmse, "untouched": 0},
+            notes=["The learned law replaces the distilled transport operator (itself distilled from "
+                   "a validation-only JS teacher, measured:false); agreement measures closed-loop "
+                   "operator migration through unlabelled domains, not membrane metrology. The "
+                   "membrane crossing stays on its ctx.react operator."])
+
+
 class GlassChargeRefinement(ValidationCase):
     name = "glass_charge_preserved_under_refinement"
     description = (
@@ -5815,6 +5901,7 @@ ALL_CASES: List[ValidationCase] = [
     GlassDomainRoutingAtTransition(),
     GlassDomainLearningUnlabelled(),
     GlassDomainLearnerDeployHeldOut(),
+    EffluxDomainLearnerDeploy(),
     GlassChargeRefinement(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),
