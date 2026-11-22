@@ -1,5 +1,7 @@
-import Mathlib.Algebra.BigOperators.Ring.Finset
-import Mathlib.Data.Real.Basic
+module
+
+public import Mathlib.Algebra.BigOperators.Ring.Finset
+public import Mathlib.Basic.Real.Basic
 import Mathlib.Tactic.Ring
 
 /-!
@@ -18,6 +20,8 @@ the velocity-set moments give `∑ feq = ρ`) and that a periodic lattice conser
 The collision is per cell over the velocity directions `Q`; streaming is over all links `L`.
 -/
 
+@[expose] public section
+
 open Finset
 
 namespace Trech.Methods.Lattice
@@ -27,7 +31,7 @@ variable {Q : Type*} [Fintype Q]
 /-- Two-relaxation-time collision without forcing: the even part of `f - feq` relaxes at `ωp`,
 the odd part at `ωm`, with `opp` the opposite-direction permutation. Equal to the classic
 `f - ωp (½(f + f∘opp) - ½(feq + feq∘opp)) - ωm (½(f - f∘opp) - ½(feq - feq∘opp))`. -/
-def relaxTRT (ωp ωm : ℝ) (opp : Q ≃ Q) (f feq : Q → ℝ) (k : Q) : ℝ :=
+noncomputable def relaxTRT (ωp ωm : ℝ) (opp : Q ≃ Q) (f feq : Q → ℝ) (k : Q) : ℝ :=
   f k - (ωp / 2) * ((f k + f (opp k)) - (feq k + feq (opp k)))
       - (ωm / 2) * ((f k - f (opp k)) - (feq k - feq (opp k)))
 

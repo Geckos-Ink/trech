@@ -15,17 +15,30 @@ Contract: [formal-laws handbook](../AGENTS/engine/formal/AGENTS.md).
 exist and cite each other; `tests/test_formal_laws.cpp` runs the classic code against each
 statement. Neither needs Lean.
 
-**Status: the Lean files have not been compiled yet** (no toolchain installed; the build is a
-gated step). The proofs use only Mathlib lemmas whose names were checked against the pinned
-`thirds/mathlib4`, but they are unverified until `lake build` succeeds.
+**Status (2026-11-22): all nine theorems compile and use only the standard axioms**
+(`propext`, `Classical.choice`, `Quot.sound`), with Lean `v4.37.0-rc1` and Mathlib
+`6ebcce3733`, on macOS arm64. They are statements about real numbers; the float gap is
+handled by the classic checks' stated tolerances.
 
-To check the proofs (heavy; needs an explicit go-ahead):
+Set up once (the Mathlib cache is about 7 GB, kept in ignored `thirds/mathlib4/.lake`):
 
 ```bash
-scripts/pull_lean.sh
-cd formal && lake exe cache get && lake build
+brew install elan-init        # or the elan installer; the toolchain follows lean-toolchain
+../scripts/pull_lean.sh
+lake exe cache get
+```
+
+Check the proofs (build plus axiom audit, about 12 s once cached):
+
+```bash
+python3 ../scripts/check_lean_laws.py
 ```
 
 `lake` must match [`lean-toolchain`](lean-toolchain), which must equal
-`thirds/mathlib4/lean-toolchain`. Configuring TRECH with `-DTRECH_ENABLE_LEAN_CHECK=ON`
-registers the same `lake build` as the CTest entry `trech_formal_lean_build`.
+`thirds/mathlib4/lean-toolchain`; after a Mathlib pull, copy it, run `lake update` and
+`lake exe cache get` again, and commit [`lake-manifest.json`](lake-manifest.json).
+Configuring TRECH with `-DTRECH_ENABLE_LEAN_CHECK=ON` registers the same check as the CTest
+entry `trech_formal_lean_build`.
+
+Every file uses Lean's module system: `module`, `public import` for what the statements need,
+plain `import` for proof tactics, and `@[expose] public section`.

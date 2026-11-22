@@ -90,9 +90,12 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
 endif()
 add_test(NAME trech_formal_laws COMMAND test_formal_laws)
 if (TRECH_ENABLE_LEAN_CHECK)
+  # lake build of formal/, then an axiom audit of every theorem listed in formal/laws.json.
   find_program(TRECH_LAKE_EXECUTABLE NAMES lake REQUIRED)
-  add_test(NAME trech_formal_lean_build COMMAND "${TRECH_LAKE_EXECUTABLE}" build
-           WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/formal")
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  add_test(NAME trech_formal_lean_build
+           COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/check_lean_laws.py"
+                   --lake "${TRECH_LAKE_EXECUTABLE}")
 else()
   message(STATUS "Lean law proofs not checked (TRECH_ENABLE_LEAN_CHECK=OFF); classic checks still run")
 endif()

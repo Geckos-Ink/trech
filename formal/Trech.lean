@@ -1,3 +1,5 @@
-import Trech.Laws.Compton
-import Trech.Laws.Attenuation
-import Trech.Methods.Lattice
+module
+
+public import Trech.Laws.Compton
+public import Trech.Laws.Attenuation
+public import Trech.Methods.Lattice

@@ -1,5 +1,7 @@
+module
+
+public import Mathlib.Basic.Real.Basic
 import Mathlib.Algebra.Order.Field.Basic
-import Mathlib.Data.Real.Basic
 import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.Ring
 
@@ -20,6 +22,8 @@ stated here. Statements are over `ℝ`; the classic code is IEEE-754 double.
 
 `ε = E / (m_e c²)` is the reduced photon energy and `c = cos θ` the scattering angle cosine.
 -/
+
+@[expose] public section
 
 namespace Trech.Laws.Compton
 

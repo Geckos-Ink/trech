@@ -6,13 +6,15 @@ Related owners: [Builds and dependencies](../../tooling/dependencies/AGENTS.md) 
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
-**Maturity (2026-11-22): first law pairs landed on the classic side; Lean is optional and
-uncompiled.** Three pairs exist ([`formal/laws.json`](../../../formal/laws.json)): Compton
-kinematics, Beer–Lambert attenuation and lattice mass conservation. Their classic C++/JS code
-is checked against each Lean statement by `trech_formal_laws`, and the pair links by
-`trech_formal_law_pairs`. The Lean files in [`formal/`](../../../formal) have **not been
-compiled** (no toolchain; gated), so no proof is verified yet. No config field, provenance
-field or run output carries a law check. Classic C++/JavaScript implementations stay the
+**Maturity (2026-11-22): three law pairs, proofs verified; Lean stays optional.** The pairs
+([`formal/laws.json`](../../../formal/laws.json)) are Compton kinematics, Beer–Lambert
+attenuation and lattice mass conservation. Their classic C++/JS code is checked against each
+Lean statement by `trech_formal_laws`, and the pair links by `trech_formal_law_pairs` (both in
+the normal suite, no Lean needed). The nine Lean theorems compile with Lean `v4.37.0-rc1` and
+Mathlib `6ebcce3733` and depend only on the standard axioms (`propext`, `Classical.choice`,
+`Quot.sound`), checked by the opt-in `trech_formal_lean_build`. The proofs are about real
+numbers, not the floating-point code. No config field, provenance field or run output carries
+a law check. Classic C++/JavaScript implementations stay the
 running path (see the first rule). The plan and
 every open item are in the [roadmap](ROADMAP.md#priority-queue). User guide:
 [`docs/engine/formal_laws.md`](../../../docs/engine/formal_laws.md).
@@ -64,10 +66,16 @@ Both are shallow submodules (`shallow = true`, `branch = master` in [`.gitmodule
   result; a new declaration states only what Mathlib lacks, and its docstring names the
   Mathlib results it builds on.
 - **Building is heavy and gated.** Pulling is light; building is not. Compiling `thirds/lean4`
-  (CMake, tens of minutes) or Mathlib (thousands of files, or several GB of prebuilt
-  `lake exe cache get` downloads) needs an explicit go-ahead, like Geant4 and V8. The toolchain
-  of record is Mathlib's `lean-toolchain`, installed through `elan` or built from `thirds/lean4`
-  checked out at that tag.
+  (CMake, tens of minutes) or all of Mathlib from source needs an explicit go-ahead, like
+  Geant4 and V8. The toolchain of record is Mathlib's `lean-toolchain`, installed through
+  `elan` (Homebrew `elan-init`, done 2026-11-22 on macOS arm64) or built from `thirds/lean4`
+  at that tag. Mathlib's prebuilt cache (`lake exe cache get` in `formal/`, about 9,100 files
+  and 6.9 GB under `thirds/mathlib4/.lake`, ignored by Mathlib's `.gitignore`) is fetched
+  again after each Mathlib pull; the TRECH package itself then builds in seconds.
+- **After a Mathlib pull:** copy `thirds/mathlib4/lean-toolchain` to `formal/lean-toolchain`
+  (`trech_formal_law_pairs` fails until they match), run `lake update` and
+  `lake exe cache get` in `formal/`, then `python3 scripts/check_lean_laws.py`; fix any proof a
+  Mathlib rename breaks, and commit `formal/lake-manifest.json` with the new pointer.
 - **Lean states and checks; it never becomes a classical-formula engine.** A Lean-stated law
   follows the root principles: a closed-form physical law stays a validation or comparison
   reference (`reference`, `validation` roles), fed from Geant4's own particle-level data, and
@@ -136,10 +144,12 @@ that release candidate, so a from-source toolchain build must check out the tag 
 | [`scripts/pull_lean.sh`](../../../scripts/pull_lean.sh) | Fast-forward both checkouts, print heads, check the toolchain Mathlib expects. |
 | [`scripts/lean_mathlib_search.py`](../../../scripts/lean_mathlib_search.py) | Grep Mathlib declaration headers (`theorem`, `lemma`, `def`, `structure`, …) by regex. |
 | [`docs/engine/formal_laws.md`](../../../docs/engine/formal_laws.md) | User guide: what the route is for, how to pull and search, what is not done yet. |
-| [`formal/`](../../../formal) | Lake package `trech_formal` (Mathlib by path from `thirds/mathlib4`, `lean-toolchain` copied from it): `Trech/Laws/Compton.lean`, `Trech/Laws/Attenuation.lean`, `Trech/Methods/Lattice.lean`. |
+| [`formal/`](../../../formal) | Lake package `trech_formal` (Mathlib by path from `thirds/mathlib4`, `lean-toolchain` copied from it; every file uses the module system: `module`, `public import` for statement types, plain `import` for proof tactics, `@[expose] public section`): `Trech/Laws/Compton.lean`, `Trech/Laws/Attenuation.lean`, `Trech/Methods/Lattice.lean`. |
 | [`formal/laws.json`](../../../formal/laws.json) | `trech_formal_laws_v1` pair manifest: id, role, statement, Lean file + declarations, classic sources and the namespace each cites, conformance checks. |
 | [`include/trech/core/FormalLaws.hpp`](../../../include/trech/core/FormalLaws.hpp) · [`src/core/FormalLaws.cpp`](../../../src/core/FormalLaws.cpp) | `trech::formal::LawCheck` and the physics-agnostic classic checks: `checkConservedTotal` (Neumaier sums), `checkWithinBounds`, `checkProbabilityVector`, `checkAgreement`, and the hypothesis checks `checkPermutation`, `checkInvolution`, `checkVelocityMoments`. `toJson()` records `lean_status: "not_checked_by_this_check"`. In `trech_core`; nothing in the engine calls them yet. |
 | [`js/trech_formal_laws.js`](../../../js/trech_formal_laws.js) | `TRECH_FORMAL_LAWS` (QuickJS, V8, Node): classic `compton` and `attenuation` references for validation companions, each naming its Lean declaration, the same check contract as C++ (`role: "validation"`), and `checkComptonBounds`/`checkAttenuationMemoryless`. Calls are reported as authored laws in the engine trace. |
 | [`tests/test_formal_laws.cpp`](../../../tests/test_formal_laws.cpp) | CTest `trech_formal_laws`: classic C++ and JS against each statement, hypothesis checks on a periodic D2Q9 lattice driven through `advanceLattice` with a body force, bit-identical C++/JS Compton values (`-ffp-contract=off`), and a negative control per check kind. |
 | [`tests/test_formal_law_pairs.py`](../../../tests/test_formal_law_pairs.py) | CTest `trech_formal_law_pairs`: each Lean file declares its listed theorems, has no `sorry`, cites its classic sources; each classic source cites the Lean namespace; `formal/lean-toolchain` equals Mathlib's. |
-| `TRECH_ENABLE_LEAN_CHECK` | Opt-in (OFF) CMake option registering `trech_formal_lean_build` (`lake build` in `formal/`, heavy). |
+| [`scripts/check_lean_laws.py`](../../../scripts/check_lean_laws.py) | `lake build` of `formal/`, then `#print axioms` for every declaration in `laws.json`; fails on a build error, a missing report or any axiom beyond `propext`, `Classical.choice`, `Quot.sound` (so `sorryAx` fails). |
+| `TRECH_ENABLE_LEAN_CHECK` | Opt-in (OFF) CMake option registering `trech_formal_lean_build`, which runs `check_lean_laws.py` (needs `lake` and the Mathlib cache; about 12 s once cached). |
+| [`formal/lake-manifest.json`](../../../formal/lake-manifest.json) | Lake's pins of Mathlib's own dependencies (batteries, aesop, Qq, ProofWidgets, plausible, …), cloned into ignored `formal/.lake/packages`. |

@@ -34,7 +34,9 @@ Read the root principles and the parent handbook first; then open only the subca
   [`scripts/pull_lean.sh`](../../../scripts/pull_lean.sh) (fast-forward, heads, toolchain check),
   and commit moved pointers with the work that needed them. First checkout (2026-11-22): lean4
   `5ec4e0be17`, mathlib4 `6ebcce3733`, whose `lean-toolchain` is `v4.37.0-rc1`. CMake and CTest
-  never use them; building Lean or Mathlib is heavy and gated. Contract and rules:
+  never use them; building Lean from source or Mathlib without its cache is heavy and gated. Installed
+  2026-11-22 on macOS arm64: Homebrew `elan-init` 4.4.0 with toolchain `v4.37.0-rc1` and the Mathlib
+  cache (6.9 GB, ignored). The opt-in `TRECH_ENABLE_LEAN_CHECK` uses them. Contract and rules:
   [formal-laws handbook](../../engine/formal/AGENTS.md).
 - **LibTorch (required):** the deep-learning backend is mandatory (`TRECH_ML_BACKEND`, only
   `torch` today; the switch is the seam for a future alternative library). There is no

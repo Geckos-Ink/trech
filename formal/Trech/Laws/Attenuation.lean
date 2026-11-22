@@ -1,4 +1,6 @@
-import Mathlib.Analysis.Complex.Exponential
+module
+
+public import Mathlib.Analysis.Complex.Exponential
 import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.Ring
 
@@ -17,6 +19,8 @@ Conformance: `tests/test_formal_laws.cpp`. Mathlib already proves the exponentia
 here (`Real.exp_add`, `Real.exp_pos`, `Real.exp_le_exp`, `Real.exp_le_one_iff`); this file only
 specialises them to the attenuation law.
 -/
+
+@[expose] public section
 
 namespace Trech.Laws.Attenuation
 

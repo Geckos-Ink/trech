@@ -8,11 +8,12 @@ statement written in Lean (a *theorem*) is accepted only with a proof that Lean'
 [Mathlib](https://github.com/leanprover-community/mathlib4) is the community library of
 mathematics written in Lean, from real analysis to linear algebra and probability.
 
-**Status (2026-11-22): three law pairs exist; the Lean side is not compiled yet.** The
+**Status (2026-11-22): three law pairs exist and their nine Lean proofs are verified.** The
 classic code of each pair is checked against its Lean statement by an ordinary test, without
-Lean. The Lean files have never been built (no toolchain is installed; building it is a
-separate, gated step), so **none of their proofs counts as verified yet**. TRECH does not
-link or run Lean, and no run output records a law check. The open work is in the
+Lean. The Lean files compile with Lean `v4.37.0-rc1` and the pinned Mathlib, and every theorem
+rests only on Lean's three standard axioms, so no step is assumed. The proofs are about real
+numbers: they do not by themselves prove the floating-point code correct (see below). TRECH
+does not link or run Lean, and no run output records a law check yet. The open work is in the
 [formal-laws roadmap](../../AGENTS/engine/formal/ROADMAP.md#priority-queue).
 
 ## What it is for
@@ -85,8 +86,21 @@ const checks = TRECH_FORMAL_LAWS.checkComptonBounds([0.5, 1.3], [-1, 0, 1], 1e-1
 // each record: {law, lean_declaration, lean_status: "not_checked_by_this_check", role: "validation", passed, ...}
 ```
 
-To compile the Lean files, see [`formal/README.md`](../../formal/README.md); configuring with
-`-DTRECH_ENABLE_LEAN_CHECK=ON` adds the `trech_formal_lean_build` test.
+To check the proofs yourself you need Lean and Mathlib's prebuilt files (a one-time download
+of about 7 GB):
+
+```bash
+brew install elan-init
+scripts/pull_lean.sh
+(cd formal && lake exe cache get)
+python3 scripts/check_lean_laws.py
+```
+
+The last command builds the package and prints one line per theorem with the axioms it uses,
+ending with `9/9 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
+an added axiom makes it fail. Configuring TRECH with `-DTRECH_ENABLE_LEAN_CHECK=ON` runs the
+same check as the CTest entry `trech_formal_lean_build`. More detail:
+[`formal/README.md`](../../formal/README.md).
 
 ## Get and update the sources
 
@@ -106,9 +120,10 @@ scripts/pull_lean.sh
 The script fast-forwards both checkouts, prints their heads and reports whether `thirds/lean4`
 is at the release Mathlib expects. On 2026-11-22 Mathlib expected `v4.37.0-rc1`, while the
 Lean checkout was a newer `master` commit; the script prints how to fetch that tag. It builds
-nothing. Building Lean or Mathlib downloads several GB or compiles for a long time, so it is a
-separate step that needs an explicit go-ahead (see the
-[dependency roadmap](../../AGENTS/tooling/dependencies/ROADMAP.md#priority-queue)).
+nothing. After it moves Mathlib, copy `thirds/mathlib4/lean-toolchain` to
+`formal/lean-toolchain` and fetch the matching cache again (`lake update` and
+`lake exe cache get` in `formal/`). Building Lean itself or all of Mathlib from source takes a
+long time and needs an explicit go-ahead.
 
 ## Search Mathlib before declaring a theorem
 
