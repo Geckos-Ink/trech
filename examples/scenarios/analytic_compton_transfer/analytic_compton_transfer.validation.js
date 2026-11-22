@@ -21,7 +21,7 @@ TRECH_VALIDATIONS["analytic_compton_transfer"] = {
     }
   ],
   "family_case": "analytic_compton_transfer_cross_check",
-  "family_summary": "Klein-Nishina mean transfer within tolerance and |z| < 4; max sampled transfer within [0.98, 1] x the Compton edge; binned u = T/T_max and cos(theta) spectra complete with chi-square p >= 0.001; <cos theta> |z| < 4; energy-angle closure residual <= 1e-9.",
+  "family_summary": "Klein-Nishina mean transfer within tolerance and |z| < 4; max sampled transfer within [0.98, 1] x the Compton edge; binned u = T/T_max and cos(theta) spectra complete with chi-square p >= 0.001; <cos theta> |z| < 4; energy-angle closure residual <= 1e-9; the classic Compton reference's Lean-pair checks recorded in law_checks all pass.",
   "family_checks": [
     {"id": "checks_present", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer]", "aggregate": "count", "op": "ge", "expected": 1},
     {"id": "all_available", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer].available", "aggregate": "all", "op": "eq", "expected": true},
@@ -40,9 +40,25 @@ TRECH_VALIDATIONS["analytic_compton_transfer"] = {
     {"id": "angular_histogram_complete", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer]", "derive": {"fn": "difference", "args": [{"fn": "list_sum", "args": ["measured_cos_theta_histogram"]}, "cos_theta_histogram_entries"]}, "aggregate": "max_abs", "op": "eq", "expected": 0},
     {"id": "angular_shape_p", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer]", "derive": {"fn": "chi2_sf", "args": ["cos_theta_histogram_chi2", "cos_theta_histogram_dof"]}, "aggregate": "min", "op": "ge", "expected": 0.001},
     {"id": "mean_cos_theta_z", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer].cos_theta_z_score", "aggregate": "max_abs", "op": "lt", "expected": 4.0},
-    {"id": "energy_angle_closure", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer].measured_max_kinematic_residual", "aggregate": "max", "op": "le", "expected": 1e-09}
+    {"id": "energy_angle_closure", "phase": "run_end", "field": "analytic_checks[?type=compton_energy_transfer].measured_max_kinematic_residual", "aggregate": "max", "op": "le", "expected": 1e-09},
+    {"id": "formal_laws_recorded", "phase": "run_end", "field": "law_checks[?origin=validation]", "aggregate": "count", "op": "ge", "expected": 2},
+    {"id": "formal_laws_hold", "phase": "run_end", "field": "law_checks[?origin=validation].passed", "aggregate": "all", "op": "eq", "expected": true}
   ],
   "physics_status": "configuration_or_transport",
   "limitations": "",
   "reference": "tools/validation/trech_validation/cases.py"
 };
+
+// Formal-law check (docs/engine/formal_laws.md). The classic JavaScript Compton reference must
+// respect its Lean pair (Trech.Laws.Compton: 0 <= T/E <= Compton edge, equal at back-scatter)
+// over a grid that includes this scenario's 662 keV line (eps = 0.6617 / 0.51099895). The
+// verdicts are recorded in the run's law_checks (origin "validation") and its provenance
+// `formal` object. A validation reference only: nothing in the scenario or the engine reads it.
+TRECH_INCLUDE("../../../js/trech_formal_laws.js");
+// Run under the "validation" trace role (hosts without TRECH_TRACE just call the function).
+(globalThis.TRECH_TRACE ? TRECH_TRACE.role : function (role, fn) { return fn(); })("validation", function () {
+  const eps = [0.01, 0.1, 0.6617 / 0.51099895, 2.0, 20.0];
+  const cosines = [];
+  for (let i = 0; i <= 20; i++) cosines.push(-1 + 0.1 * i);
+  TRECH_FORMAL_LAWS.record(TRECH_FORMAL_LAWS.checkComptonBounds(eps, cosines, 1e-15));
+});

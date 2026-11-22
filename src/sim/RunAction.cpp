@@ -9,6 +9,7 @@
 #include "trech/sim/KleinNishina.hpp"
 #include "trech/sim/PhotonuclearKinematics.hpp"
 #include "trech/core/SimulationBudget.hpp"
+#include "trech/core/FormalLaws.hpp"
 #include "trech/core/Trace.hpp"
 
 #include "trech/core/Config.hpp"
@@ -37,6 +38,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -1001,6 +1003,10 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   }
   nlohmann::json scores;
   scores["phase"] = "run_end";
+  // Law checks performed since the previous run end (engine lattices, validation companions;
+  // onRunEnd already ran). Written only when there are any, so other runs keep their bytes.
+  const nlohmann::json lawChecks = formal::takeRunChecks();
+  if (!lawChecks.empty()) scores["law_checks"] = lawChecks;
   scores["total_edep_mev"] = totalEdepMeV;
   if (!volumeScores_.empty()) {
     nlohmann::json volumeEdep = nlohmann::json::object();
@@ -1877,6 +1883,12 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.configUnknownKeys = cfg_.unknownKeys;
   record.hookPatchIgnoredPaths = activeHookInit_.ignoredPatchPaths;
   sim::g4trace::runEnded(run, activeNEvents_);
+  if (!lawChecks.empty()) {
+    std::string audit = options_.formalAuditPath;
+    if (audit.empty())
+      if (const char* env = std::getenv("TRECH_FORMAL_AUDIT")) audit = env;
+    record.formalJson = formal::provenanceBlock(lawChecks, audit).dump();
+  }
   // Observation-only: closes this batch's trace summary and stores its reference (null when off).
   if (const auto traceRef = trace::batchSummary(activeRunId_); !traceRef.is_null()) {
     record.traceJson = traceRef.dump();

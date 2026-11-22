@@ -2,7 +2,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <map>
+#include <mutex>
+#include <set>
 #include <sstream>
+#include <tuple>
 
 namespace trech {
 namespace formal {
@@ -196,6 +201,133 @@ LawCheck checkVelocityMoments(const std::string& law, const std::string& lean, s
              std::string("sum w c_") + names[a] + " c_" + names[b] + " != cs2 delta");
   }
   return finish(check);
+}
+
+namespace {
+
+#ifndef TRECH_FORMAL_MANIFEST_SHA256
+#define TRECH_FORMAL_MANIFEST_SHA256 ""
+#endif
+#ifndef TRECH_FORMAL_SOURCES_SHA256
+#define TRECH_FORMAL_SOURCES_SHA256 ""
+#endif
+
+struct Merged {
+  LawCheck check;
+  std::size_t count = 0;
+  std::string failingDetail, passingDetail;
+};
+
+std::mutex& runMutex() {
+  static std::mutex m;
+  return m;
+}
+std::map<std::tuple<std::string, std::string, std::string>, Merged>& runChecks() {
+  static std::map<std::tuple<std::string, std::string, std::string>, Merged> m;
+  return m;
+}
+
+void keepFirst(std::string& slot, const std::string& detail) {
+  if (!detail.empty() && (slot.empty() || detail < slot)) slot = detail;
+}
+
+}  // namespace
+
+void recordRunCheck(const LawCheck& check, const std::string& origin) {
+  std::lock_guard<std::mutex> lock(runMutex());
+  Merged& m = runChecks()[{origin, check.law, check.leanDeclaration}];
+  if (m.count == 0) {
+    m.check = check;
+    m.check.samples = 0;
+    m.check.violations = 0;
+    m.check.maxAbsError = 0.0;
+    m.check.tolerance = 0.0;
+    m.check.passed = true;
+  }
+  ++m.count;
+  m.check.samples += check.samples;
+  m.check.violations += check.violations;
+  if (!(check.maxAbsError <= m.check.maxAbsError)) m.check.maxAbsError = check.maxAbsError;  // NaN sticks
+  m.check.tolerance = std::max(m.check.tolerance, check.tolerance);
+  m.check.passed = m.check.passed && check.passed;
+  keepFirst(check.passed ? m.passingDetail : m.failingDetail, check.detail);
+}
+
+nlohmann::json takeRunChecks() {
+  std::lock_guard<std::mutex> lock(runMutex());
+  nlohmann::json out = nlohmann::json::array();
+  for (auto& [key, m] : runChecks()) {
+    m.check.detail = m.failingDetail.empty() ? m.passingDetail : m.failingDetail;
+    nlohmann::json record = m.check.toJson();
+    record["origin"] = std::get<0>(key);
+    record["count"] = m.count;
+    out.push_back(std::move(record));
+  }
+  runChecks().clear();
+  return out;
+}
+
+const std::string& manifestSha256() {
+  static const std::string value = TRECH_FORMAL_MANIFEST_SHA256;
+  return value;
+}
+
+const std::string& sourcesSha256() {
+  static const std::string value = TRECH_FORMAL_SOURCES_SHA256;
+  return value;
+}
+
+nlohmann::json provenanceBlock(const nlohmann::json& checks, const std::string& auditPath) {
+  std::set<std::string> declarations;
+  std::size_t failed = 0;
+  for (const auto& check : checks) {
+    const std::string lean = check.value("lean_declaration", "");
+    if (!lean.empty()) declarations.insert(lean);
+    if (!check.value("passed", false)) ++failed;
+  }
+  nlohmann::json block = {{"schema", "trech_formal_provenance_v1"},
+                          {"manifest", {{"path", "formal/laws.json"}, {"sha256", manifestSha256()}}},
+                          {"sources_sha256", sourcesSha256()},
+                          {"declarations", declarations},
+                          {"checks", checks.size()},
+                          {"failed_checks", failed},
+                          {"lean_status", "not_checked_by_this_run"}};
+  if (auditPath.empty()) return block;
+  nlohmann::json audit;
+  {
+    std::ifstream in(auditPath);
+    if (in) audit = nlohmann::json::parse(in, nullptr, false);
+  }
+  if (!audit.is_object() || audit.value("schema", "") != "trech_lean_audit_v1") {
+    block["lean_status"] = "audit_unreadable";
+    block["audit"] = {{"path", auditPath}};
+    return block;
+  }
+  const std::string auditManifest = audit.contains("manifest") ? audit["manifest"].value("sha256", "") : "";
+  std::set<std::string> proved;
+  if (audit.contains("declarations") && audit["declarations"].is_array())
+    for (const auto& d : audit["declarations"])
+      if (d.value("standard_only", false)) proved.insert(d.value("name", ""));
+  std::vector<std::string> unproved;
+  for (const auto& d : declarations)
+    if (!proved.count(d)) unproved.push_back(d);
+  const std::string auditSources = audit.value("sources_sha256", "");
+  const bool matches = !manifestSha256().empty() && auditManifest == manifestSha256() &&
+                       !sourcesSha256().empty() && auditSources == sourcesSha256();
+  block["audit"] = {{"path", auditPath},
+                    {"passed", audit.value("passed", false)},
+                    {"lean_version", audit.value("lean_version", "")},
+                    {"toolchain", audit.value("toolchain", "")},
+                    {"mathlib_revision", audit.value("mathlib_revision", "")},
+                    {"manifest_sha256", auditManifest},
+                    {"sources_sha256", auditSources},
+                    {"matches_manifest", matches},
+                    {"modules", audit.value("modules", nlohmann::json::array())},
+                    {"declarations_not_proved", unproved}};
+  block["lean_status"] = !matches ? "audit_mismatch"
+                         : (audit.value("passed", false) && unproved.empty()) ? "audited"
+                                                                              : "audit_incomplete";
+  return block;
 }
 
 }  // namespace formal

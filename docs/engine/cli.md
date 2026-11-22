@@ -30,6 +30,13 @@ attribution summary on stderr at the end. `--trace-stderr` also prints every rec
 `TRECH_TRACE`, `TRECH_TRACE_FILE` and `TRECH_TRACE_STDERR` environment variables do the same
 thing when no flag is given. Tracing never changes results or config hashes.
 
+`--formal-audit <file>` names a Lean audit report written by
+`python3 scripts/check_lean_laws.py --report <file>`. When a run performs law checks (see
+[formal laws in run outputs](formal_laws.md#law-checks-in-run-outputs)), its provenance copies the
+report's Lean identity and says whether the report matches the laws this binary was built with.
+`TRECH_FORMAL_AUDIT` does the same when the flag is not given. The run never starts Lean, and
+the option changes no result and no config hash.
+
 `--js-engine quickjs|v8` picks the JavaScript engine for every command (`run`, `inspect`, `lab`).
 Without it, the `TRECH_JS_ENGINE` environment variable decides, then the build default (QuickJS).
 V8 is available only in a binary built with `-DTRECH_ENABLE_V8=ON`; asking for it elsewhere fails

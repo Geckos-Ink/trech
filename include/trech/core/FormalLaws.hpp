@@ -74,5 +74,32 @@ LawCheck checkVelocityMoments(const std::string& law, const std::string& lean, s
                               const double* cx, const double* cy, const double* cz,
                               const double* w, double cs2, int dimensions, double tolerance);
 
+// Run record of the law checks performed (docs/engine/formal_laws.md, "In run outputs").
+//
+// Engine code (origin "engine", e.g. Lattice::checkLaws) and validation companions (origin
+// "validation", through TRECH_FORMAL_LAWS.record) report each check here. The CLI drains the
+// record at every run end: a non-empty result is written as `law_checks` in the run_end scores
+// and summarised by `provenanceBlock` as the provenance `formal` object; an empty one writes
+// nothing, so runs without checks keep their bytes. Checks with the same (origin, law, Lean
+// declaration) merge: `count` checks, summed samples and violations, the largest error and
+// tolerance, passed only if every one passed, and the lexicographically first detail of the
+// failing (else passing) ones, so the result does not depend on thread order. Thread-safe.
+// Never consumes RNG and never feeds anything back into a run.
+void recordRunCheck(const LawCheck& check, const std::string& origin);
+// Merged records since the previous call, sorted by origin, law and declaration; then cleared.
+nlohmann::json takeRunChecks();
+// SHA-256 of formal/laws.json, embedded at build time ("" when the build had none).
+const std::string& manifestSha256();
+// One SHA-256 over the manifest and every Lean module (formal/Trech.lean, formal/Trech/**.lean):
+// SHA-256 of "<path>\n<sha256>\n" per file in sorted path order, embedded at build time.
+const std::string& sourcesSha256();
+// The provenance `formal` object for drained `checks` (trech_formal_provenance_v1): manifest
+// identity, cited declarations, check counts and the Lean status. `auditPath` (from
+// --formal-audit or $TRECH_FORMAL_AUDIT, may be empty) names a check_lean_laws.py --report file;
+// its identity is copied, and `lean_status` is "audited" only when the audit passed, matches
+// this build's manifest and Lean sources (sourcesSha256) and lists every cited declaration with
+// standard axioms only.
+nlohmann::json provenanceBlock(const nlohmann::json& checks, const std::string& auditPath);
+
 }  // namespace formal
 }  // namespace trech

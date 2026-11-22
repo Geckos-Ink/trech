@@ -10,8 +10,11 @@ fails the check. Needs ``lake`` matching ``formal/lean-toolchain`` and the Mathl
 
 ``--report PATH`` also writes the audit as JSON (schema ``trech_lean_audit_v1``): the Lean
 version, the toolchain and Mathlib revision, the SHA-256 of ``formal/laws.json`` and of every
-Lean module it lists, and each declaration's laws and axioms. It is the identity a run that
-cites a Lean verdict would record; nothing in the engine reads it yet.
+Lean module it lists, ``sources_sha256`` (one hash over the manifest and every Lean module, the
+same one the engine embeds at build time), and each declaration's laws and axioms. A run that
+performs law checks with ``--formal-audit PATH`` (or ``$TRECH_FORMAL_AUDIT``) copies this
+identity into its provenance ``formal`` object and marks it ``audited`` only when the hashes
+match the engine's build.
 
     python3 scripts/check_lean_laws.py [--lake PATH] [--report PATH]
 """
@@ -94,6 +97,15 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def sources_sha256() -> str:
+    """One SHA-256 over the manifest and every Lean module, as CMakeLists.txt embeds it in the
+    engine: SHA-256 of "<path>\\n<sha256>\\n" per file, in sorted repository-relative path order."""
+    files = [FORMAL / "laws.json", FORMAL / "Trech.lean", *(FORMAL / "Trech").rglob("*.lean")]
+    paths = sorted(f.relative_to(ROOT).as_posix() for f in files if f.is_file())
+    digest = "".join(f"{p}\n{sha256(ROOT / p)}\n" for p in paths)
+    return hashlib.sha256(digest.encode("utf-8")).hexdigest()
+
+
 def write_report(path: Path, lake: str, laws: list[dict], laws_of: dict[str, list[str]],
                  found: dict[str, set[str]], passed: bool) -> None:
     version = subprocess.run([lake, "env", "lean", "--version"], cwd=FORMAL, text=True,
@@ -108,6 +120,7 @@ def write_report(path: Path, lake: str, laws: list[dict], laws_of: dict[str, lis
         "toolchain": (FORMAL / "lean-toolchain").read_text(encoding="utf-8").strip(),
         "mathlib_revision": mathlib,
         "manifest": {"path": "formal/laws.json", "sha256": sha256(FORMAL / "laws.json")},
+        "sources_sha256": sources_sha256(),
         "modules": [{"path": m, "sha256": sha256(ROOT / m)} for m in modules],
         "standard_axioms": sorted(STANDARD),
         "declarations": [

@@ -16,8 +16,10 @@ compile with Lean `v4.37.0-rc1` and Mathlib `6ebcce3733` and depend only on the 
 axioms (`propext`, `Classical.choice`, `Quot.sound`), checked by the opt-in
 `trech_formal_lean_build`. The proofs are about real numbers, not the floating-point code. The
 engine runs one classic check itself: `Lattice` checks its pair's hypotheses once per build
-(`lawChecks()`, trace category `formal`). No config field, provenance field or run output
-carries a law check (design draft in the [roadmap](ROADMAP.md#provenance-design-draft--2026-11-22)).
+(`lawChecks()`, trace category `formal`). Runs record their checks (2026-11-22): `law_checks`
+in the `run_end` scores (origins `engine` and `validation`) and a provenance `formal` object
+with the build-embedded law-source hashes and, with `--formal-audit`, the Lean audit identity.
+No config field. One bundled companion records checks (`analytic_compton_transfer`).
 Classic C++/JavaScript implementations stay the running path (see the first rule). The plan and
 every open item are in the [roadmap](ROADMAP.md#priority-queue). User guide:
 [`docs/engine/formal_laws.md`](../../../docs/engine/formal_laws.md).
@@ -98,9 +100,15 @@ Both are shallow submodules (`shallow = true`, `branch = master` in [`.gitmodule
   A theorem over `ℝ` does not certify the floating-point kernel. Bridge the two explicitly
   (stated error bounds, interval arithmetic, or a proof over the rounding model) and label the
   gap otherwise.
-- **Provenance.** Once a law is checked by a run, the run records the Lean declaration name,
-  the module source hash, the Lean toolchain and the Mathlib revision. New config fields are
-  conditionally serialized (root principles).
+- **Provenance.** A run that performs a law check records it: every check goes through
+  `formal::recordRunCheck` (engine code with origin `engine`; companions through
+  `TRECH_FORMAL_LAWS.record`, origin `validation`), the CLI drains it at each run end into
+  `law_checks` and the provenance `formal` object, and a run without checks writes neither.
+  The law-source identity (`formal::manifestSha256`, `formal::sourcesSha256`) is embedded by
+  CMake; the Lean identity (version, toolchain, Mathlib revision) comes only from a
+  `check_lean_laws.py --report` file named by `--formal-audit`/`TRECH_FORMAL_AUDIT`, and
+  `lean_status: "audited"` requires that report to match the embedded hashes. Law checks never
+  enter the config or its hash, and never feed back into a run.
 
 ## Geant4 secondary track
 
@@ -136,6 +144,10 @@ conservation, exponential attenuation from a constant interaction rate, energy c
   population, RNG stream, emit or output, and reports through the trace; a failed check is a
   warning, never an exception. Moving walls and Dirichlet links pass the bijection check with a
   "not conservative by design" detail; they are not failures.
+- **One law-source hash, two implementations.** CMake (`TRECH_FORMAL_SOURCES_SHA256`) and
+  `check_lean_laws.py` (`sources_sha256`) hash the same files the same way; `trech_formal_laws`
+  recomputes it from the tree. Adding a Lean file outside `formal/Trech.lean` or
+  `formal/Trech/**.lean` needs all three updated.
 - **Hypothesis checks matter as much as invariants.** `relaxTRT_sum_eq` assumes `∑ feq = ∑ f`,
   which the classic kernel gets from the velocity-set moments; `stream_sum_eq` assumes `src` is a
   bijection, which moving-wall and anti-bounce-back links break (they are not conservative by
@@ -160,8 +172,9 @@ that release candidate, so a from-source toolchain build must check out the tag 
 | [`include/trech/core/FormalLaws.hpp`](../../../include/trech/core/FormalLaws.hpp) · [`src/core/FormalLaws.cpp`](../../../src/core/FormalLaws.cpp) | `trech::formal::LawCheck` and the physics-agnostic classic checks: `checkConservedTotal` (Neumaier sums), `checkWithinBounds`, `checkProbabilityVector`, `checkAgreement`, and the hypothesis checks `checkPermutation`, `checkInvolution`, `checkVelocityMoments`. `toJson()` records `lean_status: "not_checked_by_this_check"`. In `trech_core`; the engine calls the three hypothesis checks from `Lattice::checkLaws` ([`LatticeContinuum.cpp`](../../../src/core/LatticeContinuum.cpp)). |
 | [`DiscreteTransition.hpp`](../../../include/trech/ml/DiscreteTransition.hpp) · [`MethodArbiter.cpp`](../../../src/ml/MethodArbiter.cpp) | `selectTransitionChannel` (the `ctx.react` draw, pair `Trech.Methods.Transition`) and the arbiter's squared-error grading (pair `Trech.Methods.Arbiter`). |
 | [`js/trech_formal_laws.js`](../../../js/trech_formal_laws.js) | `TRECH_FORMAL_LAWS` (QuickJS, V8, Node): classic `compton` and `attenuation` references for validation companions, each naming its Lean declaration, the same check contract as C++ (`role: "validation"`), and `checkComptonBounds`/`checkAttenuationMemoryless`. Calls are reported as authored laws in the engine trace. |
-| [`tests/test_formal_laws.cpp`](../../../tests/test_formal_laws.cpp) | CTest `trech_formal_laws`: classic C++ and JS against each statement, hypothesis checks on a periodic D2Q9 lattice driven through `advanceLattice` with a body force, the engine's own `lawChecks()` on a walled scalar lattice (400 advected steps) and a walled D3Q19 flow lattice, `selectTransitionChannel` over 2^20 draws, the arbiter on noisy references with biased rivals, bit-identical C++/JS Compton values (`-ffp-contract=off`), and a negative control per check kind. |
+| [`tests/test_formal_laws.cpp`](../../../tests/test_formal_laws.cpp) | CTest `trech_formal_laws`: classic C++ and JS against each statement, hypothesis checks on a periodic D2Q9 lattice driven through `advanceLattice` with a body force, the engine's own `lawChecks()` on a walled scalar lattice (400 advected steps) and a walled D3Q19 flow lattice, `selectTransitionChannel` over 2^20 draws, the arbiter on noisy references with biased rivals, bit-identical C++/JS Compton values (`-ffp-contract=off`), the run record (merging, provenance grading of missing/stale/partial/matching audits, JS recording and rejection), and a negative control per check kind. |
 | [`tests/test_formal_law_pairs.py`](../../../tests/test_formal_law_pairs.py) | CTest `trech_formal_law_pairs`: each Lean file declares its listed theorems, has no `sorry`, cites its classic sources; each classic source cites the Lean namespace; `formal/lean-toolchain` equals Mathlib's. |
-| [`scripts/check_lean_laws.py`](../../../scripts/check_lean_laws.py) | `lake build` of `formal/`, then `#print axioms` for every declaration in `laws.json`; fails on a build error, a missing report or any axiom beyond `propext`, `Classical.choice`, `Quot.sound` (so `sorryAx` fails). Shared theorems are audited once. `--report PATH` writes `trech_lean_audit_v1` JSON (Lean version, toolchain, Mathlib revision, SHA-256 of `laws.json` and each module, per-declaration laws and axioms). |
+| Run record | `formal::recordRunCheck`/`takeRunChecks`/`provenanceBlock` ([`FormalLaws.cpp`](../../../src/core/FormalLaws.cpp)); drained in `TrechRunAction::EndOfRunAction` ([`RunAction.cpp`](../../../src/sim/RunAction.cpp)) after `onRunEnd`; `--formal-audit` in [`RunOptions.cpp`](../../../src/core/RunOptions.cpp); `__TRECH_FORMAL_RECORD` in [`JsRuntime.cpp`](../../../src/js/JsRuntime.cpp) (QuickJS and V8); law-source hashes embedded by [`CMakeLists.txt`](../../../CMakeLists.txt). |
+| [`scripts/check_lean_laws.py`](../../../scripts/check_lean_laws.py) | `lake build` of `formal/`, then `#print axioms` for every declaration in `laws.json`; fails on a build error, a missing report or any axiom beyond `propext`, `Classical.choice`, `Quot.sound` (so `sorryAx` fails). Shared theorems are audited once. `--report PATH` writes `trech_lean_audit_v1` JSON (Lean version, toolchain, Mathlib revision, SHA-256 of `laws.json` and each module, `sources_sha256` computed exactly as CMake embeds it, per-declaration laws and axioms). |
 | `TRECH_ENABLE_LEAN_CHECK` | Opt-in (OFF) CMake option registering `trech_formal_lean_build`, which runs `check_lean_laws.py` (needs `lake` and the Mathlib cache; about 12 s once cached). |
 | [`formal/lake-manifest.json`](../../../formal/lake-manifest.json) | Lake's pins of Mathlib's own dependencies (batteries, aesop, Qq, ProofWidgets, plausible, …), cloned into ignored `formal/.lake/packages`. |

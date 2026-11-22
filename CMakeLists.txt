@@ -24,6 +24,25 @@ add_library(trech_core
   src/js/PowOperatorScan.cpp
 )
 target_include_directories(trech_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
+# Identity of the formal laws for run provenance (formal::manifestSha256, formal::sourcesSha256):
+# the manifest's SHA-256, and one SHA-256 over "<path>\n<sha256>\n" of the manifest and every Lean
+# module in sorted path order (scripts/check_lean_laws.py computes the same). A change to any of
+# them reconfigures and recompiles FormalLaws.cpp only.
+file(SHA256 "${PROJECT_SOURCE_DIR}/formal/laws.json" TRECH_FORMAL_MANIFEST_SHA256)
+file(GLOB_RECURSE trech_formal_lean CONFIGURE_DEPENDS RELATIVE "${PROJECT_SOURCE_DIR}"
+     "${PROJECT_SOURCE_DIR}/formal/Trech/*.lean" "${PROJECT_SOURCE_DIR}/formal/Trech.lean")
+set(trech_formal_sources formal/laws.json ${trech_formal_lean})
+list(SORT trech_formal_sources)
+set(trech_formal_digest "")
+foreach(source IN LISTS trech_formal_sources)
+  file(SHA256 "${PROJECT_SOURCE_DIR}/${source}" source_sha)
+  string(APPEND trech_formal_digest "${source}\n${source_sha}\n")
+endforeach()
+string(SHA256 TRECH_FORMAL_SOURCES_SHA256 "${trech_formal_digest}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/formal/laws.json")
+set_property(SOURCE src/core/FormalLaws.cpp APPEND PROPERTY COMPILE_DEFINITIONS
+             TRECH_FORMAL_MANIFEST_SHA256="${TRECH_FORMAL_MANIFEST_SHA256}"
+             TRECH_FORMAL_SOURCES_SHA256="${TRECH_FORMAL_SOURCES_SHA256}")
 target_link_libraries(trech_core PUBLIC nlohmann_json::nlohmann_json)
 trech_apply_warnings(trech_core)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")

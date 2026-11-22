@@ -9,7 +9,7 @@ Read the root principles and the parent handbook first; then open only the subca
 **Scenario bundles:** all 71 scenario entry points live in `examples/scenarios/<name>/` with
 `<name>.js` (physics), `.view.js` (presentation), `.validation.js` (expectations and
 validation-only declarations), and `.ui.js` (typed controls/Studio descriptions, data
-categorization and rendering indications). Shared TRECH JS lives in `js/`; failure fixtures live in
+categorization and rendering indications). A companion may record classic law-check verdicts in the run's `law_checks` with `TRECH_FORMAL_LAWS.record`, under the `validation` role (`analytic_compton_transfer` does; [formal laws](../../engine/formal/AGENTS.md)). Shared TRECH JS lives in `js/`; failure fixtures live in
 `tests/fixtures/js/`. The C++ loader loads companions for roots and nested includes; CLI/library
 and Studio share parameter validation. Source inventory includes companions. Contract:
 [`docs/scenarios/scenario_bundles.md`](../../../docs/scenarios/scenario_bundles.md). Historical media identities are retained.

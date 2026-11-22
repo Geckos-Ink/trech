@@ -233,7 +233,10 @@ void Lattice::checkLaws() {
     checkSet(*scalarSet_, gSrc_, "scalar", !dirichlet, "Dirichlet (anti-bounce-back) links exchange the scalar by design");
   }
   bool failed = false;
-  for (const auto& check : lawChecks_) failed = failed || !check.passed;
+  for (const auto& check : lawChecks_) {
+    failed = failed || !check.passed;
+    formal::recordRunCheck(check, "engine");  // law_checks in this run's run_end record
+  }
   if (!failed && !trace::active()) return;
   nlohmann::json checks = nlohmann::json::array();
   for (const auto& check : lawChecks_) checks.push_back(check.toJson());

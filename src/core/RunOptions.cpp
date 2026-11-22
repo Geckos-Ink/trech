@@ -63,6 +63,8 @@ std::string runUsage() {
       << "                    <output>/trech_trace.jsonl and a run attribution summary\n"
       << "  --trace-file <f>  Trace JSONL path instead of <output>/trech_trace.jsonl\n"
       << "  --trace-stderr    Also print every trace record on stderr\n"
+      << "  --formal-audit <f> Lean audit report (scripts/check_lean_laws.py --report) whose identity\n"
+      << "                    a run with law checks records in provenance (default: $TRECH_FORMAL_AUDIT)\n"
       << "  --js-engine <e>   JavaScript engine: quickjs or v8 (v8 needs a TRECH_ENABLE_V8 build;\n"
       << "                    default: $TRECH_JS_ENGINE, else the build default)\n"
       << "  -h, --help        Show this help\n"
@@ -356,6 +358,15 @@ RunOptions parseRunOptions(int argc, char** argv) {
     }
     if (arg == "--trace-stderr") {
       options.traceStderr = true;
+      continue;
+    }
+    if (arg == "--formal-audit") {
+      if (i + 1 >= argc) {
+        options.valid = false;
+        options.error = "Missing value for --formal-audit.";
+        return options;
+      }
+      options.formalAuditPath = argv[++i];
       continue;
     }
     if (arg == "--ui") {

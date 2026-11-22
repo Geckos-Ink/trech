@@ -129,6 +129,9 @@ struct ProvenanceRecord {
   // categories, trace file path, batch index, summary hash, totals, verdict), written as `trace`.
   // Empty (and absent) when tracing is off, so untraced records keep their bytes. Never part of
   // config_json or config_hash.
+  // Run-end provenance `formal` object (formal::provenanceBlock): written only when the run
+  // performed at least one law check, so other runs keep their record shape.
+  std::string formalJson;
   std::string traceJson;
   // Post-construction Geant4 overlap check; the `geometry_overlap_check` block
   // is written only when it ran.

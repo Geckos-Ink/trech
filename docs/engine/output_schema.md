@@ -231,6 +231,21 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   batch), `seq` (records written so far), `summary_hash` (FNV-1a 64 of the batch summary JSON),
   `totals` and `verdict` (the batch summary's). It never enters `config_json` or `config_hash`,
   and untraced records have no `trace` key.
+- `formal` (object, optional, `run_end` only): written only when the run performed at least one
+  law check (the same checks as the scores' `law_checks`), so other runs keep their record shape.
+  Schema `trech_formal_provenance_v1`: `manifest` (`path` `formal/laws.json` and its `sha256`,
+  embedded when the binary was built), `sources_sha256` (one SHA-256 over the manifest and every
+  Lean module, also embedded at build time), `declarations` (the distinct Lean declarations the
+  checks cite, sorted), `checks` and `failed_checks` (counts), `lean_status` and, when an audit
+  report was given (`--formal-audit` or `TRECH_FORMAL_AUDIT`), `audit`: `path`, `passed`,
+  `lean_version`, `toolchain`, `mathlib_revision`, `manifest_sha256`, `sources_sha256`,
+  `matches_manifest` (both hashes equal this build's), `modules` and `declarations_not_proved`.
+  `lean_status` is `not_checked_by_this_run` (no report), `audit_unreadable`, `audit_mismatch`
+  (the report was made from other law sources), `audit_incomplete` (a cited declaration is
+  missing from the report or uses a non-standard axiom) or `audited`. `audited` means the cited
+  Lean theorems were proved, as statements about real numbers, from the sources this binary
+  embeds; it does not mean the run's floating-point code was proved. It never enters
+  `config_json` or `config_hash`.
 
 Example:
 
@@ -351,6 +366,17 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   recorded in provenance; omitted when neither registry nor separate loader is configured.
 - `lab_script` (object, optional): the [hook script identity](#lab-script-identity) of a
   scenario-backed `trech lab` batch; absent otherwise.
+- `law_checks` (array[object], `run_end` only, optional): the [law checks](formal_laws.md#law-checks-in-run-outputs)
+  performed since the previous run end, absent when there were none. They come from the engine
+  (`origin: "engine"`, e.g. each built lattice's hypothesis checks) and from validation
+  companions (`origin: "validation"`, through `TRECH_FORMAL_LAWS.record`). Checks with the same
+  `origin`, `law` and `lean_declaration` are merged into one record: `count` (how many were
+  merged), `samples` and `violations` (summed), `max_abs_error` and `tolerance` (largest),
+  `passed` (all passed), `detail` (the alphabetically first detail of a failing check, else of a
+  passing one), plus `kind` and `lean_status` (`not_checked_by_this_check`). Records are sorted
+  by origin, law and declaration, so the array does not depend on thread order. Checks run during
+  configuration and `onInit` are reported by the first run end. A `trech lab` session reports each
+  check in the batch whose run performed it (a lattice built once appears only in that batch).
 - `system_enabled` (boolean): whether system-level aggregation is enabled.
 - `system_mode` (string): system aggregation mode label (config).
 - `system_frame` (string): system frame label (config, point-agnostic by default).

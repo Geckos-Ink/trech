@@ -13,9 +13,10 @@ classic code of each pair is checked against its Lean statement by an ordinary t
 Lean. The Lean files compile with Lean `v4.37.0-rc1` and the pinned Mathlib, and every theorem
 rests only on Lean's three standard axioms, so no step is assumed. The proofs are about real
 numbers: they do not by themselves prove the floating-point code correct (see below). TRECH
-does not link or run Lean. The engine itself now checks the lattice theorems' hypotheses each
-time it builds a lattice and reports them in the [engine trace](engine_trace.md), but no run
-output or provenance record carries a law check yet. The open work is in the
+does not link or run Lean. Runs now record their law checks: the engine checks the lattice
+theorems' hypotheses each time it builds a lattice, the `analytic_compton_transfer` validation
+companion checks its Compton reference, and both land in the run's outputs and provenance
+([below](#law-checks-in-run-outputs)). The open work is in the
 [formal-laws roadmap](../../AGENTS/engine/formal/ROADMAP.md#priority-queue).
 
 ## What it is for
@@ -93,7 +94,7 @@ The engine also runs the lattice hypothesis checks itself. Each time it builds a
 field evolution it checks the velocity set's moments, the opposite-direction table and the
 streaming table, once, without touching the populations. With tracing on
 (`--trace info:formal`), the [engine trace](engine_trace.md) gets one `formal` record per
-lattice listing each check. A failed check is always printed as a warning. A lattice with
+lattice listing each check, and every run records them in `law_checks` (below). A failed check is always printed as a warning. A lattice with
 moving walls or fixed-value (Dirichlet) walls still passes, with a note that it adds mass or
 scalar by design, so the conservation theorems do not apply to it.
 
@@ -106,13 +107,56 @@ ctest --test-dir build/rel -R trech_formal
 The output lists each check with its Lean declaration, sample count, largest error and verdict.
 Checks named `negative_control` are meant to fail: they prove each check can catch a violation.
 
-A validation companion can use the same classic references:
+A validation companion can use the same classic references and record their verdicts in the
+run (next section):
 
 ```js
 TRECH_INCLUDE("../../../js/trech_formal_laws.js");
 const checks = TRECH_FORMAL_LAWS.checkComptonBounds([0.5, 1.3], [-1, 0, 1], 1e-15);
 // each record: {law, lean_declaration, lean_status: "not_checked_by_this_check", role: "validation", passed, ...}
+TRECH_FORMAL_LAWS.record(checks);  // into this run's law_checks; returns how many were recorded
 ```
+
+`TRECH_FORMAL_LAWS.record` accepts only records made by the library's own check functions
+(`checkWithinBounds`, `checkConservedTotal`, `checkAgreement`, `checkProbabilityVector`,
+`checkComptonBounds`, `checkAttenuationMemoryless`) and throws on anything else. Call it only
+from a `.validation.js` companion, never from the physics script. Outside TRECH (Node, a
+browser) it records nothing and returns 0.
+
+## Law checks in run outputs
+
+A run that performs at least one law check records it in two places. Runs without checks write
+neither, so their files keep the same bytes as before.
+
+- **`law_checks`** in the `run_end` record of `trech_scores.jsonl`: one record per check, with
+  `origin` saying who ran it. `engine` checks come from the engine itself (each lattice it builds
+  checks its velocity set, opposite-direction table and streaming table). `validation` checks come
+  from a companion through `TRECH_FORMAL_LAWS.record`. Identical checks are merged, and `count`
+  says how many were merged.
+- **`formal`** in the `run_end` provenance record: which law sources the binary was built with
+  (hashes of `formal/laws.json` and of every Lean file), which Lean theorems the checks cite, how
+  many checks failed, and `lean_status`.
+
+`lean_status` says how much the run can claim about the Lean side. By default it is
+`not_checked_by_this_run`: the run checked its classic code, but did not look at any proof. To
+attach a proof audit, write one and pass it to the run:
+
+```bash
+python3 scripts/check_lean_laws.py --report build/lean_audit.json
+trech run examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js \
+  --events 200 --formal-audit build/lean_audit.json --output build/out_compton
+```
+
+The run copies the report's Lean version, toolchain and Mathlib revision. If the report was made
+from the same law sources as the binary and lists every cited theorem with standard axioms only,
+`lean_status` becomes `audited`. A report made from other sources gives `audit_mismatch`, and a
+report that misses a cited theorem gives `audit_incomplete`. The run never starts Lean, and the
+option changes no result: on 2026-11-22 the scores of this run were byte-identical with and
+without `--formal-audit`, and identical between QuickJS and V8. `audited` covers the theorems as
+statements about real numbers, not the floating-point code (see above).
+
+The Compton scenario's family gate grades the recorded checks too: `formal_laws_recorded` needs
+at least two `validation` records and `formal_laws_hold` needs all of them to pass.
 
 To check the proofs yourself you need Lean and Mathlib's prebuilt files (a one-time download
 of about 7 GB):
@@ -128,8 +172,8 @@ The last command builds the package and prints one line per theorem with the axi
 ending with `19/19 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
 an added axiom makes it fail. Add `--report build/lean_audit.json` to also save the audit
 as JSON: the Lean version, toolchain and Mathlib revision, the SHA-256 hash of `laws.json` and
-of every Lean file, and each theorem's axioms. This is the identity a run would record once
-law checks reach the run outputs; nothing reads it yet. Configuring TRECH with
+of every Lean file, one combined hash of all of them, and each theorem's axioms. A run reads it
+through `--formal-audit` ([law checks in run outputs](#law-checks-in-run-outputs)). Configuring TRECH with
 `-DTRECH_ENABLE_LEAN_CHECK=ON` runs the same check as the CTest entry `trech_formal_lean_build`. More detail:
 [`formal/README.md`](../../formal/README.md).
 

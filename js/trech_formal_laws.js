@@ -164,11 +164,46 @@
     return checkAgreement("attenuation.memoryless", attenuation.lean.memoryless, joint, split, 0, tolerance);
   }
 
+  // Invariant: every entry finite and >= -tol, and |sum - 1| <= tol (C++ checkProbabilityVector).
+  function checkProbabilityVector(law, lean, probabilities, tolerance) {
+    const r = record(law, lean, "invariant", tolerance);
+    r.samples = probabilities.length;
+    let sum = 0;
+    probabilities.forEach((p, i) => {
+      if (!Number.isFinite(p) || p < -tolerance) violate(r, Number.isFinite(p) ? -p : NaN, "entry " + i + " = " + p);
+      sum += p;
+    });
+    const error = Math.abs(neumaier(probabilities) - 1);
+    if (!(error <= tolerance)) violate(r, error, "sum " + sum + " is not 1");
+    else if (error > r.max_abs_error) r.max_abs_error = error;
+    return done(r);
+  }
+
+  // Records checks made by this module in the run's outputs: `law_checks` in the run_end scores
+  // and the provenance `formal` object, with origin "validation". Call it only from a
+  // `.validation.js` companion. Only records built by the check functions above are accepted.
+  // Outside a TRECH host (Node, Studio) nothing is recorded and it returns 0; recording never
+  // changes physics, RNG or emits.
+  function recordChecks(checks) {
+    const list = Array.isArray(checks) ? checks : [checks];
+    const sink = globalThis.__TRECH_FORMAL_RECORD;
+    let recorded = 0;
+    for (const c of list) {
+      if (!c || typeof c !== "object" || c.role !== "validation" || c.lean_status !== "not_checked_by_this_check" ||
+          typeof c.law !== "string" || !c.law) {
+        throw new TypeError("TRECH_FORMAL_LAWS.record accepts only records made by its check functions");
+      }
+      if (typeof sink === "function" && sink(JSON.stringify(c))) recorded += 1;
+    }
+    return recorded;
+  }
+
   const api = {
     schema: "trech_formal_laws_js_v1",
     compton, attenuation,
-    checkWithinBounds, checkConservedTotal, checkAgreement,
+    checkWithinBounds, checkConservedTotal, checkAgreement, checkProbabilityVector,
     checkComptonBounds, checkAttenuationMemoryless,
+    record: recordChecks,
   };
   globalThis.TRECH_FORMAL_LAWS = api;
   if (typeof module === "object" && module.exports) module.exports = api;

@@ -213,6 +213,9 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   if (!record.hookPatchIgnoredPaths.empty()) {
     j["hook_patch_ignored_paths"] = record.hookPatchIgnoredPaths;
   }
+  if (!record.formalJson.empty()) {
+    j["formal"] = nlohmann::json::parse(record.formalJson);
+  }
   if (!record.traceJson.empty()) {
     j["trace"] = nlohmann::json::parse(record.traceJson);
   }

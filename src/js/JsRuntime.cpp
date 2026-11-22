@@ -6,6 +6,7 @@
 #include "trech/core/Config.hpp"
 #include "trech/core/Provenance.hpp"
 #include "trech/core/ScalarField.hpp"
+#include "trech/core/FormalLaws.hpp"
 #include "trech/core/Trace.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/DomainDiscovery.hpp"
@@ -6320,6 +6321,33 @@ static JSValue jsTraceAuthored(JSContext* ctx, JSValueConst, int argc, JSValueCo
   return JS_UNDEFINED;
 }
 
+// TRECH_FORMAL_LAWS.record (js/trech_formal_laws.js): one JSON LawCheck record from a validation
+// companion into the run's law_checks (trech::formal::recordRunCheck, origin "validation").
+// Recording is observation only: it never touches physics, RNG or emits.
+static JSValue jsFormalRecord(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  if (argc < 1) return JS_ThrowTypeError(ctx, "__TRECH_FORMAL_RECORD needs a JSON record");
+  const char* bytes = JS_ToCString(ctx, argv[0]);
+  if (!bytes) return JS_EXCEPTION;
+  const nlohmann::json j = nlohmann::json::parse(bytes, nullptr, false);
+  JS_FreeCString(ctx, bytes);
+  if (!j.is_object() || j.value("role", "") != "validation" || !j.contains("law") || !j["law"].is_string())
+    return JS_ThrowTypeError(ctx, "law-check record must be a validation record with a law");
+  trech::formal::LawCheck check;
+  check.law = j["law"].get<std::string>();
+  check.leanDeclaration = j.value("lean_declaration", "");
+  check.kind = j.value("kind", "");
+  check.samples = j.value("samples", std::size_t{0});
+  check.violations = j.value("violations", std::size_t{0});
+  check.maxAbsError = j.contains("max_abs_error") && j["max_abs_error"].is_number()
+                          ? j["max_abs_error"].get<double>()
+                          : std::numeric_limits<double>::quiet_NaN();
+  check.tolerance = j.contains("tolerance") && j["tolerance"].is_number() ? j["tolerance"].get<double>() : 0.0;
+  check.passed = j.value("passed", false);
+  check.detail = j.value("detail", "");
+  trech::formal::recordRunCheck(check, "validation");
+  return JS_TRUE;
+}
+
 static constexpr char kTracePredict[] = "predict";
 static constexpr char kTraceCascade[] = "cascade";
 static constexpr char kTraceEvolve[] = "evolve";
@@ -6518,6 +6546,7 @@ static void installTraceHelpers(JSContext* ctx) {
   JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_SPAN_BEGIN", JS_NewCFunction(ctx, jsTraceSpanBegin, "__TRECH_TRACE_SPAN_BEGIN", 2));
   JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_SPAN_END", JS_NewCFunction(ctx, jsTraceSpanEnd, "__TRECH_TRACE_SPAN_END", 2));
   JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_AUTHORED", JS_NewCFunction(ctx, jsTraceAuthored, "__TRECH_TRACE_AUTHORED", 2));
+  JS_SetPropertyStr(ctx, global, "__TRECH_FORMAL_RECORD", JS_NewCFunction(ctx, jsFormalRecord, "__TRECH_FORMAL_RECORD", 1));
   JS_FreeValue(ctx, global);
   JSValue result = JS_Eval(ctx, kTrechTraceBootstrap, std::strlen(kTrechTraceBootstrap),
                            "<TRECH_TRACE>", JS_EVAL_TYPE_GLOBAL);

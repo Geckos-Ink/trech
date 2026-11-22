@@ -18,12 +18,10 @@ Standing constraint for every item: Lean stays optional. Each law keeps its clas
 implementation as the running path, with the Lean definition beside it for validation
 ([rule](AGENTS.md#rules)).
 
-- **P1** · R8 · Law-pair contract, second half. Landed: the manifest, the `LawCheck` record and the citation rule; the audit identity (`check_lean_laws.py --report`, `trech_lean_audit_v1`, 2026-11-22); a [design draft](#provenance-design-draft--2026-11-22) for where law checks go in run outputs. Still open: owner review of that draft, then the conditionally serialized provenance block and the `law_checks` output it proposes. No engine field before review. ([detail](#provenance-design-draft--2026-11-22))
 - **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Next candidates: `ctx.react` declared conservation (a channel with `coefficients · delta = 0` keeps the invariant, and atomic application never makes a count negative), `ctx.interact` equal-and-opposite pair updates conserving the summed quantity, and energy conservation in recorded Geant4 secondaries. Search Mathlib first for each. ([detail](#more-law-pairs-and-the-first-engine-check--2026-11-22))
-- **P2** · R8 · Classic checks in run records. Landed 2026-11-22: `Lattice` runs the velocity-moment, involution and bijection checks once per build and traces them (`formal`). Still open, after the provenance design is reviewed: carry those records into the run outputs, and expose the JS checks to validation companions' recorded output, without changing physics, RNG or emits. ([detail](#more-law-pairs-and-the-first-engine-check--2026-11-22))
 - **P2** · R8 · Conformance harness: a Lean reference evaluator (`@[export]` C symbols linked behind an opt-in `TRECH_ENABLE_LEAN`, default OFF, or a separate `lake exe` fed JSON) that checks the classic kernel on sampled or recorded inputs offline. Measure its cost; it never runs per step in production and never changes physics, RNG or emits. ([detail](#route-opened--2026-11-22))
 - **P2** · R8 · Hardware acceleration contract: Lean compiles to scalar CPU code, so accelerated kernels (C++ SIMD, LibTorch, GPU) stay the compute path. Define how a proof about an algorithm's model transfers to its accelerated implementation (shared algorithm spec, sampled conformance, documented reduction-order and fused-operation differences). ([detail](#route-opened--2026-11-22))
-- **P2** · R8 · Scenario side: a validation companion records `TRECH_FORMAL_LAWS` verdicts next to its own classic reference. Finding (2026-11-22): the analytic companions (`analytic_compton_transfer`, `analytic_beer_lambert`) are declarative JSON contracts graded after the run, with no JS that runs per run, so this waits for the output location in the provenance design. Never from the physics script, never on the decision path. ([detail](#provenance-design-draft--2026-11-22))
+- **P3** · R8 · More companions recording law checks: only `analytic_compton_transfer` records `TRECH_FORMAL_LAWS` verdicts. Candidates: `analytic_beer_lambert` (memorylessness at its own attenuation coefficients), and companions of `ctx.react` scenarios checking recorded per-cell probabilities with `checkProbabilityVector`. Always from the `.validation.js` companion under the `validation` role, never on the decision path. ([detail](#law-checks-in-run-outputs--2026-11-22))
 - **P3** · R8 · Reals vs floats: bridge Mathlib's `ℝ` theorems to IEEE-754 kernels with stated error bounds, interval arithmetic or a rounding-model proof; until then label every Lean verdict as covering the real-valued statement only. ([detail](#route-opened--2026-11-22))
 - **P3** · R8 · Arbiter ranking across calls: `Trech.Methods.Arbiter` covers one weighted sample; the leader ranks by the decayed mean of log call RMSE (a geometric mean over calls) and the learned policy by a decayed log-ratio score. State and prove what those rankings preserve (for example, that a method better on every call ranks first) or document why they need no such guarantee. ([detail](#more-law-pairs-and-the-first-engine-check--2026-11-22))
 - **P3** · R8 · Lean CI beyond this machine: the toolchain, cache and `trech_formal_lean_build` are verified on macOS arm64 only; check Linux and decide whether CI runs the Lean check. ([detail](#proofs-compiled-and-audited--2026-11-22))
@@ -109,7 +107,7 @@ implementation as the running path, with the Lean definition beside it for valid
 
 ## Provenance design draft — 2026-11-22
 
-For owner review; nothing below is implemented. It answers the P1 item: what a run records
+Approved by the owner and implemented the same day (record below); kept as the design of record. It answers the P1 item: what a run records
 when it performs a law check, and where the records go.
 
 1. **Run outputs.** A run that performs at least one law check writes a `law_checks` array in
@@ -132,4 +130,31 @@ when it performs a law check, and where the records go.
    `validation` trace role and cannot emit physical fields.
 5. **Tests.** Round-trip: a scenario without checks keeps its config hash and output bytes; a
    lattice scenario gains only `law_checks` and `formal`; strict replay stays byte-identical.
+
+## Law checks in run outputs — 2026-11-22
+
+- [x] Owner approved the design draft above. `formal::recordRunCheck`/`takeRunChecks` keep a
+  thread-safe run record, merged by (origin, law, declaration) so the result does not depend on
+  thread order; `TrechRunAction::EndOfRunAction` drains it after `onRunEnd` into `law_checks`
+  (run_end scores) and `formal` (run_end provenance, `trech_formal_provenance_v1`). Both are
+  written only when a check ran; no config field.
+- [x] Identity: CMake embeds the SHA-256 of `formal/laws.json` and one hash over it and every
+  Lean module (`sources_sha256`, also computed by `check_lean_laws.py`). `--formal-audit` /
+  `TRECH_FORMAL_AUDIT` attach a `--report` file; `lean_status` is `audited` only when it matches
+  both hashes, passed and lists every cited declaration on standard axioms
+  (`audit_mismatch`, `audit_incomplete`, `audit_unreadable`, `not_checked_by_this_run` otherwise).
+- [x] Sources: `Lattice::checkLaws` reports with origin `engine`; `TRECH_FORMAL_LAWS.record`
+  (QuickJS and V8, `__TRECH_FORMAL_RECORD`) with origin `validation`, accepting only the
+  library's own records. `analytic_compton_transfer.validation.js` records its Compton checks
+  (eps grid including 662 keV) under the `validation` role; its family gate adds
+  `formal_laws_recorded` and `formal_laws_hold`. The companion still loads on a binary without
+  `TRECH_TRACE` (the stale `build/dev` one), where recording is a no-op.
+- [x] Verified: `trech_formal_laws` (merging, provenance grading of missing, unreadable,
+  stale, partial and matching audits, JS recording and rejection, embedded hash recomputed from
+  the tree) and `trech_scenario_contracts` (gate passes, fails on a failing or missing record).
+  A 200-event Compton run: `law_checks` has 2 validation records, `lean_status` `audited` with
+  the report and `not_checked_by_this_run` without, scores byte-identical either way, and
+  identical `law_checks` under V8. CTest: `build/rel` 80/80, `build/v8` 89/89 (`TRECH_JS_ENGINE=v8`).
+- [ ] Open: more companions recording checks (queued above). `audited` covers the real-valued
+  statements only (the reals-vs-floats item). macOS arm64 only.
 

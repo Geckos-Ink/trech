@@ -100,6 +100,10 @@ struct RunOptions {
   std::string traceSpec;
   std::string traceFile;
   bool traceStderr = false;
+  // `--formal-audit <path>`: a scripts/check_lean_laws.py --report file whose Lean identity a run
+  // that performs law checks copies into its provenance `formal` object (falls back to
+  // $TRECH_FORMAL_AUDIT). Never part of the config or its hash; the run never invokes Lean.
+  std::string formalAuditPath;
   // `trech arch <job.json>`: generator override (evolvo|classic) and
   // Python interpreter for the Evolvo worker; empty keeps the job's values.
   std::string archGenerator;

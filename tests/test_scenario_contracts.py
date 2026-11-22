@@ -449,13 +449,19 @@ class BundleFamilyExports(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 run = Path(tmp) / cases.RUN_ANALYTIC_COMPTON
                 run.mkdir()
-                for patch, status, failed in (({}, "pass", None),
-                                              ({"transfer_histogram_chi2": 30.0}, "fail", "spectrum_shape_p"),
-                                              ({"measured_max_transfer_fraction": 0.73}, "fail", "edge_respected"),
-                                              ({"cos_theta_histogram_entries": 9}, "fail", "angular_entries_match_samples")):
+                law = {"origin": "validation", "law": "compton.transfer_within_edge", "passed": True}
+                laws = [law, dict(law, law="compton.edge_at_backscatter")]
+                for patch, status, failed, recorded in (
+                        ({}, "pass", None, laws),
+                        ({"transfer_histogram_chi2": 30.0}, "fail", "spectrum_shape_p", laws),
+                        ({"measured_max_transfer_fraction": 0.73}, "fail", "edge_respected", laws),
+                        ({"cos_theta_histogram_entries": 9}, "fail", "angular_entries_match_samples", laws),
+                        ({}, "fail", "formal_laws_hold", [laws[0], dict(laws[1], passed=False)]),
+                        ({}, "fail", "formal_laws_recorded", [])):
                     row = dict(check, **patch)
                     _write_jsonl(run / "trech_scores.jsonl",
-                                 [{"phase": "run_end", "n_events": 10, "analytic_checks": [row]}])
+                                 [{"phase": "run_end", "n_events": 10, "analytic_checks": [row],
+                                   "law_checks": recorded}])
                     result = case.evaluate(RunContext(runs={cases.RUN_ANALYTIC_COMPTON: RunOutputs.load(run)}))
                     self.assertEqual(result.status, status, patch)
                     self.assertIn("analytic_compton_transfer.validation.js", result.notes[0])

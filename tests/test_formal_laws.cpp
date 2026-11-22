@@ -7,6 +7,7 @@
 
 #include "trech/core/FormalLaws.hpp"
 #include "trech/core/LatticeContinuum.hpp"
+#include "trech/core/Provenance.hpp"
 #include "trech/core/LatticeKinetic.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
@@ -15,11 +16,13 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -352,6 +355,123 @@ globalThis.TRECH_CONFIG = {formal: {
                                 0.0, 0.0));
 }
 
+void runRecordContract() {
+  // The run record behind `law_checks` and the provenance `formal` object.
+  (void)formal::takeRunChecks();  // drop what the earlier sections recorded
+  if (!formal::takeRunChecks().empty()) {
+    std::fprintf(stderr, "takeRunChecks did not clear the run record\n");
+    ++failures;
+  }
+  // No checks: the provenance record keeps its shape (no "formal" key).
+  const trech::test::TemporaryDirectory dir;
+  {
+    trech::ProvenanceWriter writer((dir.path() / "plain.jsonl").string());
+    trech::ProvenanceRecord record;
+    record.phase = "run_end";
+    writer.write(record);
+    std::ifstream in(dir.path() / "plain.jsonl");
+    if (nlohmann::json::parse(in).contains("formal")) {
+      std::fprintf(stderr, "a run without law checks wrote a formal block\n");
+      ++failures;
+    }
+  }
+  // Two identical engine lattices merge into one record per check with count 2; a failing
+  // validation record keeps its first detail whatever the arrival order.
+  trech::lattice::LatticeSpec spec;
+  spec.shape = {5, 4, 1};
+  spec.flow = false;
+  spec.scalarLattice = "D2Q5";
+  trech::lattice::Lattice a(spec), b(spec);
+  formal::LawCheck bad = formal::checkProbabilityVector("probability.run_record", "Trech.Methods.Transition.noEvent_nonneg",
+                                                        {0.7, 0.7}, 1e-15);
+  formal::LawCheck worse = bad;
+  worse.detail = "a first detail";
+  formal::recordRunCheck(bad, "validation");
+  formal::recordRunCheck(worse, "validation");
+  const auto checks = formal::takeRunChecks();
+  bool merged = checks.size() == 4;
+  for (const auto& c : checks) {
+    if (c.at("origin") == "engine") merged = merged && c.at("count") == 2 && c.at("passed") == true;
+    if (c.at("origin") == "validation")
+      merged = merged && c.at("count") == 2 && c.at("passed") == false && c.at("detail") == "a first detail";
+  }
+  if (!merged || checks.front().at("origin") != "engine") {
+    std::fprintf(stderr, "run record did not merge as specified: %s\n", checks.dump().c_str());
+    ++failures;
+  }
+  // The embedded law-source hash equals the one recomputed from the files (the same algorithm as
+  // scripts/check_lean_laws.py sources_sha256), so the build is not stale.
+  {
+    const auto root = std::filesystem::path(TRECH_SOURCE_DIR);
+    std::vector<std::string> files = {"formal/laws.json", "formal/Trech.lean"};
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(root / "formal/Trech"))
+      if (entry.path().extension() == ".lean")
+        files.push_back(std::filesystem::relative(entry.path(), root).generic_string());
+    std::sort(files.begin(), files.end());
+    std::string digest;
+    for (const auto& file : files) {
+      std::ifstream in(root / file, std::ios::binary);
+      const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      digest += file + "\n" + trech::sha256Hex(bytes) + "\n";
+    }
+    if (trech::sha256Hex(digest) != formal::sourcesSha256()) {
+      std::fprintf(stderr, "embedded formal sources hash is stale; reconfigure the build\n");
+      ++failures;
+    }
+  }
+  // Provenance: no audit, an unreadable one, a mismatched one, a matching one.
+  auto status = [&](const std::string& audit) { return formal::provenanceBlock(checks, audit).at("lean_status").get<std::string>(); };
+  const auto block = formal::provenanceBlock(checks, "");
+  if (formal::manifestSha256().size() != 64 || formal::sourcesSha256().size() != 64 ||
+      block.at("failed_checks") != 1 || block.at("declarations").size() != 3 || status("") != "not_checked_by_this_run" ||
+      status((dir.path() / "missing.json").string()) != "audit_unreadable") {
+    std::fprintf(stderr, "provenance block without a valid audit is wrong: %s\n", block.dump().c_str());
+    ++failures;
+  }
+  auto writeAudit = [&](const std::string& name, const std::string& sources, bool withAll) {
+    nlohmann::json declarations = nlohmann::json::array();
+    for (const auto& d : block.at("declarations"))
+      if (withAll || d != "Trech.Methods.Transition.noEvent_nonneg")
+        declarations.push_back({{"name", d}, {"standard_only", true}});
+    const nlohmann::json audit = {{"schema", "trech_lean_audit_v1"}, {"passed", true},
+                                  {"manifest", {{"sha256", formal::manifestSha256()}}},
+                                  {"sources_sha256", sources}, {"declarations", declarations}};
+    std::ofstream(dir.path() / name) << audit.dump();
+    return (dir.path() / name).string();
+  };
+  const std::string matching = writeAudit("audit.json", formal::sourcesSha256(), true);
+  if (status(writeAudit("stale.json", std::string(64, '0'), true)) != "audit_mismatch" ||
+      status(writeAudit("partial.json", formal::sourcesSha256(), false)) != "audit_incomplete" ||
+      status(matching) != "audited") {
+    std::fprintf(stderr, "provenance block does not grade the audit as specified\n");
+    ++failures;
+  }
+  // The JS side: TRECH_FORMAL_LAWS.record reaches the same record, and rejects foreign records.
+  const auto root = std::filesystem::path(TRECH_SOURCE_DIR);
+  const auto path = dir.path() / "record.js";
+  std::ofstream(path) << "TRECH_INCLUDE(" << nlohmann::json((root / "js/trech_formal_laws.js").string()).dump() << ");\n"
+                      << R"JS(
+const L = TRECH_FORMAL_LAWS;
+let rejected = false;
+try { L.record({law: "forged", role: "scenario"}); } catch (e) { rejected = true; }
+globalThis.TRECH_CONFIG = {formal: {
+  recorded: L.record(L.checkComptonBounds([0.5, 1.3], [-1, 0, 1], 1e-15)),
+  probability: L.record(L.checkProbabilityVector("transition.js_probability", "Trech.Methods.Transition.noEvent_nonneg", [0.25, 0.75], 1e-15)),
+  rejected}};
+)JS";
+  trech::JsRuntime runtime;
+  const auto out = nlohmann::json::parse(runtime.evalExperimentAndGetConfigJson(path.string())).at("formal");
+  const auto jsChecks = formal::takeRunChecks();
+  bool js = out.at("recorded") == 2 && out.at("probability") == 1 && out.at("rejected") == true && jsChecks.size() == 3;
+  for (const auto& c : jsChecks) js = js && c.at("origin") == "validation" && c.at("passed") == true;
+  if (!js) {
+    std::fprintf(stderr, "JS law-check recording failed: %s %s\n", out.dump().c_str(), jsChecks.dump().c_str());
+    ++failures;
+  }
+  std::printf("%-40s run record, provenance block and JS recording %s\n", "formal.run_record",
+              merged && js ? "pass" : "FAIL");
+}
+
 }  // namespace
 
 int main() {
@@ -363,6 +483,7 @@ int main() {
     transitionPairs();
     arbiterPairs();
     javascriptPairs();
+    runRecordContract();
     const auto sample = formal::checkProbabilityVector("probability.example", "", {0.25, 0.25, 0.5}, 1e-15);
     expect(sample);
     if (sample.toJson().at("lean_status") != "not_checked_by_this_check") ++failures;

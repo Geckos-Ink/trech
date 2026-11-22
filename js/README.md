@@ -6,7 +6,7 @@ relative to each module. Scenario bundles live in [`examples/scenarios/`](../exa
 See [the bundle contract](../docs/scenarios/scenario_bundles.md).
 `trech_ml.js` holds the host-neutral ML model definition/search library and registry resolver
 shared with the `tools/ml` CLI ([contract](../docs/inference/ml_models.md)).
-`trech_formal_laws.js` (`TRECH_FORMAL_LAWS`) holds classic Compton and Beer–Lambert references for validation companions, each naming its optional Lean pair, with law-check records ([guide](../docs/engine/formal_laws.md)).
+`trech_formal_laws.js` (`TRECH_FORMAL_LAWS`) holds classic Compton and Beer–Lambert references for validation companions, each naming its optional Lean pair, with law-check records; `TRECH_FORMAL_LAWS.record(checks)` writes them into the run's `law_checks` ([guide](../docs/engine/formal_laws.md#law-checks-in-run-outputs)).
 `trech_geometry.js` (`TRECH_GEOMETRY`) generates procedural assemblies (grids, rings, layer
 stacks, concentric shells) as plain engine volumes and audits them for overlaps/containment
 before the config reaches Geant4; it decides no physics.

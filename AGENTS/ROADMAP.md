@@ -74,7 +74,6 @@ later step regress an earlier contract.
 
 **R8 Formal laws (Lean)**
 
-- Law-pair contract, second half: review the provenance design draft, then the provenance fields and `law_checks` output for law checks (manifest, `LawCheck` record, citations and the `--report` audit identity landed 2026-11-22). — [engine/formal](engine/formal/ROADMAP.md#priority-queue)
 - Law inventory, continued: `ctx.react` declared conservation, `ctx.interact` pair symmetry, Geant4 secondary energy conservation (six pairs landed 2026-11-22, including `ctx.react` step probabilities, the arbiter's proper score and scalar-lattice conservation). — [engine/formal](engine/formal/ROADMAP.md#priority-queue)
 
 ### Gated items (need a go-ahead)
