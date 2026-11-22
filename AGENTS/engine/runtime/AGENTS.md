@@ -21,6 +21,21 @@ Read the root principles and the parent handbook first; then open only the subca
   returns `null` for missing required inputs. The generic-surrogate demo reads composition/density
   from live material probes, with a water/ethanol perturbation guard.
 
+- **Engine trace attribution (2026-11-22).** With the [engine trace](../core/AGENTS.md) active,
+  `dispatchHook` installs each inference entry point (`predict`, `cascade`, `evolve`, `react`,
+  `interact`, `lift`, `detectDomains`, `learnDomains`, `evolveField`) through
+  `setInferenceFunction<fn, name>`, which wraps it in `jsTracedCall`. The wrapper calls the
+  original first and only then reads the result: it never alters it. `traceOutcome` classifies
+  the call from the result's own metadata (`engine`, `engine_extrapolated` from
+  `__coverage.inDomain`/`stagesExtrapolating`/`outOfDomainInferences`, `engine_not_ran` from
+  `ran:false`/`stagesRun:0`/`levelsRun:0` incl. `__cascade`, `null_strict`, `null_unavailable`,
+  `error`). The per-dispatch counters `callEngineCalls`/`callEngineBacked`/`callAuthored` feed one
+  `countHook` per invocation (`emits_without_inference`) and the debug `hook` record. Off, the
+  plain functions are installed. `ctx.log`/`ctx.authored` and the `TRECH_LOG` global are always
+  present and do nothing while off. `loadDeclaredModels` reports each model as loaded or missing.
+  Both JS engines compile the same code (template function pointers, no `JS_NewCFunctionData`,
+  which the V8 shim lacks).
+
 - **Dispatch trust counts remain separate.** `HookDispatchReport.starvedCount` and
   `scaleMismatchCount` count successful evaluations across all five inference APIs, independently
   of hull `outOfDomainCount`. Cascade counts include inherited evidence; operators retain local

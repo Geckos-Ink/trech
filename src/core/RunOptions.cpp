@@ -1,8 +1,10 @@
 #include "trech/core/RunOptions.hpp"
 
 #include "trech/core/Config.hpp"
+#include "trech/core/Trace.hpp"
 
 #include <exception>
+#include <filesystem>
 #include <cmath>
 #include <sstream>
 
@@ -55,6 +57,11 @@ std::string runUsage() {
       << "  --viz-all         As --viz, also recording non-optical particles (run only)\n"
       << "  --viz-max-trajectories <n> Trajectory cap for a --viz capture (run only)\n"
       << "  --strict-config   Refuse a config with keys the engine never reads\n"
+      << "  --trace <spec>    Engine trace (observation only): <level>[:<cat>,...]; level off,\n"
+      << "                    summary, info, debug or trace (default: $TRECH_TRACE). Writes\n"
+      << "                    <output>/trech_trace.jsonl and a run attribution summary\n"
+      << "  --trace-file <f>  Trace JSONL path instead of <output>/trech_trace.jsonl\n"
+      << "  --trace-stderr    Also print every trace record on stderr\n"
       << "  --js-engine <e>   JavaScript engine: quickjs or v8 (v8 needs a TRECH_ENABLE_V8 build;\n"
       << "                    default: $TRECH_JS_ENGINE, else the build default)\n"
       << "  -h, --help        Show this help\n"
@@ -298,6 +305,31 @@ RunOptions parseRunOptions(int argc, char** argv) {
       options.strictConfig = true;
       continue;
     }
+    if (arg == "--trace" || arg == "--trace-file") {
+      if (i + 1 >= argc) {
+        options.valid = false;
+        options.error = "Missing value for " + arg + ".";
+        return options;
+      }
+      const std::string value = argv[++i];
+      if (arg == "--trace-file") {
+        options.traceFile = value;
+        continue;
+      }
+      try {
+        (void)trace::parseSpec(value);
+      } catch (const std::exception& error) {
+        options.valid = false;
+        options.error = std::string("Invalid --trace value: ") + error.what() + ".";
+        return options;
+      }
+      options.traceSpec = value;
+      continue;
+    }
+    if (arg == "--trace-stderr") {
+      options.traceStderr = true;
+      continue;
+    }
     if (arg == "--ui") {
       if (options.command != CliCommand::Run) {
         options.valid = false;
@@ -429,6 +461,24 @@ void applyRunOverrides(TrechConfig& cfg, const RunOptions& options) {
       cfg.viz.maxTrajectories = options.captureVizMaxTrajectories;
     }
   }
+}
+
+bool configureTraceFromOptions(const RunOptions& options) {
+  trace::Options resolved = trace::optionsFromEnvironment();
+  if (!options.traceSpec.empty()) {
+    const auto fromCli = trace::parseSpec(options.traceSpec);
+    resolved.level = fromCli.level;
+    resolved.categories = fromCli.categories;
+  }
+  if (!options.traceFile.empty()) resolved.path = options.traceFile;
+  if (options.traceStderr) resolved.toStderr = true;
+  if (resolved.level != trace::Level::Off && resolved.path.empty()) {
+    std::error_code ignored;
+    std::filesystem::create_directories(options.outputDir, ignored);
+    resolved.path = (std::filesystem::path(options.outputDir) / "trech_trace.jsonl").string();
+  }
+  trace::configure(resolved);
+  return trace::active();
 }
 
 } // namespace trech

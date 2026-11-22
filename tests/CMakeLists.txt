@@ -30,6 +30,11 @@ target_link_libraries(test_js_runtime PRIVATE trech_js)
 target_compile_definitions(test_js_runtime PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_js_runtime COMMAND test_js_runtime)
 
+# Observation-only engine trace: attribution, scenario reports, summary, no physics change.
+add_executable(test_engine_trace test_engine_trace.cpp)
+target_link_libraries(test_engine_trace PRIVATE trech_js)
+add_test(NAME trech_engine_trace COMMAND test_engine_trace)
+
 # Scenario-backed live lab: transactional script re-evaluation (Geant4-free).
 add_executable(test_lab_script_host test_lab_script_host.cpp)
 target_link_libraries(test_lab_script_host PRIVATE trech_js)

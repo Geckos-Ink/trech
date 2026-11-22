@@ -124,6 +124,35 @@ reduction algorithm identity. It is output metadata and does not enter the confi
 
 - **Tests:** [`tests/test_provenance_writer.cpp`](../../../tests/test_provenance_writer.cpp).
 
+#### [`src/core/Trace.cpp`](../../../src/core/Trace.cpp) · [`Trace.hpp`](../../../include/trech/core/Trace.hpp)
+
+The observation-only engine trace (2026-11-22): a process-wide, mutex-guarded verbose log
+(`trech_trace.jsonl`, schema `trech_trace_v1`) plus run attribution counters. User guide:
+[`docs/engine/engine_trace.md`](../../../docs/engine/engine_trace.md).
+
+- **Key symbols:** `trace::Level` (`Off`/`Summary`/`Info`/`Debug`/`Trace`), `trace::Options`
+  (level, category filter, path, stderr copy, per-category cap 20000, digest bound 2 KB),
+  `parseSpec("<level>[:<cat>,...]")`, `optionsFromEnvironment` (`TRECH_TRACE`,
+  `TRECH_TRACE_FILE`, `TRECH_TRACE_STDERR`), `configure`, `active`/`at`/`enabled` (one relaxed
+  atomic load when off), `Scope` (thread-local hook/event/step stamp), `record`, the counters
+  `countCall`/`countHook`/`countAuthored`/`countModel`, `digest`, `summary` (with a
+  plain-language `verdict`) and `finish` (summary record + stderr table; idempotent).
+  `configureTraceFromOptions` in [`RunOptions.cpp`](../../../src/core/RunOptions.cpp) resolves CLI
+  over environment and defaults the file to `<output>/trech_trace.jsonl`; `main` configures it for
+  `run`/`lab` only and a scope guard calls `finish` however the command ends.
+- **Contract:** never part of `TrechConfig`, the config JSON, the hash or provenance; never
+  changes a ctx result, RNG stream or emit. When off, `dispatchHook` installs the plain ctx
+  functions (no wrapper). `test_engine_trace` asserts byte-identical config and emits traced vs
+  untraced.
+- **Instrumented sites:** the JS host (attribution wrapper on each inference entry point, hook
+  records, model load/miss, `ctx.log`/`ctx.authored`/`TRECH_LOG`; see the
+  [runtime handbook](../runtime/AGENTS.md)), `MethodArbiter::step` (debug step, info leader
+  change; `stepUntraced` holds the arbitration) and the CLI run start/error.
+- **Common mistakes:** gating an instrumented site on `enabled()` but building its JSON payload
+  before the check (cost when off); adding a trace knob to the config (hash churn, and the trace
+  must stay out of the decision path).
+- **Tests:** [`tests/test_engine_trace.cpp`](../../../tests/test_engine_trace.cpp).
+
 ### Entry point & build
 
 #### [`apps/trech-cli/main.cpp`](../../../apps/trech-cli/main.cpp)
@@ -142,10 +171,11 @@ loop, `GeantLabRunner`; with a scenario, a `LabScriptHost` whose stable runtime 
 - **CLI:** `trech run <exp.js> [--macro --ui --output/-o --seed --events --param --viz
   --viz-all --viz-max-trajectories --strict-config]`,
   `trech inspect <exp.js> [--param n=<json> --strict-config]`, `trech lab [<exp.js> --param n=<json> | --config]
-  [--commands --output --seed --events --strict-config]` → [`apps/trech-cli/main.cpp`](../../../apps/trech-cli/main.cpp) + `parseRunOptions`/`runUsage`
+  [--commands --output --seed --events --strict-config]`; `run`/`lab` also take the observation-only
+  `--trace <level>[:<cats>] --trace-file <path> --trace-stderr` → [`apps/trech-cli/main.cpp`](../../../apps/trech-cli/main.cpp) + `parseRunOptions`/`runUsage`
   in [`src/core/RunOptions.cpp`](../../../src/core/RunOptions.cpp).
 - **Hook `ctx` surface:** `config`/`runtime`/`event`/`step`/`state`/`rng`/`emit`/`predict`/
-  `cascade`/`evolve`/`materials`/`optics` → [`src/js/JsRuntime.cpp`](../../../src/js/JsRuntime.cpp).
+  `cascade`/`evolve`/`materials`/`optics`/`log`/`authored` (trace reports; `TRECH_LOG` global) → [`src/js/JsRuntime.cpp`](../../../src/js/JsRuntime.cpp).
   Authoring globals `TRECH_CONFIG`/`TRECH_HOOKS`/
   `TRECH_VALUE`/`TRECH_PARAMETER`/`TRECH_PARAMETERS`/`TRECH_FLOW`/`TRECH_INCLUDE`
   (`TRECH_FLOW` validation presets `run`/`beam`/`materials`/`geometry`/`models`/`hooks`/
@@ -165,4 +195,5 @@ loop, `GeantLabRunner`; with a scenario, a `LabScriptHost` whose stable runtime 
 - **Output files** (schemas in [`docs/engine/output_schema.md`](../../../docs/engine/output_schema.md)):
   `trech_scores.jsonl`/`trech_provenance.jsonl` (core writers), `trech_event_scores.jsonl`
   (stratifier), `trech_hook_emits.jsonl` (hook emits), `trech_viz_scene.json` +
-  `trech_viz_trajectories.jsonl` (`VizRecorder`, gated on `viz.enable`).
+  `trech_viz_trajectories.jsonl` (`VizRecorder`, gated on `viz.enable`), `trech_trace.jsonl`
+  (`trace`, only with `--trace`/`TRECH_TRACE`).

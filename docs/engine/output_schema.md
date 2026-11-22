@@ -1117,6 +1117,47 @@ Single targets add `spectrum_geant4_context` (material-probe density, electron d
 excitation energy for the same composition at a declared density; context, not a model input).
 See [`spectrum_prediction.md`](../research/spectrum_prediction.md).
 
+## trech_trace.jsonl
+
+Written only when the [engine trace](engine_trace.md) is on (`--trace` or `TRECH_TRACE`), at
+`<output>/trech_trace.jsonl` unless `--trace-file` names another path. It records observations
+only. It is not part of provenance and does not enter the config hash. Each line is one record:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `schema` | string | `trech_trace_v1`. |
+| `seq` | integer | Order of writing within the file. With several Geant4 workers, the order across workers is not deterministic. |
+| `level` | string | `info`, `debug`, `trace` or `summary`. |
+| `cat` | string | Category: `trace`, `run`, `model`, `hook`, `scenario`, `authored`, `arbiter`, an inference entry point (`predict`, `cascade`, `evolve`, `react`, `interact`, `lift`, `detectDomains`, `learnDomains`, `evolveField`) or `summary`. |
+| `msg` | string | A short description, the hook name, or the law name for `authored`. |
+| `hook`, `event`, `step` | string, integer, integer | The hook invocation that wrote the record (omitted outside a hook, or when not applicable). |
+| `data` | object | The record's payload, described below. |
+
+Payloads:
+
+- `run` (`run start` / `lab start`): `determinism`, `inference_enabled`, `events`, `seed`,
+  `hooks_registered`, `models_declared[{name,path,scale}]`, `models_loaded`,
+  `unknown_config_keys`. An `error` record carries `what`.
+- `model`: `{name, path, scale, loaded}`; `msg` is `model loaded` or `model missing: …`.
+- `hook` (debug): `engine_calls`, `engine_backed_calls`, `authored_reports`, `emits`,
+  `emits_dropped`, `emit_tags{tag:count}`, `predict_count`, `out_of_domain`,
+  `emits_backed_by_engine`.
+- inference categories (trace): `outcome` (see the
+  [attribution outcomes](engine_trace.md#attribution-outcomes)), `mode`, `name` (model name for
+  `ctx.predict`), `args` and `result` digests. A digest keeps scalars, shortens strings to 160
+  characters and arrays to 8 items, and stops at depth 3 and about 2 KB.
+- `arbiter`: per step (debug) `call`, `methods`, `policy`, `leader`, `elements`,
+  `selected{method:count}`, `selected_from_learned_errors`, `unpredicted`, `graded`, `frozen`,
+  and when graded `arbitrated_rmse`, `oracle_rmse`, `method_rmse`. A leader change (info) has
+  `from`, `to`, `policy`, `methods`.
+- `scenario`: the `data` passed to `ctx.log` / `TRECH_LOG`; `authored`: the `detail`.
+- `summary` (always the last line): `totals{calls, engine_backed, emits,
+  emits_without_inference, authored_reports, <outcome>...}`, `calls{<call>:{<outcome>:n,
+  total}}`, `hooks{<hook>:{invocations, invocations_with_engine, engine_calls,
+  engine_backed_calls, emits, emits_without_inference}}`, `authored{<law>:n}`,
+  `models{<name>:"loaded"|"missing"}`, `models_missing` when any, `suppressed_records` when a
+  category reached its cap, and a plain-language `verdict`.
+
 ## trech_event_scores.jsonl
 
 When event stratification is enabled (`stratify.enable: true`), each event emits

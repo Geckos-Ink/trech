@@ -16,11 +16,35 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
+- **P2** · R3 · Engine trace adoption: the trace sees a `null` engine result but not the authored law the scenario runs next. Add `ctx.authored(law)` at every residual-law fallback in the migration ledger (scenario purity report), then cross-check the static ledger against runtime `authored` counts per scenario in the validation suite. ([engine trace](#engine-trace-2026-11-22))
+- **P2** · R4 · Engine trace depth: attribution is per hook invocation, not per emitted value (an invocation with one engine call and one unreported authored law counts as engine-backed). Carry value-level origin (lineage) into emit records, and trace the inner decisions of `RivalArbitration` (evolve/react/cascade/interact rivals), cascade stages and `ctx.evolve` operator routing as their own categories instead of only the `trace`-level result digest. ([engine trace](#engine-trace-2026-11-22))
+- **P2** · R1 · Engine trace and provenance: record the trace summary (or its path and digest) in `run_end` provenance when tracing is on, and split the summary per `trech lab` batch (today one summary covers the session); keep it out of the config hash. ([engine trace](#engine-trace-2026-11-22))
+- **P2** · R6 · Studio engine trace: a launch option that passes `--trace`, and a panel that shows the attribution summary and the `emits_without_inference` hooks of a run beside its playback (today Studio only inherits `TRECH_TRACE`). ([engine trace](#engine-trace-2026-11-22))
+- **P3** · R5 · Engine trace Geant4 categories: physics list/process registration, per-run process tallies and geometry resolution as `geant4` trace records, so the base-of-truth side of a run is as visible as the inference side. ([engine trace](#engine-trace-2026-11-22))
 - **P2** · R1 · Runtime (non-`onInit`) hooks cannot patch config, so ignored-override reporting covers `onInit` only; decide whether later hooks may patch at all before extending it. (dated records below)
 - **P2** · R5 · Sweep the three PubChem-dependent scenarios (`beaker_water_n_pentane`, its Studio variant, `testscenario_h2o_electrolysis_combustion`) through inspect/type/unknown-key checks once a PubChem cache is present. (dated records below)
 
 ## Delivery records
 
+<a name="engine-trace-2026-11-22"></a>
+
+- [x] Engine trace, first implementation (2026-11-22). A configurable, observation-only verbose
+  log answers whether a rendered result came from the engine or from a scenario's own law.
+  `src/core/Trace.cpp` (levels `summary`/`info`/`debug`/`trace`, category filter, JSONL sink
+  `trech_trace.jsonl`, stderr copy, per-category cap, bounded digests, run attribution summary
+  with a verdict); CLI `--trace`/`--trace-file`/`--trace-stderr` and `TRECH_TRACE*` (run and
+  lab). Instrumented: every JS-host inference entry point (attribution outcome per call:
+  `engine`, `engine_extrapolated`, `engine_not_ran`, `null_strict`, `null_unavailable`, `error`),
+  each hook invocation (`emits_without_inference`), model load/miss, `MethodArbiter` steps and
+  leader changes, run start/error; scenario reports `ctx.log`, `ctx.authored`, `TRECH_LOG`
+  (no-ops when off). Not in the config, hash or provenance. Verification: new
+  `trech_engine_trace` (spec/CLI parsing, digest bound, strict/predictive outcomes, authored
+  counts, category filter, summary-only level, traced vs untraced config and emits identical);
+  Release CTest 76/76; smoke runs of `cascade_multiscale_demo` (5/5 engine) and
+  `briggs_rauscher_oscillator` (5 of 8 emits without inference) with `--trace debug`/`trace`.
+  Docs: [engine trace guide](../../../docs/engine/engine_trace.md), output schema, CLI and hook API.
+  Residuals: queued above (adoption of `ctx.authored`, value-level attribution and rival/stage
+  categories, provenance and per-batch summaries, Studio, Geant4 categories).
 - [x] Config reader block and entry types (2026-11-17). Every object-only block reader and every
   collection entry (`beams`, `materials`, `models`, `geometry.volumes`, `nuclear.cycles`,
   reaction participants, `analytic.checks`, `precision.axes`, material components, optics

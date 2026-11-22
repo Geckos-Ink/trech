@@ -1,5 +1,6 @@
 #include "trech/ml/MethodArbiter.hpp"
 
+#include "trech/core/Trace.hpp"
 #include "trech/ml/ComputeBudget.hpp"
 
 #include <algorithm>
@@ -8,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <map>
 #include <numeric>
 #include <stdexcept>
 
@@ -56,6 +58,7 @@ struct MethodArbiter::Impl {
   bool frozen = false;  // restored for deployment: select and grade, never learn
   double unseenSelections = 0.0;  // run total: elements far from every error law (median prior)
   bool restored = false;  // laws come from an earlier run (fromState)
+  std::string tracedLeader;  // engine trace only: last leader reported (never exported)
 
   // Variance (log units) of a method's error learner; unknown until it has been graded.
   double uncertainty(std::size_t m) const { return learnerW[m] > 0 ? learnerSq[m] / learnerW[m] : std::numeric_limits<double>::infinity(); }
@@ -121,6 +124,44 @@ MethodArbiter& MethodArbiter::operator=(MethodArbiter&&) noexcept = default;
 const MethodArbiterOptions& MethodArbiter::options() const { return impl_->o; }
 
 MethodArbiterResult MethodArbiter::step(const MethodArbiterBatch& b) {
+  MethodArbiterResult r = stepUntraced(b);
+  if (!trace::active()) return r;
+  auto& s = *impl_;
+  std::map<std::string, std::size_t> chosen;
+  std::size_t learned = 0, unchosen = 0;
+  for (std::size_t e = 0; e < r.selection.size(); ++e) {
+    const int k = r.selection[e];
+    if (k < 0) { ++unchosen; continue; }
+    chosen[s.o.methods[static_cast<std::size_t>(k)]] += 1;
+    if (e < r.learned.size() && r.learned[e]) ++learned;
+  }
+  if (trace::enabled(trace::Level::Debug, "arbiter")) {
+    nlohmann::json rmse = nlohmann::json::object();
+    for (std::size_t m = 0; m < s.M && m < r.callRmse.size(); ++m)
+      if (std::isfinite(r.callRmse[m])) rmse[s.o.methods[m]] = r.callRmse[m];
+    nlohmann::json data = {{"call", s.calls}, {"methods", s.o.methods}, {"policy", r.policy},
+                           {"leader", r.leader}, {"elements", r.selection.size()},
+                           {"selected", chosen}, {"selected_from_learned_errors", learned},
+                           {"unpredicted", unchosen}, {"graded", r.graded},
+                           {"frozen", s.frozen}};
+    if (r.graded) {
+      data["arbitrated_rmse"] = r.arbitratedRmse;
+      data["oracle_rmse"] = r.oracleRmse;
+      data["method_rmse"] = rmse;
+    }
+    trace::record(trace::Level::Debug, "arbiter", "method arbiter step", std::move(data));
+  }
+  if (r.leader != s.tracedLeader) {
+    trace::record(trace::Level::Info, "arbiter",
+                  s.tracedLeader.empty() ? "method arbiter leader" : "method arbiter leader changed",
+                  {{"call", s.calls}, {"from", s.tracedLeader}, {"to", r.leader}, {"policy", r.policy},
+                   {"methods", s.o.methods}});
+    s.tracedLeader = r.leader;
+  }
+  return r;
+}
+
+MethodArbiterResult MethodArbiter::stepUntraced(const MethodArbiterBatch& b) {
   auto& s = *impl_;
   const std::size_t n = b.count, M = s.M, K = s.K;
   if (b.features.size() != n * s.F) throw std::invalid_argument("method arbiter features do not match the elements");
@@ -264,7 +305,7 @@ MethodArbiterResult MethodArbiter::step(const MethodArbiterBatch& b) {
     for (int k : r.selection) if (k >= 0) rec.selected[static_cast<std::size_t>(k)] += 1.0;
     s.history.push_back(std::move(rec));
   }
-  if (std::getenv("TRECH_DEBUG_ARBITER")) {
+  if (std::getenv("TRECH_DEBUG_ARBITER")) {  // legacy raw dump; prefer --trace debug:arbiter
     std::fprintf(stderr, "[call %ld] policy=%s leader=%s arb=%.4f leaderPol=%.4f learnedPol=%.4f |", s.calls, r.policy.c_str(), r.leader.c_str(),
                  r.arbitratedRmse, std::sqrt(policySq[0] / g), std::sqrt(policySq[1] / g));
     for (std::size_t m = 0; m < M; ++m) std::fprintf(stderr, " %s=%.4f(%g)", s.o.methods[m].c_str(), r.callRmse[m], callN[m]);

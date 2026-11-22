@@ -36,6 +36,7 @@ JS experiment (TRECH_CONFIG / TRECH_HOOKS / TRECH_VALUE / TRECH_FLOW / TRECH_INC
       ▼
   outputs (--output dir):  trech_scores.jsonl · trech_provenance.jsonl · trech_event_scores.jsonl
                            trech_hook_emits.jsonl · trech_viz_scene.json · trech_viz_trajectories.jsonl
+                           trech_trace.jsonl (opt-in engine trace: --trace / TRECH_TRACE)
       │
       ├──► tools/viz (PyVista) + tools/viz/demos (README media)
       ├──► studio/ (PySide6 + wgpu viewer/editor)

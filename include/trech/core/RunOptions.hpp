@@ -94,6 +94,12 @@ struct RunOptions {
   // `--js-engine quickjs|v8`: the JavaScript engine for every runtime this command creates
   // (empty keeps TRECH_JS_ENGINE or the build default). Validated here, applied by the CLI.
   std::string jsEngine;
+  // `--trace <level>[:<cats>]`, `--trace-file <path>`, `--trace-stderr`: the observation-only
+  // engine trace (trech/core/Trace.hpp). Empty spec keeps $TRECH_TRACE (off when unset). Never
+  // part of the config or its hash.
+  std::string traceSpec;
+  std::string traceFile;
+  bool traceStderr = false;
   // `trech arch <job.json>`: generator override (evolvo|classic) and
   // Python interpreter for the Evolvo worker; empty keeps the job's values.
   std::string archGenerator;
@@ -149,5 +155,8 @@ struct RunOptions {
 std::string runUsage();
 RunOptions parseRunOptions(int argc, char** argv);
 void applyRunOverrides(TrechConfig& cfg, const RunOptions& options);
+// Resolves the trace options (CLI over $TRECH_TRACE*; default file <output>/trech_trace.jsonl)
+// and installs them. Returns true when tracing is active.
+bool configureTraceFromOptions(const RunOptions& options);
 
 } // namespace trech

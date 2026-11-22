@@ -27,6 +27,8 @@ session commands and when the Geant4 kernel can be reused.
 Open [validation](validation/README.md) for the evidence categories and retained reports.
 Find the scenario, its source and its evidence path in the [catalog](scenarios/catalog.md).
 Use [the output schema](engine/output_schema.md) to locate the exact record in a run.
+To see whether a rendered result came from the engine or from a law the scenario wrote,
+run it with the [engine trace](engine/engine_trace.md) (`--trace debug`).
 
 </details>
 

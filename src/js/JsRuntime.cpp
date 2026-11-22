@@ -6,6 +6,7 @@
 #include "trech/core/Config.hpp"
 #include "trech/core/Provenance.hpp"
 #include "trech/core/ScalarField.hpp"
+#include "trech/core/Trace.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/DomainDiscovery.hpp"
 #include "trech/ml/DomainLearner.hpp"
@@ -141,6 +142,11 @@ struct JsRuntimeState {
   std::size_t totalOutOfDomainCount = 0;
   std::size_t callStarvedCount = 0;
   std::size_t callScaleMismatchCount = 0;
+  // Engine-trace attribution for the running hook invocation (only counted while tracing):
+  // ctx.* inference calls made, how many returned an engine result, ctx.authored reports.
+  std::size_t callEngineCalls = 0;
+  std::size_t callEngineBacked = 0;
+  std::size_t callAuthored = 0;
   // Online domain learners (ctx.learnDomains), persistent across hook calls
   // of one run and keyed by their scenario-chosen name.
   std::map<std::string, std::unique_ptr<trech::ml::DomainLearner>> domainLearners;
@@ -6148,6 +6154,171 @@ static JSValue jsTrechPubChem(JSContext* ctx, JSValueConst /*this_val*/, int arg
   return parsed;
 }
 
+// ---- Engine trace (trech/core/Trace.hpp) -------------------------------------------------
+// Observation only: nothing here changes a ctx result, an RNG stream, an emit or the config.
+// When tracing is off, dispatchHook installs the plain ctx functions (no wrapper at all).
+
+static nlohmann::json traceJsonOf(JSContext* ctx, JSValueConst value) {
+  if (JS_IsUndefined(value)) return nullptr;
+  const std::string text = jsonStringifyValue(ctx, value);
+  if (text.empty()) {
+    JS_FreeValue(ctx, JS_GetException(ctx));  // a value JSON cannot hold: drop, keep running
+    return "<unserializable>";
+  }
+  auto parsed = nlohmann::json::parse(text, nullptr, /*allow_exceptions=*/false);
+  return parsed.is_discarded() ? nlohmann::json("<unserializable>") : parsed;
+}
+
+static bool traceBoolProperty(JSContext* ctx, JSValueConst object, const char* name, bool* out) {
+  JSValue v = JS_GetPropertyStr(ctx, object, name);
+  const bool found = JS_IsBool(v);
+  if (found) *out = JS_ToBool(ctx, v) > 0;
+  JS_FreeValue(ctx, v);
+  return found;
+}
+
+static bool traceNumberProperty(JSContext* ctx, JSValueConst object, const char* name, double* out) {
+  JSValue v = JS_GetPropertyStr(ctx, object, name);
+  const bool found = JS_IsNumber(v) && JS_ToFloat64(ctx, out, v) == 0;
+  JS_FreeValue(ctx, v);
+  return found;
+}
+
+// Attribution outcome of one ctx.* inference call, read from the result's own metadata:
+//   engine               an engine result (learned inference / engine-owned method)
+//   engine_extrapolated  an engine result produced outside its trained domain
+//   engine_not_ran       an object came back but no engine stage ran (ran:false, 0 stages)
+//   null_strict          null because strict determinism disables inference
+//   null_unavailable     null in predictive mode (undeclared/unloaded model, nothing to run)
+//   error                the call threw
+static const char* traceOutcome(JSContext* ctx, JsRuntimeState* state, JSValueConst result) {
+  if (JS_IsException(result)) return "error";
+  if (JS_IsNull(result) || JS_IsUndefined(result)) {
+    return normalizeDeterminismMode(state->activeHookContext.determinismMode) == "predictive"
+               ? "null_unavailable"
+               : "null_strict";
+  }
+  if (!JS_IsObject(result)) return "engine";
+  JSValue cascadeMeta = JS_GetPropertyStr(ctx, result, "__cascade");
+  const bool hasCascadeMeta = JS_IsObject(cascadeMeta);
+  JSValueConst meta = hasCascadeMeta ? cascadeMeta : result;
+  const char* outcome = "engine";
+  bool flag = true;
+  double n = 0.0;
+  if ((traceBoolProperty(ctx, meta, "ran", &flag) && !flag) ||
+      (traceNumberProperty(ctx, meta, "stagesRun", &n) && n == 0.0) ||
+      (traceNumberProperty(ctx, meta, "levelsRun", &n) && n == 0.0)) {
+    outcome = "engine_not_ran";
+  } else if ((traceNumberProperty(ctx, meta, "stagesExtrapolating", &n) && n > 0.0) ||
+             (traceNumberProperty(ctx, meta, "outOfDomainInferences", &n) && n > 0.0)) {
+    outcome = "engine_extrapolated";
+  } else {
+    JSValue coverage = JS_GetPropertyStr(ctx, result, "__coverage");
+    if (JS_IsObject(coverage) && traceBoolProperty(ctx, coverage, "inDomain", &flag) && !flag) {
+      outcome = "engine_extrapolated";
+    }
+    JS_FreeValue(ctx, coverage);
+  }
+  JS_FreeValue(ctx, cascadeMeta);
+  return outcome;
+}
+
+static bool traceEngineBacked(const char* outcome) {
+  return std::strcmp(outcome, "engine") == 0 || std::strcmp(outcome, "engine_extrapolated") == 0;
+}
+
+template <JSCFunction* Inner, const char* Call>
+static JSValue jsTracedCall(JSContext* ctx, JSValueConst thisVal, int argc, JSValueConst* argv) {
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  JSValue result = Inner(ctx, thisVal, argc, argv);
+  if (!state || !trech::trace::active()) return result;
+  const char* outcome = traceOutcome(ctx, state, result);
+  state->callEngineCalls += 1;
+  if (traceEngineBacked(outcome)) state->callEngineBacked += 1;
+  trech::trace::countCall(Call, outcome);
+  if (trech::trace::enabled(trech::trace::Level::Trace, Call)) {
+    const std::size_t budget = trech::trace::options().maxDigestBytes;
+    nlohmann::json data = {{"outcome", outcome},
+                           {"mode", normalizeDeterminismMode(state->activeHookContext.determinismMode)}};
+    if (argc > 0 && JS_IsString(argv[0])) {
+      const char* raw = JS_ToCString(ctx, argv[0]);
+      if (raw) {
+        data["name"] = raw;
+        JS_FreeCString(ctx, raw);
+      }
+      if (argc > 1 && !JS_IsUndefined(argv[1])) {
+        data["args"] = trech::trace::digest(traceJsonOf(ctx, argv[1]), budget);
+      }
+    } else if (argc > 0) {
+      data["args"] = trech::trace::digest(traceJsonOf(ctx, argv[0]), budget);
+    }
+    if (!JS_IsException(result)) {
+      data["result"] = trech::trace::digest(traceJsonOf(ctx, result), budget);
+    }
+    trech::trace::record(trech::trace::Level::Trace, Call, std::string("ctx.") + Call, std::move(data));
+  }
+  return result;
+}
+
+static nlohmann::json traceLogPayload(JSContext* ctx, int argc, JSValueConst* argv, int index) {
+  if (argc <= index || JS_IsUndefined(argv[index])) return nullptr;
+  return trech::trace::digest(traceJsonOf(ctx, argv[index]), trech::trace::options().maxDigestBytes);
+}
+
+static std::string traceStringArg(JSContext* ctx, int argc, JSValueConst* argv, int index,
+                                  const char* fallback) {
+  if (argc <= index) return fallback;
+  const char* raw = JS_ToCString(ctx, argv[index]);
+  if (!raw) {
+    JS_FreeValue(ctx, JS_GetException(ctx));
+    return fallback;
+  }
+  std::string out = raw;
+  JS_FreeCString(ctx, raw);
+  return out;
+}
+
+// ctx.log(message, data?) / TRECH_LOG(message, data?): a scenario's own note in the engine
+// trace (category `scenario`, info level). A no-op when tracing is off; never returns a value.
+static JSValue jsTraceLog(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  if (!trech::trace::enabled(trech::trace::Level::Info, "scenario")) return JS_UNDEFINED;
+  trech::trace::record(trech::trace::Level::Info, "scenario", traceStringArg(ctx, argc, argv, 0, ""),
+                       traceLogPayload(ctx, argc, argv, 1));
+  return JS_UNDEFINED;
+}
+
+// ctx.authored(law, detail?): the scenario declares that the value it is about to use comes
+// from a law it authored (a residual law, a fallback after a null engine result, a forced
+// reference). Counted per law in the run summary; one debug record per call. A no-op when off.
+static JSValue jsTraceAuthored(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  if (!trech::trace::active()) return JS_UNDEFINED;
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  const std::string law = traceStringArg(ctx, argc, argv, 0, "unnamed");
+  trech::trace::countAuthored(law);
+  if (state) state->callAuthored += 1;
+  if (trech::trace::enabled(trech::trace::Level::Debug, "authored")) {
+    trech::trace::record(trech::trace::Level::Debug, "authored", law, traceLogPayload(ctx, argc, argv, 1));
+  }
+  return JS_UNDEFINED;
+}
+
+static constexpr char kTracePredict[] = "predict";
+static constexpr char kTraceCascade[] = "cascade";
+static constexpr char kTraceEvolve[] = "evolve";
+static constexpr char kTraceDetectDomains[] = "detectDomains";
+static constexpr char kTraceLearnDomains[] = "learnDomains";
+static constexpr char kTraceEvolveField[] = "evolveField";
+static constexpr char kTraceReact[] = "react";
+static constexpr char kTraceInteract[] = "interact";
+static constexpr char kTraceLift[] = "lift";
+
+// Installs one inference entry point on ctx: traced when the engine trace is active.
+template <JSCFunction* Inner, const char* Call>
+static void setInferenceFunction(JSContext* ctx, JSValueConst contextObj, int length, bool traced) {
+  JS_SetPropertyStr(ctx, contextObj, Call,
+                    JS_NewCFunction(ctx, traced ? &jsTracedCall<Inner, Call> : Inner, Call, length));
+}
+
 JsRuntime::JsRuntime() : impl_(new Impl) {
   impl_->rt = JS_NewRuntime();
   impl_->ctx = JS_NewContext(impl_->rt);
@@ -6171,6 +6342,8 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
                     JS_NewCFunction(impl_->ctx, jsTrechPubChem, "TRECH_PUBCHEM", 1));
   JS_SetPropertyStr(impl_->ctx, global, "__TRECH_VALUE",
                     JS_NewCFunction(impl_->ctx, jsTrechValue, "__TRECH_VALUE", 2));
+  JS_SetPropertyStr(impl_->ctx, global, "TRECH_LOG",
+                    JS_NewCFunction(impl_->ctx, jsTraceLog, "TRECH_LOG", 2));
   JS_FreeValue(impl_->ctx, global);
   installFlowHelpers(impl_->ctx);
   installValueHelpers(impl_->ctx);
@@ -6455,6 +6628,13 @@ void JsRuntime::loadDeclaredModels() {
     }
     // Keep the entry regardless: an unloaded model makes ctx.predict return
     // null (graceful degradation), which is deterministic and logged.
+    trech::trace::countModel(name, ok);
+    trech::trace::record(trech::trace::Level::Info, "model",
+                         ok ? "model loaded" : "model missing: inference through it returns null",
+                         {{"name", name},
+                          {"path", path},
+                          {"scale", entry.value("scale", std::string(""))},
+                          {"loaded", ok}});
     impl_->state.models[name] = std::move(model);
     impl_->state.modelScales[name] = entry.value("scale", std::string(""));
     ModelOperatorMetadata metadata;
@@ -6536,6 +6716,12 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   impl_->state.callStarvedCount = 0;
   impl_->state.callScaleMismatchCount = 0;
   impl_->state.callReactSequence = 0;
+  impl_->state.callEngineCalls = 0;
+  impl_->state.callEngineBacked = 0;
+  impl_->state.callAuthored = 0;
+  const bool traced = trech::trace::active();
+  std::optional<trech::trace::Scope> traceScope;
+  if (traced) traceScope.emplace(hookName, context.eventId, context.stepIndex);
   impl_->state.callMaxEmitsPerCallback =
       context.maxEmitsPerCallback < 0 ? 0 : context.maxEmitsPerCallback;
   impl_->state.callMaxEmitPayloadBytes =
@@ -6731,30 +6917,24 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   JS_SetPropertyStr(ctx, rngObj, "normal", JS_NewCFunction(ctx, jsHookRngNormal, "normal", 2));
   JS_SetPropertyStr(ctx, contextObj, "rng", rngObj);
   JS_SetPropertyStr(ctx, contextObj, "emit", JS_NewCFunction(ctx, jsHookEmit, "emit", 2));
-  JS_SetPropertyStr(ctx, contextObj, "predict",
-                    JS_NewCFunction(ctx, jsHookPredict, "predict", 2));
-  JS_SetPropertyStr(ctx, contextObj, "cascade",
-                    JS_NewCFunction(ctx, jsHookCascade, "cascade", 1));
-  JS_SetPropertyStr(ctx, contextObj, "evolve",
-                    JS_NewCFunction(ctx, jsHookEvolve, "evolve", 1));
-  JS_SetPropertyStr(ctx, contextObj, "detectDomains",
-                    JS_NewCFunction(ctx, jsHookDetectDomains, "detectDomains", 1));
-  JS_SetPropertyStr(ctx, contextObj, "learnDomains",
-                    JS_NewCFunction(ctx, jsHookLearnDomains, "learnDomains", 1));
-  JS_SetPropertyStr(ctx, contextObj, "evolveField",
-                    JS_NewCFunction(ctx, jsHookEvolveField, "evolveField", 1));
-  JS_SetPropertyStr(ctx, contextObj, "react",
-                    JS_NewCFunction(ctx, jsHookReact, "react", 1));
+  setInferenceFunction<jsHookPredict, kTracePredict>(ctx, contextObj, 2, traced);
+  setInferenceFunction<jsHookCascade, kTraceCascade>(ctx, contextObj, 1, traced);
+  setInferenceFunction<jsHookEvolve, kTraceEvolve>(ctx, contextObj, 1, traced);
+  setInferenceFunction<jsHookDetectDomains, kTraceDetectDomains>(ctx, contextObj, 1, traced);
+  setInferenceFunction<jsHookLearnDomains, kTraceLearnDomains>(ctx, contextObj, 1, traced);
+  setInferenceFunction<jsHookEvolveField, kTraceEvolveField>(ctx, contextObj, 1, traced);
+  setInferenceFunction<jsHookReact, kTraceReact>(ctx, contextObj, 1, traced);
   JS_SetPropertyStr(ctx, contextObj, "arbitrationState",
                     JS_NewCFunction(ctx, jsHookArbitrationState, "arbitrationState", 1));
   JS_SetPropertyStr(ctx, contextObj, "restoreArbitration",
                     JS_NewCFunction(ctx, jsHookRestoreArbitration, "restoreArbitration", 2));
-  JS_SetPropertyStr(ctx, contextObj, "interact",
-                    JS_NewCFunction(ctx, jsHookInteract, "interact", 1));
-  JS_SetPropertyStr(ctx, contextObj, "lift",
-                    JS_NewCFunction(ctx, jsHookLift, "lift", 1));
+  setInferenceFunction<jsHookInteract, kTraceInteract>(ctx, contextObj, 1, traced);
+  setInferenceFunction<jsHookLift, kTraceLift>(ctx, contextObj, 1, traced);
   JS_SetPropertyStr(ctx, contextObj, "operatorCatalog",
                     JS_NewCFunction(ctx, jsHookOperatorCatalog, "operatorCatalog", 0));
+  JS_SetPropertyStr(ctx, contextObj, "log", JS_NewCFunction(ctx, jsTraceLog, "log", 2));
+  JS_SetPropertyStr(ctx, contextObj, "authored",
+                    JS_NewCFunction(ctx, jsTraceAuthored, "authored", 2));
 
   JSValue argv[1] = {contextObj};
   JSValue hookResult = JS_Call(ctx, hookFn, hooks, 1, argv);
@@ -6764,6 +6944,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   JS_FreeValue(ctx, global);
 
   if (JS_IsException(hookResult)) {
+    trech::trace::record(trech::trace::Level::Info, "hook", hookName + " threw");
     JSValue exc = JS_GetException(ctx);
     std::string err = "Hook dispatch failed";
     const char* msg = JS_ToCString(ctx, exc);
@@ -6790,6 +6971,25 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
 
   report.invoked = true;
   report.emitCount = impl_->state.callEmits.size();
+  if (traced) {
+    const auto& st = impl_->state;
+    trech::trace::countHook(hookName, st.callEmits.size(), st.callEngineBacked, st.callEngineCalls);
+    if (trech::trace::enabled(trech::trace::Level::Debug, "hook")) {
+      nlohmann::json tags = nlohmann::json::object();
+      for (const auto& emit : st.callEmits) tags[emit.tag] = tags.value(emit.tag, 0) + 1;
+      trech::trace::record(
+          trech::trace::Level::Debug, "hook", hookName,
+          {{"engine_calls", st.callEngineCalls},
+           {"engine_backed_calls", st.callEngineBacked},
+           {"authored_reports", st.callAuthored},
+           {"emits", st.callEmits.size()},
+           {"emits_dropped", st.callDroppedEmits},
+           {"emit_tags", tags},
+           {"predict_count", st.callPredictCount},
+           {"out_of_domain", st.callOutOfDomainCount},
+           {"emits_backed_by_engine", st.callEngineBacked > 0}});
+    }
+  }
   report.emitDroppedCount = impl_->state.callDroppedEmits;
   report.predictCount = impl_->state.callPredictCount;
   report.outOfDomainCount = impl_->state.callOutOfDomainCount;

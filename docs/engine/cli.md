@@ -23,6 +23,13 @@ and `--viz-all` also captures non-optical trajectories. `run` also supports a Ge
 `--macro` or interactive `--ui` when the corresponding Geant4 support is available.
 Use a separate `--output` directory per run to make comparisons easy.
 
+`--trace <level>[:<categories>]` (`run` and `lab`) turns on the observation-only
+[engine trace](engine_trace.md). The levels are `summary`, `info`, `debug` and `trace`. The
+trace writes `<output>/trech_trace.jsonl`, or the file named by `--trace-file`, and prints an
+attribution summary on stderr at the end. `--trace-stderr` also prints every record. The
+`TRECH_TRACE`, `TRECH_TRACE_FILE` and `TRECH_TRACE_STDERR` environment variables do the same
+thing when no flag is given. Tracing never changes results or config hashes.
+
 `--js-engine quickjs|v8` picks the JavaScript engine for every command (`run`, `inspect`, `lab`).
 Without it, the `TRECH_JS_ENGINE` environment variable decides, then the build default (QuickJS).
 V8 is available only in a binary built with `-DTRECH_ENABLE_V8=ON`; asking for it elsewhere fails

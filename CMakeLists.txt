@@ -19,6 +19,7 @@ add_library(trech_core
   src/core/Provenance.cpp
   src/core/Sha256.cpp
   src/core/RunOptions.cpp
+  src/core/Trace.cpp
   src/js/PowOperatorScan.cpp
 )
 target_include_directories(trech_core PUBLIC ${PROJECT_SOURCE_DIR}/include)

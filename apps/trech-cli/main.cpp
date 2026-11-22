@@ -1,6 +1,7 @@
 #include "trech/core/Config.hpp"
 #include "trech/core/LabSession.hpp"
 #include "trech/core/RunOptions.hpp"
+#include "trech/core/Trace.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/js/LabScriptHost.hpp"
 #include "trech/ml/ArchitectureGenerator.hpp"
@@ -56,6 +57,27 @@ void warnIgnoredInitPaths(const trech::HookInitTallies& init) {
   }
 }
 
+// Info-level record of what the engine was handed: the attribution baseline for the trace.
+void traceRunStart(const char* command, const trech::TrechConfig& cfg,
+                   const trech::RunOptions& options) {
+  if (!trech::trace::enabled(trech::trace::Level::Info, "run")) return;
+  nlohmann::json models = nlohmann::json::array();
+  for (const auto& model : cfg.models) {
+    models.push_back({{"name", model.name}, {"path", model.path}, {"scale", model.scale}});
+  }
+  trech::trace::record(
+      trech::trace::Level::Info, "run", std::string(command) + " start",
+      {{"experiment", options.experimentPath},
+       {"determinism", cfg.determinism.mode},
+       {"inference_enabled", cfg.determinism.mode == "predictive"},
+       {"events", cfg.run.nEvents},
+       {"seed", cfg.run.seed},
+       {"hooks_registered", cfg.hooks.registered},
+       {"models_declared", models},
+       {"models_loaded", options.modelsLoaded},
+       {"unknown_config_keys", cfg.unknownKeys}});
+}
+
 int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
   trech::TrechConfig cfg;
   // Scenario-backed lab: the scenario's hooks drive every batch, and `reload` / `params`
@@ -79,6 +101,7 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
   }
   trech::applyRunOverrides(cfg, options);
 
+  traceRunStart("lab", cfg, options);
   trech::LabSession session(cfg, options.strictConfig, script != nullptr);
   if (script) session.setScriptStatus(script->status());
 #ifdef TRECH_HAS_GEANT4
@@ -245,7 +268,15 @@ int main(int argc, char** argv) {
     return options.valid ? 0 : 2;
   }
 
+  // The trace covers run and lab (inspect/arch/budget stay silent). Its run-end summary is
+  // written however the command ends, including on an error.
+  struct TraceFinish {
+    ~TraceFinish() { trech::trace::finish(); }
+  } traceFinish;
   try {
+    if (options.command == trech::CliCommand::Run || options.command == trech::CliCommand::Lab) {
+      trech::configureTraceFromOptions(options);
+    }
     if (!options.jsEngine.empty()) {
       trech::JsRuntime::setDefaultEngine(trech::parseJsEngine(options.jsEngine));
     }
@@ -337,6 +368,7 @@ int main(int argc, char** argv) {
     options.modelsLoaded = js.loadedModelNames();
     trech::applyRunOverrides(cfg, options);
     options.hookRuntime = &js;
+    traceRunStart("run", cfg, options);
 
 #ifdef TRECH_HAS_GEANT4
     return trech::runGeant4(cfg, options, argc, argv);
@@ -345,6 +377,7 @@ int main(int argc, char** argv) {
     return 0;
 #endif
   } catch (const std::exception& ex) {
+    trech::trace::record(trech::trace::Level::Info, "run", "error", {{"what", ex.what()}});
     std::cerr << "TRECH error: " << ex.what() << "\n";
     return 1;
   }

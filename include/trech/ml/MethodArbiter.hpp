@@ -108,6 +108,8 @@ class MethodArbiter {
   bool frozen() const;
 
  private:
+  // The arbitration itself; step() adds the observation-only engine trace around it.
+  MethodArbiterResult stepUntraced(const MethodArbiterBatch& batch);
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

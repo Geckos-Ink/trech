@@ -280,6 +280,12 @@ tracking action only when one of them is registered.
   transcendental rounding has not been validated. RNG remains available in strict mode and
   does not count as model inference.
 - `ctx.emit(tag, payload)`: write a tagged hook-emit record.
+- `ctx.log(message, data?)` and `ctx.authored(law, detail?)`: reports for the
+  [engine trace](engine_trace.md). `ctx.log` writes a `scenario` note. `ctx.authored` declares
+  that the value about to be used comes from a law the scenario wrote, such as a fallback after
+  a `null` engine result. Each law is counted in the run attribution summary. Both return
+  `undefined` and do nothing while tracing is off. They never change results, RNG or emits.
+  `TRECH_LOG(message, data?)` is the evaluation-time form of `ctx.log`.
 - `ctx.materials`: when `materialProbe.enable` is active, named Geant4 material probes plus
   `.list` (density, electron density, element number densities, mean excitation energy,
   radiation length). This is serialized engine data, not a Geant4 object binding.
