@@ -1,6 +1,7 @@
 #include "trech/sim/SteppingAction.hpp"
 #include "trech/sim/Geant4Trace.hpp"
 
+#include "trech/sim/EnergyBalance.hpp"
 #include "trech/sim/EventAction.hpp"
 #include "trech/sim/KleinNishina.hpp"
 #include "trech/sim/PhotonuclearKinematics.hpp"
@@ -346,9 +347,23 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
               G4int transferBin = -1;
               double cosTheta = std::numeric_limits<double>::quiet_NaN();
               double kinematicResidual = 0.0;
+              // Energy balance of the scatter, read from Geant4's own step record (no rest
+              // mass is released, Q = 0): E = E' + sum T_secondary + local deposit
+              // (sim/EnergyBalance.hpp, Lean pair Trech.Laws.EnergyBalance). Observation only.
+              double energyBalanceResidual = std::numeric_limits<double>::quiet_NaN();
               if (subType == fComptonScattering) {
                 const double preKE = step->GetPreStepPoint()->GetKineticEnergy();
                 if (preKE > 0.0) {
+                  std::vector<double> secondaryKE;
+                  if (const auto* secondaries = step->GetSecondaryInCurrentStep()) {
+                    secondaryKE.reserve(secondaries->size());
+                    for (const auto* secondary : *secondaries) {
+                      secondaryKE.push_back(secondary->GetKineticEnergy());
+                    }
+                  }
+                  energyBalanceResidual = sim::energy_balance::relativeResidual(
+                      preKE, 0.0, postPoint->GetKineticEnergy(), secondaryKE,
+                      step->GetTotalEnergyDeposit());
                   const double epsilon = preKE / CLHEP::electron_mass_c2;
                   const double postKE = postPoint->GetKineticEnergy();
                   const double ratio = postKE / preKE;
@@ -365,7 +380,8 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
                 }
               }
               runAction->AddPrimaryFirstInteraction(subType, transferFraction, transferBin,
-                                                    cosTheta, kinematicResidual);
+                                                    cosTheta, kinematicResidual,
+                                                    energyBalanceResidual);
               if (subType == fHadronInelastic &&
                   track->GetDefinition() == G4Gamma::Definition()) {
                 runAction->AddPhotonuclearFinalState(analysePhotonuclearFinalState(step));

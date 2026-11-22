@@ -85,7 +85,18 @@ preview capture is disabled until there are new recorded results. Before replaci
 scene or closing, Save exports it, Discard restores recorded geometry, and Cancel (the default)
 keeps it open. Failed/cancelled exports also keep the draft. Reload the run to restore playback
 after Discard. Opening an output directory without `trech_viz_scene.json` leaves the current run
-and scene together. Live lab patches, gizmos, undo/redo and arbitrary source reconstruction remain open.
+and scene together. Live lab patches, gizmos and arbitrary source reconstruction remain open.
+
+**Undo and redo.** **Edit ▸ Undo scene edit** (Ctrl+Z / Cmd+Z) restores the scene as it was
+before the last applied draft, and **Edit ▸ Redo scene edit** (Shift+Ctrl+Z / Shift+Cmd+Z)
+re-applies it. The menu names the edit (for example *Undo scene edit (beam proton)*). Undo also
+reselects the node you were editing; when that node no longer exists, such as a volume you just
+added, World is selected. Applying a new edit after an undo discards the undone edits, and loading
+another run or scene clears the history (up to 100 edits are kept). Undo only changes the draft
+scene, never the recorded run, the JS source or active jobs. Undoing back to the recorded geometry
+(or to the last export) leaves nothing to save, so the close and replace prompts no longer ask;
+recorded playback still stays hidden until you reload the run. While a text field or the code
+editor has keyboard focus, Ctrl+Z undoes text there instead; use the Edit menu for the scene.
 
 Named beams preserve their source origins/spreads across reorder or nonprimary deletion.
 Changing beam identities, removing the primary or editing multiple unnamed sources requires

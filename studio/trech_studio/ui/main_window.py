@@ -16,12 +16,14 @@ The window owns the engine bridge objects (locator + runner + lab session) and t
 
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 import json
 import uuid
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (
     QDockWidget,
     QFileDialog,
@@ -43,6 +45,7 @@ from ..render.playback import build_playback, build_material_frame_playback
 from ..render.probability import probability_views, build_probability_playback
 from ..render.viewport import create_viewport
 from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_viz_data
+from ..scene.history import SceneHistory
 from ..scene.model import SceneModel
 from ..scene.dependencies import run_search_dirs
 from ..scene.writer import scene_to_bundle
@@ -99,6 +102,10 @@ class StudioWindow(QMainWindow):
         self._scene: SceneModel = placeholder_scene()
         self._scene_is_draft = False
         self._scene_dirty = False
+        # Undo/redo of applied Inspector drafts. _scene_saved is the last scene with nothing to
+        # export (the loaded scene or the last export), so an undo back to it leaves no draft.
+        self._scene_history = SceneHistory()
+        self._scene_saved: SceneModel = deepcopy(self._scene)
 
         # --- central viewport --------------------------------------------------------
         self.viewport = create_viewport(background=settings.background, parent=self)
@@ -200,6 +207,14 @@ class StudioWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction("Quit", self.close)
 
+        edit_menu = bar.addMenu("&Edit")
+        # Window-wide shortcuts; a focused text editor keeps Ctrl+Z for its own text history.
+        self._undo_scene_action = edit_menu.addAction("Undo scene edit", self.undo_scene_edit)
+        self._undo_scene_action.setShortcut(QKeySequence.Undo)
+        self._redo_scene_action = edit_menu.addAction("Redo scene edit", self.redo_scene_edit)
+        self._redo_scene_action.setShortcut(QKeySequence.Redo)
+        self._sync_scene_history_actions()
+
         run_menu = bar.addMenu("&Run")
         run_menu.addAction("Run scenario ▶", self._run_scenario)
         run_menu.addAction("Stop", self._runner.stop)
@@ -300,6 +315,9 @@ class StudioWindow(QMainWindow):
         self._scene_is_draft = False
         self._scene_dirty = False
         self._scene = scene
+        self._scene_saved = deepcopy(scene)
+        self._scene_history.clear()
+        self._sync_scene_history_actions()
         self.inspector.set_editing(False, "Load an exportable transport run to edit its scene.")
         self.outliner.set_scene(scene)
         self.inspector.set_scene(scene)
@@ -332,14 +350,35 @@ class StudioWindow(QMainWindow):
         if candidate == self._scene:
             self.inspector.show_edit_error("No scene fields changed.")
             return
+        before_selection = (kind, name) if kind != "volume" or self._scene.volume_by_name(name) else ("world", "")
         if kind == "beam":
             # An unnamed single beam is selected by its particle label, which may have changed.
             old_index = next(i for i, b in enumerate(self._scene.beams) if (b.name or b.particle) == name)
             beam = candidate.beams[old_index]
             name = beam.name or beam.particle
+        label = {"world": "world", "beam": f"beam {name}"}.get(kind, f"{kind} {name}")
+        self._scene_history.record(self._scene, before_selection, candidate, (kind, name), label)
+        self._install_scene_draft(candidate, kind, name, result)
+        self.console.log_info("Applied scene draft. Recorded playback hidden; source files and active jobs are unchanged.")
+
+    def _node_exists(self, scene: SceneModel, kind: str, name: str) -> bool:
+        if kind == "world":
+            return True
+        if kind == "volume":
+            return scene.volume_by_name(name) is not None
+        if kind == "beam":
+            return any((b.name or b.particle) == name for b in scene.beams)
+        if kind == "material":
+            return scene.material_by_name(name) is not None
+        return False
+
+    def _install_scene_draft(self, candidate: SceneModel, kind: str, name: str, result) -> None:
+        """Show ``candidate`` as the current draft and select ``kind``/``name`` (or the world)."""
+        if not self._node_exists(candidate, kind, name):
+            kind, name = "world", ""
         self._scene = candidate
         self._scene_is_draft = True
-        self._scene_dirty = True
+        self._scene_dirty = candidate != self._scene_saved
         # Results belong to the recorded geometry. Do not overlay them on an authored draft.
         self.processes.set_streams([])
         self.processes.set_recipe_reports([])
@@ -357,8 +396,37 @@ class StudioWindow(QMainWindow):
         self.inspector.show_node(kind, name)
         self.outliner.select_node(kind, name)
         self.viewport.set_scene(candidate)
+        self._sync_scene_history_actions()
         self.statusBar().showMessage("Scene draft — export scene scenario to save; no simulation results for these edits.")
-        self.console.log_info("Applied scene draft. Recorded playback hidden; source files and active jobs are unchanged.")
+
+    def _sync_scene_history_actions(self) -> None:
+        history = self._scene_history
+        undo = getattr(self, "_undo_scene_action", None)
+        redo = getattr(self, "_redo_scene_action", None)
+        if undo is not None:
+            undo.setEnabled(history.can_undo)
+            undo.setText(f"Undo scene edit ({history.undo_label})" if history.can_undo else "Undo scene edit")
+        if redo is not None:
+            redo.setEnabled(history.can_redo)
+            redo.setText(f"Redo scene edit ({history.redo_label})" if history.can_redo else "Redo scene edit")
+
+    def _restore_scene_state(self, state, verb: str) -> bool:
+        result = getattr(self, "_loaded_run", None)
+        if state is None or result is None:
+            return False
+        kind, name = state.selection
+        self._install_scene_draft(state.scene, kind, name, result)
+        saved = "" if self._scene_dirty else " Scene matches the last saved state; reload the run to restore playback."
+        self.console.log_info(f"{verb} scene draft.{saved}")
+        return True
+
+    def undo_scene_edit(self) -> bool:
+        """Restore the scene before the last applied Inspector edit. Physics and sources are untouched."""
+        return self._restore_scene_state(self._scene_history.undo(), "Undid")
+
+    def redo_scene_edit(self) -> bool:
+        """Re-apply the last undone Inspector edit."""
+        return self._restore_scene_state(self._scene_history.redo(), "Redid")
 
     def _resolve_scene_draft(self) -> bool:
         if not getattr(self, "_scene_dirty", False):
@@ -442,6 +510,7 @@ class StudioWindow(QMainWindow):
             QMessageBox.warning(self, "Cannot export scene scenario", str(exc))
             return False
         self._scene_dirty = False
+        self._scene_saved = deepcopy(self._scene)
         packaged = f" with {len(bundle.files)} model file(s) in {target.stem}_deps/" if bundle.files else ""
         self.console.log_info(f"Exported transport scene draft: {target}{packaged}")
         return True

@@ -18,7 +18,8 @@ Standing constraint for every item: Lean stays optional. Each law keeps its clas
 implementation as the running path, with the Lean definition beside it for validation
 ([rule](AGENTS.md#rules)).
 
-- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Added declared `ctx.react` count conservation and antisymmetric `ctx.interact` exchange. Next: energy conservation in recorded Geant4 secondaries. Search Mathlib first. ([detail](#operator-conservation-2026-11-22))
+- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Added declared `ctx.react` count conservation, antisymmetric `ctx.interact` exchange and the energy balance of recorded Geant4 Compton steps. Next: relativistic two-body kinematics (the Compton relation from four-momentum conservation, checked against the recorded electron direction). Search Mathlib first. ([detail](#geant4-step-energy-balance-2026-11-22))
+- **P2** · R8 · Energy balance on every recorded step: today `energy.step_balance` reads only a primary photon's first Compton scatter. Extend it to every process and generation with the rest-mass term `Q` (gamma conversion `−2 m_e c²`, positron annihilation, nuclear reactions from Geant4's mass table), behind the same observe-only contract and only in runs that ask for it. ([detail](#geant4-step-energy-balance-2026-11-22))
 - **P2** · R8 · Conformance harness: a Lean reference evaluator (`@[export]` C symbols linked behind an opt-in `TRECH_ENABLE_LEAN`, default OFF, or a separate `lake exe` fed JSON) that checks the classic kernel on sampled or recorded inputs offline. Measure its cost; it never runs per step in production and never changes physics, RNG or emits. ([detail](#route-opened--2026-11-22))
 - **P2** · R8 · Hardware acceleration contract: Lean compiles to scalar CPU code, so accelerated kernels (C++ SIMD, LibTorch, GPU) stay the compute path. Define how a proof about an algorithm's model transfers to its accelerated implementation (shared algorithm spec, sampled conformance, documented reduction-order and fused-operation differences). ([detail](#route-opened--2026-11-22))
 - **P3** · R8 · More companions recording law checks: only `analytic_compton_transfer` records `TRECH_FORMAL_LAWS` verdicts. Candidates: `analytic_beer_lambert` (memorylessness at its own attenuation coefficients), and companions of `ctx.react` scenarios checking recorded per-cell probabilities with `checkProbabilityVector`. Always from the `.validation.js` companion under the `validation` role, never on the decision path. ([detail](#law-checks-in-run-outputs--2026-11-22))
@@ -29,6 +30,23 @@ implementation as the running path, with the Lean definition beside it for valid
 - **P3** · R5 · Geant4 secondary track: Lean statements of Geant4's basic laws (two-body kinematics, the Compton relation from four-momentum conservation, exponential attenuation, energy conservation in `SampleSecondaries`), attached through derived classes in shadow mode (inheritance preferred; `patches/geant4/` only for non-virtual code). Observation first; any replacement needs byte parity or a validated tolerance, a regression against the unpatched build and the owner's go-ahead. ([detail](AGENTS.md#geant4-secondary-track))
 - **gated** · R8 · Owner decision: whether to add a physics-specific Lean library (for example PhysLean) as a further reference checkout, so physical laws are also checked against it before being declared.
 - **gated** · R8 · Owner decision: when (if ever) Lean stops being optional for a given path.
+
+## Geant4 step energy balance (2026-11-22)
+
+- [x] `Trech.Laws.EnergyBalance` states `E_pre + Q = E_post + ΣT_i + d` as a zero residual, bounds
+  the outgoing particle and each secondary by `E_pre` when `Q = 0`, and proves that balanced
+  steps telescope along a track (`Finset.sum_range_sub'`). Four theorems listed; the audit
+  passes 26/26 with standard axioms only.
+- [x] Classic side `sim/EnergyBalance.hpp` (`relativeResidual`, Neumaier sum, NaN on non-finite
+  input). `SteppingAction` reads it on each primary photon's first Compton scatter; `RunAction`
+  records the engine check `energy.step_balance` and two analytic-check fields only when a
+  `compton_energy_transfer` check is configured.
+- [x] Conformance: 410 modelled Compton steps, a gamma conversion with `Q = −2 m_e c²`, a
+  41-step telescoping track, a dropped-electron negative control and non-finite input.
+- Verification: Debug CTest 80/80; Lean audit 26/26. A 20,000-event Geant4 Compton run read
+  16,423 scatters, largest relative residual `4.2e-17`, no violations, and differed from the
+  previous build's 20,000-event output only in the new fields. The family gate passes 24/24 and
+  fails the pre-change output on the six law-check entries.
 
 ## Operator conservation (2026-11-22)
 

@@ -64,7 +64,12 @@ volume fields used for edits. The volume inspector removes a leaf volume from th
 The writer rejects case-insensitive name collisions, new names reserved for built-in parents,
 and removal of a parent still referenced by a child.
 Apply builds a detached candidate, validates it through the same lossless writer, and only then
-updates the scene/Outliner/viewport. Callback/model-bearing or mismatched runs remain read-only.
+updates the scene/Outliner/viewport. Each applied draft is recorded in `scene/history.SceneHistory`
+(pure data, deep-copied before/after snapshots with their selections, 100-edit limit); **Edit ▸
+Undo/Redo scene edit** (`StudioWindow.undo_scene_edit`/`redo_scene_edit`) reinstall a snapshot
+through `_install_scene_draft`, the same path Apply uses. `_scene_dirty` compares with
+`_scene_saved` (the loaded scene or the last export), so undoing back to it leaves nothing to save.
+`_apply_scene` clears the history. Callback/model-bearing or mismatched runs remain read-only.
 Recorded playback and precision are hidden for the draft; original config/score/emit reports retain
 their recorded meaning. Applying leaves JS source drafts and active jobs untouched. Export saves a
 separate JS file; Run still targets the open source. Unsaved scene replacement/close offers
@@ -74,5 +79,6 @@ is disabled until its exported scenario is run. Opening an output directory with
 is refused before replacing any scene/results, preserving their pairing. Gizmos, live patches, companions and typed
 declarations are not reconstructed.
 Tests: `studio/tests/test_scene_editing.py` (atomic Apply validation, draft/recorded isolation,
-source/job preservation and scene-draft guard) and `studio/tests/test_scene_writer.py` (exact unchanged config + edit isolation through real
+source/job preservation, scene-draft guard and undo/redo with real key events),
+`studio/tests/test_scene_history.py` (pure history) and `studio/tests/test_scene_writer.py` (exact unchanged config + edit isolation through real
 `trech inspect`, canonical source/material preservation, lossy-export guards and File export).

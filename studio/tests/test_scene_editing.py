@@ -342,3 +342,90 @@ def test_outliner_marks_engine_geometry_substitutions(window, tmp_path):
     window._apply_scene(window._scene)
     assert outliner.resolution_marks() == {}
     assert RESOLUTION_MARK not in outliner.topLevelItem(0).text(0)
+
+
+def test_undo_and_redo_restore_drafts_selection_and_saved_state(window):
+    panel = window.inspector
+    assert not window._undo_scene_action.isEnabled()
+    recorded = deepcopy(window._scene)
+    panel.show_node("world", "")
+    panel._fields["world_size"].setText("150")
+    apply(panel)
+    panel.show_node("beam", "gamma")
+    panel._fields["particle"].setText("proton")
+    apply(panel)
+    assert window._undo_scene_action.isEnabled() and "beam proton" in window._undo_scene_action.text()
+
+    # Undo the beam edit: the renamed unnamed beam is selected again by its old particle label.
+    assert window.undo_scene_edit()
+    assert window._scene.beams[0].particle == "gamma" and window._scene.world_size_mm == 150
+    assert window.outliner.selectedItems()[0].text(0) == "gamma"
+    assert window._scene_dirty and window.viewport.scene is window._scene
+    assert window._redo_scene_action.isEnabled()
+
+    # Undo back to the recorded geometry: still a draft (playback stays hidden) but nothing to save.
+    assert window.undo_scene_edit() and not window.undo_scene_edit()
+    assert window._scene == recorded and not window._scene_dirty and window._scene_is_draft
+    assert window.viewport.playback is None
+
+    assert window.redo_scene_edit() and window.redo_scene_edit() and not window.redo_scene_edit()
+    assert window._scene.beams[0].particle == "proton" and window._scene_dirty
+    assert window._loaded_run.recorded_config() == window.test_original_config
+    assert window.code_editor.text() == "// independent source draft"
+
+
+def test_undo_of_an_added_volume_selects_the_world_and_new_edits_drop_redo(window):
+    panel = window.inspector
+    panel.show_node("world", "")
+    panel.findChild(QPushButton, "add_scene_volume").click()
+    panel._fields["name"].setText("Target")
+    apply(panel)
+    assert window._scene.volume_by_name("Target") is not None
+    assert window.undo_scene_edit()
+    assert window._scene.volume_by_name("Target") is None
+    assert window.outliner.selectedItems()[0].text(0).lower().startswith("world")
+    panel.show_node("world", "")
+    panel._fields["world_size"].setText("180")
+    apply(panel)
+    assert not window._redo_scene_action.isEnabled() and not window.redo_scene_edit()
+
+
+def test_loading_a_scene_clears_history_and_export_marks_the_saved_state(window, tmp_path):
+    panel = window.inspector
+    panel.show_node("world", "")
+    panel._fields["world_size"].setText("150")
+    apply(panel)
+    target = tmp_path / "scene.js"
+    with patch.object(module.QFileDialog, "getSaveFileName", return_value=(str(target), "")):
+        assert window._export_scene_scenario()
+    assert not window._scene_dirty
+    assert window.undo_scene_edit() and window._scene_dirty
+    assert window.redo_scene_edit() and not window._scene_dirty
+
+    window._apply_scene(deepcopy(window._scene))
+    assert not window._undo_scene_action.isEnabled() and not window.undo_scene_edit()
+
+
+def test_scene_undo_shortcut_leaves_focused_text_fields_their_own_undo(window):
+    from PySide6.QtGui import QKeySequence
+    from PySide6.QtTest import QTest
+    panel = window.inspector
+    panel.show_node("world", "")
+    panel._fields["world_size"].setText("150")
+    apply(panel)
+    window.show()
+    window.activateWindow()
+    _APP.processEvents()
+    field = panel._fields["world_size"]
+    field.setFocus()
+    field.selectAll()
+    QTest.keyClicks(field, "77")
+    QTest.keySequence(field, QKeySequence.Undo)
+    _APP.processEvents()
+    # The focused field undid its own typing; the scene draft is untouched.
+    assert field.text() == "150.0" and window._scene.world_size_mm == 150
+    window.outliner.setFocus()
+    QTest.keySequence(window.outliner, QKeySequence.Undo)
+    _APP.processEvents()
+    assert window._scene.world_size_mm == 100 and not window._scene_dirty
+    window.hide()

@@ -14,6 +14,7 @@
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/MethodArbiter.hpp"
 #include "trech/ml/PairInteraction.hpp"
+#include "trech/sim/EnergyBalance.hpp"
 #include "trech/sim/KleinNishina.hpp"
 
 #include <nlohmann/json.hpp>
@@ -79,6 +80,63 @@ void comptonPairs() {
   std::vector<double> tight = upper;
   for (double& u : tight) u *= 0.99;
   expect(formal::checkWithinBounds("compton.negative_control", "", values, lower, tight, 1e-15), false);
+}
+
+void energyBalancePairs() {
+  // Trech.Laws.EnergyBalance on the classic energy_balance::relativeResidual. Steps are formed
+  // the way Geant4's free-electron Compton model forms them: E' = ratio * E, the electron gets
+  // E - E' unless that is below the 100 eV secondary threshold (then it is deposited), and a
+  // photon left below the threshold is killed with its energy deposited.
+  namespace eb = trech::sim::energy_balance;
+  const double me = 0.51099895;     // MeV
+  const double threshold = 100e-6;  // MeV
+  std::vector<double> residuals, zeros, tolerances, posts, pres;
+  for (double eps : kEps) {
+    const double e = eps * me;
+    for (double c : cosGrid()) {
+      double post = kn::scatteredEnergyRatio(eps, c) * e;
+      std::vector<double> secondaries;
+      double deposit = 0.0;
+      const double electron = e - post;
+      if (electron > threshold) secondaries.push_back(electron); else deposit += electron;
+      if (post <= threshold) { deposit += post; post = 0.0; }
+      residuals.push_back(eb::relativeResidual(e, 0.0, post, secondaries, deposit));
+      zeros.push_back(0.0);
+      tolerances.push_back(eb::kRelativeTolerance);
+      posts.push_back(post);
+      pres.push_back(e);
+    }
+  }
+  expect(formal::checkWithinBounds("energy.step_balance", "Trech.Laws.EnergyBalance.residual_eq_zero_iff",
+                                   residuals, zeros, tolerances, 0.0));
+  // post_le_pre: with Q = 0 the scattered photon never gains energy.
+  expect(formal::checkWithinBounds("energy.post_le_pre", "Trech.Laws.EnergyBalance.post_le_pre", posts,
+                                   zeros, pres, 0.0));
+  // A gamma conversion releases Q = -2 m_e c^2: 10 MeV -> e- 6 MeV + e+ (10 - 2 me - 6) MeV.
+  const double conversion = eb::relativeResidual(10.0, -2.0 * me, 0.0, {6.0, 10.0 - 2.0 * me - 6.0}, 0.0);
+  expect(formal::checkWithinBounds("energy.conversion_balance", "Trech.Laws.EnergyBalance.residual_eq_zero_iff",
+                                   {conversion}, {0.0}, {eb::kRelativeTolerance}, 0.0));
+  // track_released_sum: what balanced steps hand on adds up to the kinetic-energy drop.
+  std::vector<double> before = {pres.back()}, after;
+  double k = pres.back();
+  for (double c : cosGrid()) {
+    const double next = kn::scatteredEnergyRatio(k / me, c) * k;
+    after.push_back(k - next);  // released by this step
+    k = next;
+  }
+  after.push_back(k);
+  expect(formal::checkConservedTotal("energy.track_released_sum", "Trech.Laws.EnergyBalance.track_released_sum",
+                                     before, after, 1e-13));
+  // The check must catch a step that loses its electron, and refuse non-finite input.
+  const double lost = eb::relativeResidual(1.0, 0.0, 0.6, {}, 0.0);
+  expect(formal::checkWithinBounds("energy.lost_secondary_negative_control", "", {lost}, {0.0},
+                                   {eb::kRelativeTolerance}, 0.0),
+         false);
+  if (!std::isnan(eb::relativeResidual(1.0, 0.0, std::nan(""), {}, 0.0)) ||
+      eb::relativeResidual(0.0, 0.0, 0.0, {}, 0.0) != 0.0) {
+    std::fprintf(stderr, "relativeResidual mishandles non-finite or empty steps\n");
+    ++failures;
+  }
 }
 
 void attenuationPairs() {
@@ -563,6 +621,7 @@ globalThis.TRECH_CONFIG = {formal: {
 int main() {
   try {
     comptonPairs();
+    energyBalancePairs();
     attenuationPairs();
     latticePairs();
     scalarLatticePairs();

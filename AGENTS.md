@@ -46,7 +46,7 @@ never drawn.
 | 4 | **P1** | R2 | [scenarios/chemistry](AGENTS/scenarios/chemistry/ROADMAP.md#priority-queue) | Next learned lift: geometry/charge/isotope-conditioned electronic and bond response trained on Geant4 particle/ionization histories |
 | 5 | **P1** | R3 | [scenarios/migrations](AGENTS/scenarios/migrations/ROADMAP.md#priority-queue) | Row 6 remainder — osmosis (efflux promoted 2026-07-26). |
 | 6 | **P2** | R3 | [engine/inference](AGENTS/engine/inference/ROADMAP.md#priority-queue) | Closed-loop deployment of learned-domain operators beyond the furnace thermal law |
-| 7 | **P2** | R6 | [studio/authoring](AGENTS/studio/authoring/ROADMAP.md#priority-queue) | Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics, undo/redo. |
+| 7 | **P2** | R6 | [studio/authoring](AGENTS/studio/authoring/ROADMAP.md#priority-queue) | Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics. |
 | 8 | **P2** | R6 | [scenarios/references](AGENTS/scenarios/references/ROADMAP.md#priority-queue) | JS workflow execution: editable training/harvest/inference jobs with provenance, progress/cancellation and safe model activation. |
 | 9 | **P2** | R3 | [tooling/training](AGENTS/tooling/training/ROADMAP.md#priority-queue) | Next set-network users: efflux/foam parcel operators, an MPNN where neighbour-of-neighbour structure matters, a conservative set operator through `ctx.interact`. |
 | 10 | **P3** | R2 | [engine/precision](AGENTS/engine/precision/ROADMAP.md#priority-queue) | Evolutionary model search beyond uniform MLP width/depth (DAGs, activations, cross-family discovery) |

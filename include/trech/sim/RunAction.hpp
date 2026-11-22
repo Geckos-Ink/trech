@@ -115,9 +115,12 @@ public:
   // distribution) and kinematicResidual is |E'/E - 1/(1+eps(1-cos theta))|, the
   // free-electron energy-angle closure. All Compton arguments are ignored for
   // other subtypes; a non-finite cosTheta leaves the angular tallies untouched.
+  // energyBalanceResidual is the scatter's relative energy-balance residual
+  // (sim/EnergyBalance.hpp); NaN means it was not measured.
   void AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction,
                                   G4int transferBin, G4double cosTheta,
-                                  G4double kinematicResidual);
+                                  G4double kinematicResidual,
+                                  G4double energyBalanceResidual);
   // Record the final state of a primary's first photonuclear absorption (called
   // in addition to AddPrimaryFirstInteraction for fHadronInelastic).
   void AddPhotonuclearFinalState(const PhotonuclearFinalState& state);
@@ -270,6 +273,11 @@ private:
   sim::ScoreSum comptonFirstCosSum_;
   sim::ScoreSum comptonFirstCosSumSq_;
   G4Accumulable<G4double> comptonFirstKinematicResidualMax_;
+  // First-Compton energy balance (sim/EnergyBalance.hpp): measured steps, steps above
+  // energy_balance::kRelativeTolerance, and the largest relative residual (kMaximum merge).
+  G4Accumulable<G4int> comptonEnergyBalanceCount_;
+  G4Accumulable<G4int> comptonEnergyBalanceViolations_;
+  G4Accumulable<G4double> comptonEnergyBalanceResidualMax_;
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> comptonFirstCosHistogram_;
   // First photonuclear absorptions: final-state counts, conservation residuals
   // (max |.| merges), the two-body ejectile-edge excess and a neutron

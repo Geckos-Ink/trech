@@ -65,6 +65,7 @@ Lean file and theorems, and the classic sources.
 | Pair | Lean (`formal/`) | Classic code | What is checked without Lean |
 | --- | --- | --- | --- |
 | Compton kinematics | `Trech.Laws.Compton`: the electron's share `T/E` lies between 0 and the Compton edge `2ε/(1+2ε)`, and equals the edge at back-scatter | `include/trech/sim/KleinNishina.hpp`, `js/trech_formal_laws.js` | 410 (energy, angle) samples respect the bound; the C++ and JavaScript values are bit-identical |
+| Energy balance of a recorded step | `Trech.Laws.EnergyBalance`: a step conserves energy when `E_pre + Q = E_post + ΣT_i + d` (its residual is zero); with no rest mass released (`Q = 0`) the outgoing particle and every secondary carry at most `E_pre`, and balanced steps telescope along a track | `include/trech/sim/EnergyBalance.hpp`, read in `src/sim/SteppingAction.cpp` | 410 Compton steps formed as Geant4's free-electron model forms them, a gamma conversion with `Q = −2 m_e c²` and a 41-step track close within `1e-12` relative; a step that drops its electron fails on purpose. In a Geant4 run the engine records the same check on every first Compton scatter |
 | Beer–Lambert attenuation | `Trech.Laws.Attenuation`: survival `exp(-μx)` multiplies over consecutive paths, stays in (0, 1] and decreases with path length | `src/sim/AnalyticCrossCheck.cpp`, `js/trech_formal_laws.js` | `S(x+y)` against `S(x)·S(y)` on 20 path pairs, within a stated float tolerance |
 | Lattice mass conservation | `Trech.Methods.Lattice`: the collision keeps a cell's mass if the equilibrium does, a zero-sum source keeps it, streaming along a bijection keeps the total | `src/core/LatticeKinetic.cpp` | the theorems' hypotheses (velocity-set moments, opposite-direction table, streaming map) and the total mass over 300 forced steps on a periodic lattice |
 | Scalar lattice conservation | `Trech.Methods.Lattice.advectedEquilibrium_sum`: the advection-diffusion equilibrium carries the cell's value, so with the same collision and streaming theorems a scalar lattice with closed (zero-flux) walls keeps its total | `src/core/LatticeKinetic.cpp`, `src/core/LatticeContinuum.cpp` | the engine's own hypothesis checks on a walled lattice with an obstacle, and the scalar total over 400 advected steps; a Dirichlet wall (which adds scalar by design) is the counter-example |
@@ -165,6 +166,25 @@ statements about real numbers, not the floating-point code (see above).
 The Compton scenario's family gate grades the recorded checks too: `formal_laws_recorded` needs
 at least two `validation` records and `formal_laws_hold` needs all of them to pass.
 
+**Energy balance from Geant4's own steps.** In a run with a `compton_energy_transfer` analytic
+check, the engine reads each primary photon's first Compton scatter from Geant4's step record:
+the photon's energy before and after, the kinetic energy of every secondary the step created,
+and the energy deposited on the spot. It records how far `E − E′ − ΣT − deposit` is from zero,
+divided by the largest of those energies, as the engine check `energy.step_balance` (tolerance
+`1e-12`) and as `measured_max_energy_balance_residual` in the analytic check. Nothing else in
+the run changes: on 2026-11-22 a 20,000-event run differed from the previous build's output only
+in these new fields and the new engine record in `law_checks`. That run read 16,423 scatters with a largest residual of `4.2e-17`, so
+Geant4's sampled Compton steps close to rounding. The family gate adds
+`energy_balance_measured`, `energy_balance_closure`, `engine_laws_recorded` and
+`engine_laws_hold`. To see it:
+
+```bash
+trech run examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js \
+  --events 2000 --output build/out_compton
+grep run_end build/out_compton/trech_scores.jsonl | python3 -c \
+  "import json,sys; print([c for c in json.load(sys.stdin)['law_checks'] if c['origin']=='engine'])"
+```
+
 To check the proofs yourself you need Lean and Mathlib's prebuilt files (a one-time download
 of about 7 GB):
 
@@ -176,7 +196,7 @@ python3 scripts/check_lean_laws.py
 ```
 
 The last command builds the package and prints one line per theorem with the axioms it uses,
-ending with `22/22 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
+ending with `26/26 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
 an added axiom makes it fail. Add `--report build/lean_audit.json` to also save the audit
 as JSON: the Lean version, toolchain and Mathlib revision, the SHA-256 hash of `laws.json` and
 of every Lean file, one combined hash of all of them, and each theorem's axioms. A run reads it
@@ -230,4 +250,6 @@ attaches them to the Geant4 models that compute them. TRECH would do this by der
 C++ classes from the Geant4 model classes, which call the original and compare its result with
 the Lean statement. A patch to the Geant4 sources is the fallback only where a method cannot be
 overridden. Geant4 stays the base of truth: such a class only observes until a regression shows
-it changes nothing. Contract: [formal-laws handbook](../../AGENTS/engine/formal/AGENTS.md#geant4-secondary-track).
+it changes nothing. The first observation does not need a derived class: the energy balance of
+Compton scatters is read from the step record that Geant4 already hands to TRECH (see
+[law checks in run outputs](#law-checks-in-run-outputs)). Contract: [formal-laws handbook](../../AGENTS/engine/formal/AGENTS.md#geant4-secondary-track).

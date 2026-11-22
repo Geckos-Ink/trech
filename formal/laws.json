@@ -39,6 +39,24 @@
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["attenuation.memoryless"]}
     },
     {
+      "id": "energy.step_balance",
+      "role": "reference",
+      "statement": "A recorded step conserves energy when E_pre + Q = E_post + sum T_i + d (zero residual), Q being the rest-mass energy it releases; with Q = 0 and nonnegative products the outgoing particle and every secondary carry at most E_pre, and balanced steps telescope along a track (energy handed on = E_0 - E_n + sum Q).",
+      "lean": {
+        "file": "formal/Trech/Laws/EnergyBalance.lean",
+        "declarations": [
+          "Trech.Laws.EnergyBalance.residual_eq_zero_iff",
+          "Trech.Laws.EnergyBalance.post_le_pre",
+          "Trech.Laws.EnergyBalance.secondary_le_pre",
+          "Trech.Laws.EnergyBalance.track_released_sum"
+        ]
+      },
+      "classic": [
+        {"path": "include/trech/sim/EnergyBalance.hpp", "cites": "Trech.Laws.EnergyBalance"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["energy.step_balance", "energy.post_le_pre", "energy.conversion_balance", "energy.track_released_sum"]}
+    },
+    {
       "id": "lattice.collision_conserves_mass",
       "role": "method_property",
       "statement": "The two-relaxation-time collision keeps a cell's summed populations when the equilibrium carries the same mass, a zero-sum source keeps it, and pull streaming along a bijection of the links keeps the lattice total.",

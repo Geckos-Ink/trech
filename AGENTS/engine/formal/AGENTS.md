@@ -6,19 +6,21 @@ Related owners: [Builds and dependencies](../../tooling/dependencies/AGENTS.md) 
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
-**Maturity (2026-11-22): eight law pairs, 22 proofs verified. Lean stays optional.** The pairs
-([`formal/laws.json`](../../../formal/laws.json)) are Compton kinematics, Beer–Lambert
-attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step
+**Maturity (2026-11-22): nine law pairs, 26 proofs verified. Lean stays optional.** The pairs
+([`formal/laws.json`](../../../formal/laws.json)) are Compton kinematics, the energy balance of a
+recorded step, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step
 probabilities and declared count conservation, antisymmetric `ctx.interact` exchange, and the
 method arbiter's proper squared score. Their classic C++/JS code is
 checked against each Lean statement by `trech_formal_laws`, and the pair links by
-`trech_formal_law_pairs` (both in the normal suite, no Lean needed). The 22 Lean theorems
+`trech_formal_law_pairs` (both in the normal suite, no Lean needed). The 26 Lean theorems
 compile with Lean `v4.37.0-rc1` and Mathlib `6ebcce3733` and depend only on the standard
 axioms (`propext`, `Classical.choice`, `Quot.sound`), checked by the opt-in
 `trech_formal_lean_build`. The count proof uses mathematical integers. The exchange proof uses
 reals, with classic conformance tested before bound clipping at `1e-15` relative. The
-engine runs one classic check itself: `Lattice` checks its pair's hypotheses once per build
-(`lawChecks()`, trace category `formal`). Runs record their checks (2026-11-22): `law_checks`
+engine runs two classic checks itself: `Lattice` checks its pair's hypotheses once per build
+(`lawChecks()`, trace category `formal`), and a run with a `compton_energy_transfer` analytic
+check records `energy.step_balance` over every first Compton scatter, read from Geant4's step
+record in `SteppingAction` (`sim/EnergyBalance.hpp`, relative tolerance `1e-12`). Runs record their checks (2026-11-22): `law_checks`
 in the `run_end` scores (origins `engine` and `validation`) and a provenance `formal` object
 with the build-embedded law-source hashes and, with `--formal-audit`, the Lean audit identity.
 No config field. One bundled companion records checks (`analytic_compton_transfer`).
@@ -145,7 +147,11 @@ conservation, exponential attenuation from a constant interaction rate, energy c
 - **Engine-side checks observe only.** `Lattice::checkLaws` runs once per build, touches no
   population, RNG stream, emit or output, and reports through the trace; a failed check is a
   warning, never an exception. Moving walls and Dirichlet links pass the bijection check with a
-  "not conservative by design" detail; they are not failures.
+  "not conservative by design" detail; they are not failures. The Compton energy balance reads
+  `GetSecondaryInCurrentStep` and `GetTotalEnergyDeposit` without touching the track; its
+  accumulables merge by sum and maximum, and it writes only when a `compton_energy_transfer`
+  check is configured, so other runs keep their bytes. Its `max_abs_error` is relative to the
+  step's largest energy term.
 - **One law-source hash, two implementations.** CMake (`TRECH_FORMAL_SOURCES_SHA256`) and
   `check_lean_laws.py` (`sources_sha256`) hash the same files the same way; `trech_formal_laws`
   recomputes it from the tree. Adding a Lean file outside `formal/Trech.lean` or
