@@ -347,9 +347,17 @@ lab is running. For what the engine records, see the [engine trace guide](../doc
   changes what is shown immediately. Raising the level applies from the next run, because a
   running engine records only what it was asked for. Warnings, errors and the summary are
   always shown.
-- When the run ends, the banner shows the **run attribution** verdict, for example
-  *"0 of 4 ctx inference calls returned an engine result … 3 of 3 emits came from hook calls with
-  no engine-backed inference"*. It also names any model that failed to load.
+- When each batch ends (one per `trech run`, one per *Simulate* in a live lab), the banner shows
+  that **batch's attribution** verdict. When the run ends, it shows the **run attribution**
+  verdict, for example *"0 of 4 ctx inference calls returned an engine result … 3 of 3 emits came
+  from hook calls with no engine-backed inference"*. It also names any model that failed to load.
+- The **Attribution** tab, next to the selected record, breaks a summary down per hook. Choose
+  *Run* or one *Batch* in the list above the table. Each row shows the hook's invocations, how
+  many of them had an engine result, its emits, the emits with no engine result behind them, and
+  the share of emits that were engine-backed. Hooks with the most unbacked emits come first, so
+  the hooks that rest on authored JavaScript or bare Geant4 tallies stand out. Work done by a
+  validation companion is not counted here (see
+  [roles](../docs/engine/engine_trace.md#validation-and-reference-code-roles)).
 - Opening a finished output directory loads its `trech_trace.jsonl`. If Studio was started with
   `TRECH_TRACE` set, a run's trace is shown even when the panel is set to *Off*.
 

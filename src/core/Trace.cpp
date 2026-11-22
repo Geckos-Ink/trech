@@ -31,6 +31,30 @@ struct HookTally {
   std::size_t engineBackedCalls = 0;
 };
 
+// Attribution counters. The state keeps two copies: one for the whole session (the run summary)
+// and one since the last batch summary (one Geant4 run; a `trech lab` session has several).
+// ctx calls and authored laws made under a purpose role (a validation companion, a forced
+// reference): kept apart so they never count as the scenario's own path.
+struct RoleTally {
+  std::map<std::string, std::map<std::string, std::size_t>> calls;
+  std::map<std::string, std::size_t> authored;
+};
+
+struct Tallies {
+  std::map<std::string, std::map<std::string, std::size_t>> calls;
+  std::map<std::string, HookTally> hooks;
+  std::map<std::string, std::size_t> authored;
+  std::map<std::string, double> counters;
+  std::map<std::string, RoleTally> roles;
+  void clear() {
+    calls.clear();
+    hooks.clear();
+    authored.clear();
+    counters.clear();
+    roles.clear();
+  }
+};
+
 struct State {
   std::mutex mutex;
   Options options;
@@ -39,11 +63,10 @@ struct State {
   bool finished = true;
   std::map<std::string, std::size_t> recordsPerCategory;
   std::map<std::string, std::size_t> suppressed;
-  std::map<std::string, std::map<std::string, std::size_t>> calls;
-  std::map<std::string, HookTally> hooks;
-  std::map<std::string, std::size_t> authored;
+  Tallies session;
+  Tallies batch;
+  std::size_t batches = 0;
   std::map<std::string, bool> models;
-  std::map<std::string, double> counters;
   struct Span {
     std::string category, name, hook;
     long long event = -1;
@@ -61,6 +84,7 @@ State& state() {
 thread_local std::string tHook;
 thread_local long long tEvent = -1;
 thread_local long long tStep = -1;
+thread_local std::string tRole;
 
 std::string trim(std::string s) {
   const auto notSpace = [](unsigned char c) { return !std::isspace(c); };
@@ -126,6 +150,7 @@ void writeLocked(State& s, Level level, std::string_view category, std::string_v
                          {"msg", std::string(message)}};
   if (!severity.empty()) line["severity"] = std::string(severity);
   if (!tHook.empty()) line["hook"] = tHook;
+  if (!tRole.empty()) line["role"] = tRole;
   if (tEvent >= 0) line["event"] = tEvent;
   if (tStep >= 0) line["step"] = tStep;
   if (!data.is_null()) line["data"] = data;
@@ -180,6 +205,12 @@ std::string verdict(const nlohmann::json& totals) {
   if (authored > 0) {
     os << " " << authored << " uses of authored laws were reported (ctx.authored or a library's "
           "reference solver); see `authored` for each law.";
+  }
+  const std::size_t roleCalls = get("role_calls");
+  const std::size_t roleAuthored = get("role_authored_reports");
+  if (roleCalls + roleAuthored > 0) {
+    os << " Off the decision path (validation/reference roles, not counted above): " << roleCalls
+       << " ctx calls and " << roleAuthored << " authored-law uses; see `roles`.";
   }
   return os.str();
 }
@@ -248,11 +279,11 @@ void configure(const Options& options) {
   s.seq = 0;
   s.recordsPerCategory.clear();
   s.suppressed.clear();
-  s.calls.clear();
-  s.hooks.clear();
-  s.authored.clear();
+  tRole.clear();
+  s.session.clear();
+  s.batch.clear();
+  s.batches = 0;
   s.models.clear();
-  s.counters.clear();
   s.spans.clear();
   s.finished = options.level == Level::Off;
   if (options.level != Level::Off && !options.path.empty()) {
@@ -275,6 +306,22 @@ void configure(const Options& options) {
 }
 
 const Options& options() { return state().options; }
+
+bool isRole(std::string_view name) {
+  return name == "validation" || name == "reference" || name == "teacher" || name == "forced";
+}
+
+std::string setRole(std::string role) {
+  if (!role.empty() && !isRole(role)) {
+    throw std::invalid_argument("unknown trace role '" + role +
+                                "' (expected validation, reference, teacher or forced)");
+  }
+  std::string previous = std::move(tRole);
+  tRole = std::move(role);
+  return previous;
+}
+
+const std::string& role() { return tRole; }
 
 bool enabled(Level level, std::string_view category) {
   if (!at(level)) return false;
@@ -322,7 +369,8 @@ void countScript(std::string_view name, double amount) {
   if (!active()) return;
   auto& s = state();
   std::lock_guard<std::mutex> lock(s.mutex);
-  s.counters[std::string(name)] += amount;
+  s.session.counters[std::string(name)] += amount;
+  s.batch.counters[std::string(name)] += amount;
 }
 
 std::uint64_t spanBegin(std::string_view category, std::string_view name) {
@@ -357,7 +405,10 @@ void countCall(std::string_view call, std::string_view outcome) {
   if (!active()) return;
   auto& s = state();
   std::lock_guard<std::mutex> lock(s.mutex);
-  s.calls[std::string(call)][std::string(outcome)] += 1;
+  for (auto* tallies : {&s.session, &s.batch}) {
+    auto& calls = tRole.empty() ? tallies->calls : tallies->roles[tRole].calls;
+    calls[std::string(call)][std::string(outcome)] += 1;
+  }
 }
 
 void countHook(std::string_view hook, std::size_t emits, std::size_t engineBackedCalls,
@@ -365,20 +416,27 @@ void countHook(std::string_view hook, std::size_t emits, std::size_t engineBacke
   if (!active()) return;
   auto& s = state();
   std::lock_guard<std::mutex> lock(s.mutex);
-  auto& t = s.hooks[std::string(hook)];
-  t.invocations += 1;
-  t.emits += emits;
-  t.engineCalls += engineCalls;
-  t.engineBackedCalls += engineBackedCalls;
-  if (engineBackedCalls > 0) t.invocationsWithEngine += 1;
-  else t.emitsWithoutInference += emits;
+  for (auto* tallies : {&s.session, &s.batch}) {
+    auto& t = tallies->hooks[std::string(hook)];
+    t.invocations += 1;
+    t.emits += emits;
+    t.engineCalls += engineCalls;
+    t.engineBackedCalls += engineBackedCalls;
+    if (engineBackedCalls > 0) t.invocationsWithEngine += 1;
+    else t.emitsWithoutInference += emits;
+  }
 }
 
 std::size_t countAuthored(std::string_view law) {
   if (!active()) return 0;
   auto& s = state();
   std::lock_guard<std::mutex> lock(s.mutex);
-  return ++s.authored[std::string(law)];
+  if (!tRole.empty()) {
+    ++s.batch.roles[tRole].authored[std::string(law)];
+    return ++s.session.roles[tRole].authored[std::string(law)];
+  }
+  ++s.batch.authored[std::string(law)];
+  return ++s.session.authored[std::string(law)];
 }
 
 void countModel(std::string_view name, bool loaded) {
@@ -393,13 +451,13 @@ nlohmann::json digest(const nlohmann::json& value, std::size_t maxBytes) {
   return digestImpl(value, 3, budget);
 }
 
-nlohmann::json summary() {
-  auto& s = state();
-  std::lock_guard<std::mutex> lock(s.mutex);
+namespace {
+
+nlohmann::json summarizeLocked(const State& s, const Tallies& t) {
   nlohmann::json calls = nlohmann::json::object();
   std::size_t total = 0, engine = 0;
   std::map<std::string, std::size_t> byOutcome;
-  for (const auto& [call, outcomes] : s.calls) {
+  for (const auto& [call, outcomes] : t.calls) {
     nlohmann::json row = nlohmann::json::object();
     std::size_t callTotal = 0;
     for (const auto& [outcome, n] : outcomes) {
@@ -414,19 +472,19 @@ nlohmann::json summary() {
   }
   nlohmann::json hooks = nlohmann::json::object();
   std::size_t emits = 0, bare = 0;
-  for (const auto& [hook, t] : s.hooks) {
-    hooks[hook] = {{"invocations", t.invocations},
-                   {"invocations_with_engine", t.invocationsWithEngine},
-                   {"engine_calls", t.engineCalls},
-                   {"engine_backed_calls", t.engineBackedCalls},
-                   {"emits", t.emits},
-                   {"emits_without_inference", t.emitsWithoutInference}};
-    emits += t.emits;
-    bare += t.emitsWithoutInference;
+  for (const auto& [hook, h] : t.hooks) {
+    hooks[hook] = {{"invocations", h.invocations},
+                   {"invocations_with_engine", h.invocationsWithEngine},
+                   {"engine_calls", h.engineCalls},
+                   {"engine_backed_calls", h.engineBackedCalls},
+                   {"emits", h.emits},
+                   {"emits_without_inference", h.emitsWithoutInference}};
+    emits += h.emits;
+    bare += h.emitsWithoutInference;
   }
   std::size_t authoredTotal = 0;
   nlohmann::json authored = nlohmann::json::object();
-  for (const auto& [law, n] : s.authored) {
+  for (const auto& [law, n] : t.authored) {
     authored[law] = n;
     authoredTotal += n;
   }
@@ -442,12 +500,89 @@ nlohmann::json summary() {
                            {"emits_without_inference", bare},
                            {"authored_reports", authoredTotal}};
   for (const auto& [outcome, n] : byOutcome) totals[outcome] = n;
+  nlohmann::json roles = nlohmann::json::object();
+  std::size_t roleCalls = 0, roleAuthored = 0;
+  for (const auto& [name, r] : t.roles) {
+    nlohmann::json row = {{"calls", nlohmann::json::object()}, {"authored", r.authored}};
+    std::size_t callsN = 0, engineN = 0, authoredN = 0;
+    for (const auto& [call, outcomes] : r.calls) {
+      for (const auto& [outcome, n] : outcomes) {
+        row["calls"][call][outcome] = n;
+        callsN += n;
+        if (isEngineBacked(outcome)) engineN += n;
+      }
+    }
+    for (const auto& [law, n] : r.authored) authoredN += n;
+    row["totals"] = {{"calls", callsN}, {"engine_backed", engineN}, {"authored_reports", authoredN}};
+    roles[name] = row;
+    roleCalls += callsN;
+    roleAuthored += authoredN;
+  }
+  if (!t.roles.empty()) {
+    totals["role_calls"] = roleCalls;
+    totals["role_authored_reports"] = roleAuthored;
+  }
   nlohmann::json out = {{"totals", totals}, {"calls", calls},       {"hooks", hooks},
                         {"authored", authored}, {"models", models}, {"verdict", verdict(totals)}};
+  if (!t.roles.empty()) out["roles"] = roles;
   if (!missing.empty()) out["models_missing"] = missing;
   if (!s.suppressed.empty()) out["suppressed_records"] = s.suppressed;
-  if (!s.counters.empty()) out["counters"] = s.counters;
+  if (!t.counters.empty()) out["counters"] = t.counters;
   return out;
+}
+
+}  // namespace
+
+nlohmann::json summary() {
+  auto& s = state();
+  std::lock_guard<std::mutex> lock(s.mutex);
+  nlohmann::json out = summarizeLocked(s, s.session);
+  if (s.batches > 0) out["batches"] = s.batches;
+  return out;
+}
+
+nlohmann::json batchSummary(long long runId) {
+  if (!active()) return nullptr;
+  auto& s = state();
+  std::lock_guard<std::mutex> lock(s.mutex);
+  if (s.finished) return nullptr;
+  nlohmann::json report = summarizeLocked(s, s.batch);
+  // Session-wide sections stay in the run summary; a batch lists only what happened in it.
+  report.erase("suppressed_records");
+  ++s.batches;
+  report["batch"] = s.batches;
+  if (runId >= 0) report["run_id"] = runId;
+  s.batch.clear();
+  if (s.file.is_open()) {
+    nlohmann::json line = {{"schema", "trech_trace_v1"}, {"seq", ++s.seq},  {"level", "summary"},
+                           {"cat", "summary"},           {"msg", "batch attribution summary"},
+                           {"data", report}};
+    s.file << line.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) << '\n';
+    s.file.flush();
+  }
+  nlohmann::json cats = nlohmann::json::array();
+  for (const auto& c : s.options.categories) cats.push_back(c);
+  const std::string dumped = report.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+  std::uint64_t hash = 14695981039346656037ull;
+  for (unsigned char c : dumped) {
+    hash ^= c;
+    hash *= 1099511628211ull;
+  }
+  std::ostringstream hex;
+  hex << std::hex;
+  hex.width(16);
+  hex.fill('0');
+  hex << hash;
+  nlohmann::json ref = {{"schema", "trech_trace_ref_v1"},
+                        {"level", levelName(s.options.level)},
+                        {"categories", cats},
+                        {"path", s.options.path},
+                        {"batch", s.batches},
+                        {"seq", s.seq},
+                        {"summary_hash", hex.str()},
+                        {"totals", report.at("totals")},
+                        {"verdict", report.at("verdict")}};
+  return ref;
 }
 
 void finish() {

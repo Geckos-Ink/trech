@@ -125,6 +125,11 @@ struct ProvenanceRecord {
   // onInit override leaves the patcher did not apply; `hook_patch_ignored_paths`
   // is written only when non-empty.
   std::vector<std::string> hookPatchIgnoredPaths;
+  // run_end only, when the engine trace is on: canonical JSON of trace::batchSummary() (level,
+  // categories, trace file path, batch index, summary hash, totals, verdict), written as `trace`.
+  // Empty (and absent) when tracing is off, so untraced records keep their bytes. Never part of
+  // config_json or config_hash.
+  std::string traceJson;
   // Post-construction Geant4 overlap check; the `geometry_overlap_check` block
   // is written only when it ran.
   bool geometryOverlapCheckRan = false;

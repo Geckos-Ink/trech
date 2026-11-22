@@ -18,14 +18,39 @@ dated record below, and queue its residuals in the same change.
 
 - **P2** · R3 · Engine trace adoption: the trace sees a `null` engine result but not the authored law the scenario runs next. Add `ctx.authored(law)` at every residual-law fallback in the migration ledger (scenario purity report), then cross-check the static ledger against runtime `authored` counts per scenario in the validation suite. ([engine trace](#engine-trace-2026-11-22))
 - **P2** · R4 · Engine trace depth: attribution is per hook invocation, not per emitted value (an invocation with one engine call and one unreported authored law counts as engine-backed). Carry value-level origin (lineage) into emit records, and trace the inner decisions of `RivalArbitration` (evolve/react/cascade/interact rivals), cascade stages and `ctx.evolve` operator routing as their own categories instead of only the `trace`-level result digest. ([engine trace](#engine-trace-2026-11-22))
-- **P2** · R1 · Engine trace and provenance: record the trace summary (or its path and digest) in `run_end` provenance when tracing is on, and split the summary per `trech lab` batch (today one summary covers the session); keep it out of the config hash. ([engine trace](#engine-trace-2026-11-22))
-- **P2** · R6 · Studio engine trace residuals: link a trace row to its emit/timeline frame (`hook`+`event` → Emits tab), add a per-hook attribution view of the summary (`emits_without_inference` per hook), and change the level of a running live lab (today it applies from the next start). No committed reference capture of the panel yet. ([script logging and Studio panel](#script-logging-and-studio-trace-panel-2026-11-22))
-- **P3** · R3 · Library logging residuals: `trech_helpers.js` and the scenario companions (`.validation.js`, `.ui.js`, `.view.js`) have no channel yet; reference solvers report `authored` from inside the library, so a validation companion running one is counted with the normal path (the trace cannot tell a reference run from a normal-path use until companions report their role). ([library channels](#library-trace-channels-2026-11-22))
+- **P2** · R6 · Studio engine trace residuals: link a trace row to its emit/timeline frame (`hook`+`event` → Emits tab), show the summary's `roles` (validation/reference work) in the Attribution tab, and change the level of a running live lab (today it applies from the next start). No committed reference capture of the panel yet. ([script logging and Studio panel](#script-logging-and-studio-trace-panel-2026-11-22), [batches and roles](#trace-batches-provenance-and-roles-2026-11-22))
+- **P3** · R3 · Library logging residuals: `trech_helpers.js` and the `.ui.js`/`.view.js` companions have no channel and no role. The host wraps only the functions of a validation companion's `TRECH_CHECKS[<stem>]` entry: a companion that registers under another key, or a scenario that runs a reference solver outside its companion without `TRECH_TRACE.role`, is still counted as the scenario's own path. ([library channels](#library-trace-channels-2026-11-22), [batches and roles](#trace-batches-provenance-and-roles-2026-11-22))
+- **P3** · R1 · Trace reference checks: the validation suite does not yet read the `run_end` `trace` reference or check its `summary_hash` against the trace file's batch record; a run that fails before `run_end` has no reference (only the trace file's run summary). ([batches and roles](#trace-batches-provenance-and-roles-2026-11-22))
 - **P3** · R5 · Engine trace Geant4 categories: physics list/process registration, per-run process tallies and geometry resolution as `geant4` trace records, so the base-of-truth side of a run is as visible as the inference side. ([engine trace](#engine-trace-2026-11-22))
 - **P2** · R1 · Runtime (non-`onInit`) hooks cannot patch config, so ignored-override reporting covers `onInit` only; decide whether later hooks may patch at all before extending it. (dated records below)
 - **P2** · R5 · Sweep the three PubChem-dependent scenarios (`beaker_water_n_pentane`, its Studio variant, `testscenario_h2o_electrolysis_combustion`) through inspect/type/unknown-key checks once a PubChem cache is present. (dated records below)
 
 ## Delivery records
+
+<a name="trace-batches-provenance-and-roles-2026-11-22"></a>
+
+- [x] Trace batches, provenance reference and roles (2026-11-22). `trace::batchSummary(runId)`
+  (called by `TrechRunAction::EndOfRunAction` on the master) writes a `batch attribution summary`
+  per Geant4 run (the first also covers configuration and `onInit`) and returns a
+  `trech_trace_ref_v1` reference (level, categories, path, batch, seq, FNV-1a `summary_hash`,
+  totals, verdict) that `run_end` provenance stores as `trace` only while tracing; the run summary
+  still covers the session and gains `batches`. Roles: `TRECH_TRACE.role(role, fn)` (QuickJS, V8,
+  Node) and the host's wrapping of validation-companion functions tally `validation`/`reference`/
+  `teacher`/`forced` work under `roles`, stamp `role` on records, and keep it out of the hooks'
+  engine backing and the scenario totals. Studio's trace panel shows each batch verdict, then the
+  run verdict, and an **Attribution** tab per hook for the run or one batch. Effect on the lamp:
+  its validation companion's three `ctx.evolveField` calls move to `roles.validation`; on the
+  furnace likewise (25 own engine calls, 3 validation calls). Verification: `trech_engine_trace`
+  (batch numbering, per-batch counts, session totals, reference fields, off → null; roles:
+  companion and `role()` tallies, unknown label rejected traced and untraced, `this` kept, role
+  restored, emits/config identical) on Release, on the V8 build and with `TRECH_JS_ENGINE=v8`;
+  `trech_provenance_writer`; Node `ml.test.js` 23/23; Studio `test_trace_log.py` 7/7 (a real run
+  checks the `run_end` reference). End to end: Briggs–Rauscher run (emits and scores identical
+  traced/untraced; only the traced `run_end` has `trace`), a two-batch `trech lab` (batch emits 8
+  and 10, session 18, distinct hashes), glass furnace identical traced/untraced; the lava lamp is
+  identical with `TRECH_COMPUTE_BUDGET` pinned (unpinned, two untraced runs already differ in the
+  twin evidence: the queued [deterministic learner capacity](../lattice/ROADMAP.md#priority-queue)
+  item). Residuals queued above.
 
 <a name="library-trace-channels-2026-11-22"></a>
 

@@ -70,8 +70,11 @@ are pure (no Qt) and unit-tested headless. `settings.py` holds app settings.
 2026-11-22: its Level/Categories become `--trace`/`--trace-file` for the next run and live lab via
 `command_args`; `begin`/`poll`/`finish` tail `<output>/trech_trace.jsonl` through the Qt-free
 [`engine/trace_feed.py`](../../../studio/trech_studio/engine/trace_feed.py) `TraceTail`; display-only
-`TraceFilter` (level, categories, search; summary and warn/error always shown); the summary's
-`verdict` goes to the banner; Level/Categories persist in `QSettings("TRECH","Studio")` under
+`TraceFilter` (level, categories, search; summary and warn/error always shown); `summary_kind`
+tells a `batch attribution summary` from the run summary, each verdict goes to the banner
+(`Batch N attribution: …`, then `Run attribution (N batches): …`); the right-hand **Attribution**
+tab (`scope` combo: Run, Batch 1…N; `hooks` table from `hook_attribution`, sorted by
+`emits_without_inference`, with the backed share) breaks a summary down per hook; Level/Categories persist in `QSettings("TRECH","Studio")` under
 `trace/*`; an opened output dir loads its trace; tests `studio/tests/test_trace_log.py` incl. a real
 engine run), [`run_summary.py`](../../../studio/trech_studio/ui/run_summary.py) (sectioned run header from
 `studio/trech_studio/run_summary.py`), [`emits.py`](../../../studio/trech_studio/ui/emits.py) (tag-filtered hook-emit browser;

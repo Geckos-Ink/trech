@@ -224,6 +224,13 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   Present on both provenance phases when a registry or separate loader is configured.
 - `lab_script` (object, optional): the [hook script identity](#lab-script-identity) of a
   scenario-backed `trech lab` batch; absent otherwise.
+- `trace` (object, optional, `run_end` only): written only when the [engine trace](engine_trace.md)
+  is on. It is a reference to the batch's trace summary, so a provenance record says whether and
+  how the run was traced: `schema` (`trech_trace_ref_v1`), `level`, `categories`, `path` (the
+  trace file, empty when none), `batch` (1 for the first Geant4 run, then one per `trech lab`
+  batch), `seq` (records written so far), `summary_hash` (FNV-1a 64 of the batch summary JSON),
+  `totals` and `verdict` (the batch summary's). It never enters `config_json` or `config_hash`,
+  and untraced records have no `trace` key.
 
 Example:
 
@@ -1121,7 +1128,8 @@ See [`spectrum_prediction.md`](../research/spectrum_prediction.md).
 
 Written only when the [engine trace](engine_trace.md) is on (`--trace` or `TRECH_TRACE`), at
 `<output>/trech_trace.jsonl` unless `--trace-file` names another path. It records observations
-only. It is not part of provenance and does not enter the config hash. Each line is one record:
+only and does not enter the config hash. Each `run_end` provenance record of a traced run
+points at it through [`trace`](#trech_provenancejsonl). Each line is one record:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
@@ -1132,6 +1140,7 @@ only. It is not part of provenance and does not enter the config hash. Each line
 | `msg` | string | A short description, the hook name, or the law name for `authored`. |
 | `severity` | string | `warn` or `error` for script warnings (`TRECH_TRACE.warn/error`, `console.warn/error`); absent otherwise. |
 | `hook`, `event`, `step` | string, integer, integer | The hook invocation that wrote the record (omitted outside a hook, or when not applicable). |
+| `role` | string | `validation`, `reference`, `teacher` or `forced` when the record was written by code running under that [role](engine_trace.md#validation-and-reference-code-roles); absent on the scenario's own path. |
 | `data` | object | The record's payload, described below. |
 
 Payloads:
@@ -1154,13 +1163,19 @@ Payloads:
 - `scenario`: the `data` passed to `ctx.log` / `TRECH_LOG`; `authored`: the `detail`.
 - `script`, `console` and channel categories (`TRECH_TRACE.channel(name)`): the `data` passed.
   A span record has `{span, duration_ms, data?}`.
-- `summary` (always the last line): `totals{calls, engine_backed, emits,
+- `summary`, `batch attribution summary` (one per Geant4 run, written at its end): the same
+  sections as the run summary, counted since the previous batch summary (the first batch also
+  covers configuration and `onInit`), plus `batch` (1, 2, …) and `run_id`. `models` stays
+  session-wide; `suppressed_records` appears only in the run summary.
+- `summary`, `run attribution summary` (always the last line): `batches` (when any batch ended) and `totals{calls, engine_backed, emits,
   emits_without_inference, authored_reports, <outcome>...}`, `calls{<call>:{<outcome>:n,
   total}}`, `hooks{<hook>:{invocations, invocations_with_engine, engine_calls,
   engine_backed_calls, emits, emits_without_inference}}`, `authored{<law>:n}`,
   `models{<name>:"loaded"|"missing"}`, `models_missing` when any, `suppressed_records` when a
-  category reached its cap, `counters{<channel>.<name>:n}` when a script counted, and a
-  plain-language `verdict`.
+  category reached its cap, `counters{<channel>.<name>:n}` when a script counted,
+  `roles{<role>:{calls{<call>:{<outcome>:n}}, authored{<law>:n}, totals{calls, engine_backed,
+  authored_reports}}}` plus `totals.role_calls` and `totals.role_authored_reports` when code ran
+  under a role (those are not in the other counts), and a plain-language `verdict`.
 
 ## trech_event_scores.jsonl
 

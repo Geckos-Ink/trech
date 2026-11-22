@@ -213,6 +213,9 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   if (!record.hookPatchIgnoredPaths.empty()) {
     j["hook_patch_ignored_paths"] = record.hookPatchIgnoredPaths;
   }
+  if (!record.traceJson.empty()) {
+    j["trace"] = nlohmann::json::parse(record.traceJson);
+  }
 
   if (record.geometryRefused) {
     j["geometry_refusal"] = {{"schema", "trech_geometry_refusal_v1"},

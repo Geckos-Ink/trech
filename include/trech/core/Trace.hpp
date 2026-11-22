@@ -83,6 +83,17 @@ struct Scope {
   long long previousStep_;
 };
 
+// Purpose role of the code running on this thread: "" (the scenario's own path) or one of
+// "validation", "reference", "teacher", "forced" (the labels the project principles require for
+// code that names or forces a method off the decision path). Set by TRECH_TRACE.role(role, fn)
+// and by the JS host around a validation companion's functions. While a role is set, records are
+// stamped with `role`, and ctx calls and authored laws are tallied under `roles` in the summary
+// instead of the scenario's own counts. setRole returns the previous role so callers can restore
+// it; an unknown name throws std::invalid_argument.
+std::string setRole(std::string role);
+const std::string& role();
+bool isRole(std::string_view name);
+
 // Writes one record when `enabled(level, category)`. `data` may be null. A `severity` of
 // "warn" or "error" is stamped on the record; when the level or category is not recorded, such a
 // record is printed on stderr instead (`TRECH js warn: ...`), so a script's warnings are never silently lost.
@@ -113,6 +124,14 @@ nlohmann::json digest(const nlohmann::json& value, std::size_t maxBytes);
 // The run summary: attribution per ctx call, per hook, authored laws, models, suppressed records,
 // and a short plain-language verdict.
 nlohmann::json summary();
+
+// Closes one batch (one Geant4 run; `trech lab` runs several per session): writes a
+// `batch attribution summary` record covering everything since the previous batch summary (the
+// first batch also covers configuration and onInit), resets the batch counters and returns the
+// reference that run_end provenance stores as `trace` (schema `trech_trace_ref_v1`: level,
+// categories, path, batch index, record sequence, summary hash, totals, verdict). Returns null when
+// tracing is off, so untraced provenance keeps its shape. The run summary still covers the session.
+nlohmann::json batchSummary(long long runId = -1);
 
 // Writes the summary (record + stderr table when level >= Summary) and flushes/closes the sink.
 // Idempotent until the next configure().

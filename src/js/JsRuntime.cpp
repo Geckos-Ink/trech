@@ -6089,6 +6089,15 @@ static JSValue evalScenarioSource(JSContext* ctx, JsRuntimeState* state,
     JSValue result = evaluate(source);
     if (JS_IsException(result)) { JS_FreeValue(ctx, descriptor); return result; }
     JS_FreeValue(ctx, result);
+    // While tracing, a validation companion's functions run under the "validation" role, so the
+    // engine methods it grades and the reference laws it runs are not counted as the scenario's
+    // own path. Untraced runs never install the wrapper.
+    if (std::string(role) == ".validation" && trech::trace::active()) {
+      const std::string wrap = "TRECH_TRACE.__wrapCompanion(" + nlohmann::json(stem).dump() + ", \"validation\")";
+      JSValue wrapped = JS_Eval(ctx, wrap.c_str(), wrap.size(), "<trech-trace-companion>", JS_EVAL_TYPE_GLOBAL);
+      if (JS_IsException(wrapped)) { JS_FreeValue(ctx, descriptor); return wrapped; }
+      JS_FreeValue(ctx, wrapped);
+    }
     if (std::string(role) == ".ui") {
       JSValue global = JS_GetGlobalObject(ctx);
       descriptor = JS_GetPropertyStr(ctx, global, "TRECH_UI_DESCRIPTOR");
@@ -6233,8 +6242,12 @@ static JSValue jsTracedCall(JSContext* ctx, JSValueConst thisVal, int argc, JSVa
   JSValue result = Inner(ctx, thisVal, argc, argv);
   if (!state || !trech::trace::active()) return result;
   const char* outcome = traceOutcome(ctx, state, result);
-  state->callEngineCalls += 1;
-  if (traceEngineBacked(outcome)) state->callEngineBacked += 1;
+  // A call made under a purpose role (a validation companion grading engine methods) is tallied
+  // under that role; it never makes the hook's own emits count as engine-backed.
+  if (trech::trace::role().empty()) {
+    state->callEngineCalls += 1;
+    if (traceEngineBacked(outcome)) state->callEngineBacked += 1;
+  }
   trech::trace::countCall(Call, outcome);
   if (trech::trace::enabled(trech::trace::Level::Trace, Call)) {
     const std::size_t budget = trech::trace::options().maxDigestBytes;
@@ -6295,7 +6308,7 @@ static JSValue jsTraceAuthored(JSContext* ctx, JSValueConst, int argc, JSValueCo
   auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
   const std::string law = traceStringArg(ctx, argc, argv, 0, "unnamed");
   const std::size_t uses = trech::trace::countAuthored(law);
-  if (state) state->callAuthored += 1;
+  if (state && trech::trace::role().empty()) state->callAuthored += 1;
   // Every use is counted; records are thinned to uses 1, 2, 4, 8, ... so a law called in an
   // inner loop (a reference solver's step) cannot fill the category cap.
   const bool powerOfTwo = uses != 0 && (uses & (uses - 1)) == 0;
@@ -6381,6 +6394,17 @@ static JSValue jsTraceSpanBegin(JSContext* ctx, JSValueConst, int argc, JSValueC
   return JS_NewFloat64(ctx, static_cast<double>(id));
 }
 
+// __TRECH_TRACE_ROLE(role) -> previous role: sets the purpose role of the code that runs next on
+// this thread ("" clears it). The bootstrap's TRECH_TRACE.role(role, fn) restores it in a finally.
+static JSValue jsTraceRole(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  try {
+    const std::string previous = trech::trace::setRole(traceStringArg(ctx, argc, argv, 0, ""));
+    return JS_NewString(ctx, previous.c_str());
+  } catch (const std::exception& error) {
+    return JS_ThrowTypeError(ctx, "TRECH_TRACE.role: %s", error.what());
+  }
+}
+
 // __TRECH_TRACE_SPAN_END(id, data?)
 static JSValue jsTraceSpanEnd(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
   double id = 0.0;
@@ -6429,9 +6453,42 @@ static constexpr const char* kTrechTraceBootstrap = R"JS(
     return api;
   }
   var root = channel("script");
+  var ROLES = ["validation", "reference", "teacher", "forced"];
   root.channel = function(category) { return Object.freeze(channel(category)); };
   root.level = function() { return global.__TRECH_TRACE_LEVEL(); };
   root.authored = function(law, detail) { global.__TRECH_TRACE_AUTHORED(law, detail); };
+  // role(role, fn): runs fn as validation/reference/teacher/forced code. Its ctx calls and
+  // authored laws are counted under `roles`, off the scenario's own path. With the trace off it
+  // only calls fn.
+  root.role = function(role, fn) {
+    if (typeof fn !== "function") throw new TypeError("TRECH_TRACE.role(role, fn) needs a function");
+    // Checked with the trace off too, so a wrong label fails the same way in every run.
+    if (ROLES.indexOf(String(role)) < 0) {
+      throw new TypeError("TRECH_TRACE.role: unknown role '" + role + "' (expected " + ROLES.join(", ") + ")");
+    }
+    if (global.__TRECH_TRACE_LEVEL() === "off") return fn();
+    var previous = global.__TRECH_TRACE_ROLE(String(role));
+    try { return fn(); } finally { global.__TRECH_TRACE_ROLE(previous); }
+  };
+  // Wraps every function of a companion's TRECH_CHECKS entry in role(role, ...). The host calls
+  // it after loading a .validation.js companion, only while tracing.
+  root.__wrapCompanion = function(key, role) {
+    var checks = global.TRECH_CHECKS && global.TRECH_CHECKS[key];
+    if (!checks || typeof checks !== "object") return 0;
+    var n = 0;
+    Object.keys(checks).forEach(function(name) {
+      var fn = checks[name];
+      if (typeof fn !== "function" || fn.__trechRole) return;
+      var wrapped = function() {
+        var self = this, args = arguments;
+        return root.role(role, function() { return fn.apply(self, args); });
+      };
+      wrapped.__trechRole = role;
+      checks[name] = wrapped;
+      n++;
+    });
+    return n;
+  };
   root.host = "trech";
   global.TRECH_TRACE = Object.freeze(root);
   // console.* routes into the trace (category "console") on QuickJS and V8 alike, so a script
@@ -6457,6 +6514,7 @@ static void installTraceHelpers(JSContext* ctx) {
   JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_ENABLED", JS_NewCFunction(ctx, jsTraceEnabled, "__TRECH_TRACE_ENABLED", 2));
   JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_LEVEL", JS_NewCFunction(ctx, jsTraceLevel, "__TRECH_TRACE_LEVEL", 0));
   JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_COUNT", JS_NewCFunction(ctx, jsTraceCount, "__TRECH_TRACE_COUNT", 2));
+  JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_ROLE", JS_NewCFunction(ctx, jsTraceRole, "__TRECH_TRACE_ROLE", 1));
   JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_SPAN_BEGIN", JS_NewCFunction(ctx, jsTraceSpanBegin, "__TRECH_TRACE_SPAN_BEGIN", 2));
   JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_SPAN_END", JS_NewCFunction(ctx, jsTraceSpanEnd, "__TRECH_TRACE_SPAN_END", 2));
   JS_SetPropertyStr(ctx, global, "__TRECH_TRACE_AUTHORED", JS_NewCFunction(ctx, jsTraceAuthored, "__TRECH_TRACE_AUTHORED", 2));

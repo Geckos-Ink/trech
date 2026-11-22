@@ -9,8 +9,11 @@ The panel does two jobs:
   (:class:`~trech_studio.engine.trace_feed.TraceTail`) and appends each record as it arrives.
   Lowering the level or narrowing the categories filters what is shown at once. Raising them
   applies from the next run, because a running engine cannot record more than it was asked for.
-  The run attribution summary, which says how much of the run the engine answered, appears in
-  the banner when the run ends.
+  Each batch's attribution summary (one per Geant4 run, several in a live lab) and then the run
+  summary, which say how much of the run the engine answered, appear in the banner as they arrive.
+* **Attribute.** The *Attribution* tab lists every hook of the run or of one batch with its
+  invocations, emits and the emits that had no engine result behind them, those first, so the
+  hooks that rest on authored JavaScript or bare Geant4 tallies stand out.
 
 Studio stays a viewer: the panel never changes what the engine computes, and the trace itself
 is observation-only.
@@ -25,11 +28,11 @@ from typing import Any, Dict, List, Optional
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QPlainTextEdit, QPushButton, QSplitter, QTableView, QVBoxLayout,
-                               QWidget)
+                               QLineEdit, QPlainTextEdit, QPushButton, QSplitter, QTableView, QTableWidget,
+                               QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget)
 
-from ..engine.trace_feed import (LEVELS, TRACE_FILE, TraceFilter, TraceTail, compact, parse_categories,
-                                 trace_args, where)
+from ..engine.trace_feed import (HOOK_COLUMNS, LEVELS, TRACE_FILE, TraceFilter, TraceTail, compact,
+                                 hook_attribution, parse_categories, summary_kind, trace_args, where)
 
 MAX_RECORDS = 50000
 COLUMNS = ("#", "Level", "Category", "Where", "Message", "Data")
@@ -131,6 +134,7 @@ class TraceLogPanel(QWidget):
         self._settings = settings if settings is not None else QSettings("TRECH", "Studio")
         self._tail: Optional[TraceTail] = None
         self._summary: Optional[Dict[str, Any]] = None
+        self._batches: List[Dict[str, Any]] = []
         self._run_level = "off"
 
         self.level = QComboBox(self)
@@ -171,6 +175,24 @@ class TraceLogPanel(QWidget):
         self.details.setReadOnly(True)
         self.details.setFont(font)
         self.details.setPlaceholderText("Select a record to see it in full.")
+        self.scope = QComboBox(self)
+        self.scope.setToolTip("Which attribution summary to break down per hook: the whole run or one batch.")
+        self.hooks = QTableWidget(0, len(HOOK_COLUMNS), self)
+        self.hooks.setHorizontalHeaderLabels(list(HOOK_COLUMNS))
+        self.hooks.verticalHeader().setVisible(False)
+        self.hooks.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.hooks.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.hooks.horizontalHeader().setStretchLastSection(True)
+        self.hooks.setToolTip("Emits without inference came from hook calls with no engine-backed ctx.* result: "
+                              "Geant4 tallies or scenario-authored JavaScript.")
+        attribution = QWidget(self)
+        attribution_layout = QVBoxLayout(attribution)
+        attribution_layout.setContentsMargins(0, 0, 0, 0)
+        attribution_layout.addWidget(self.scope)
+        attribution_layout.addWidget(self.hooks, 1)
+        self.side = QTabWidget(self)
+        self.side.addTab(self.details, "Record")
+        self.side.addTab(attribution, "Attribution")
 
         bar = QHBoxLayout()
         bar.addWidget(QLabel("Level", self))
@@ -182,7 +204,7 @@ class TraceLogPanel(QWidget):
         bar.addWidget(self.clear_button)
         split = QSplitter(Qt.Horizontal, self)
         split.addWidget(self.table)
-        split.addWidget(self.details)
+        split.addWidget(self.side)
         split.setStretchFactor(0, 3)
         split.setStretchFactor(1, 1)
         layout = QVBoxLayout(self)
@@ -199,6 +221,7 @@ class TraceLogPanel(QWidget):
         self.search.textChanged.connect(self._on_search)
         self.clear_button.clicked.connect(self.clear)
         self.table.selectionModel().currentRowChanged.connect(self._on_row)
+        self.scope.currentIndexChanged.connect(self._show_hooks)
         self._apply_filter()
 
     # --- request ----------------------------------------------------------------------
@@ -254,7 +277,10 @@ class TraceLogPanel(QWidget):
             self.model.clear()
         records = self._tail.poll()
         for record in records:
-            if record.get("cat") == "summary":
+            kind = summary_kind(record)
+            if kind == "batch":
+                self._show_batch(record.get("data") or {})
+            elif kind == "run":
                 self._show_summary(record.get("data") or {})
         shown = self.model.append(records)
         if shown and self.follow.isChecked():
@@ -275,12 +301,23 @@ class TraceLogPanel(QWidget):
         self.model.clear()
         self.details.clear()
         self._summary = None
+        self._batches = []
+        self._refresh_scopes()
 
     def record_count(self) -> int:
         return self.model.rowCount()
 
     def summary(self) -> Optional[Dict[str, Any]]:
+        """The run attribution summary (``None`` until the run ends)."""
         return self._summary
+
+    def batch_summaries(self) -> List[Dict[str, Any]]:
+        """Per-batch attribution summaries received so far, in order."""
+        return list(self._batches)
+
+    def hook_rows(self) -> List[Dict[str, Any]]:
+        """Rows the Attribution tab shows for the selected scope."""
+        return hook_attribution(self._scope_summary())
 
     # --- internals --------------------------------------------------------------------
 
@@ -289,7 +326,57 @@ class TraceLogPanel(QWidget):
         verdict = str(data.get("verdict", "run summary received"))
         missing = data.get("models_missing") or []
         extra = f"  Missing models: {', '.join(map(str, missing))}." if missing else ""
-        self.banner.setText(f"Run attribution: {verdict}{extra}")
+        batches = int(data.get("batches", 0) or 0)
+        scope = f"Run attribution ({batches} batches)" if batches > 1 else "Run attribution"
+        self.banner.setText(f"{scope}: {verdict}{extra}")
+        self._refresh_scopes(select_run=True)
+
+    def _show_batch(self, data: Dict[str, Any]) -> None:
+        self._batches.append(data)
+        index = data.get("batch", len(self._batches))
+        self.banner.setText(f"Batch {index} attribution: {data.get('verdict', 'batch summary received')}")
+        self._refresh_scopes(select_last=True)
+
+    def _refresh_scopes(self, select_run: bool = False, select_last: bool = False) -> None:
+        labels = (["Run"] if self._summary is not None else []) + [
+            f"Batch {b.get('batch', i + 1)}" for i, b in enumerate(self._batches)]
+        current = self.scope.currentText()
+        self.scope.blockSignals(True)
+        self.scope.clear()
+        self.scope.addItems(labels)
+        if select_run and labels:
+            self.scope.setCurrentIndex(0)
+        elif select_last and labels:
+            self.scope.setCurrentIndex(len(labels) - 1)
+        elif current in labels:
+            self.scope.setCurrentText(current)
+        self.scope.blockSignals(False)
+        self._show_hooks()
+
+    def _scope_summary(self) -> Optional[Dict[str, Any]]:
+        text = self.scope.currentText()
+        if text == "Run":
+            return self._summary
+        if text.startswith("Batch "):
+            for i, batch in enumerate(self._batches):
+                if f"Batch {batch.get('batch', i + 1)}" == text:
+                    return batch
+        return None
+
+    def _show_hooks(self, *_args: Any) -> None:
+        rows = hook_attribution(self._scope_summary())
+        self.hooks.setRowCount(len(rows))
+        for r, row in enumerate(rows):
+            backed = "" if row["backed"] is None else f"{100.0 * row['backed']:.0f}%"
+            values = (row["hook"], row["invocations"], row["invocations_with_engine"], row["emits"],
+                      row["emits_without_inference"], backed)
+            for c, value in enumerate(values):
+                item = QTableWidgetItem(str(value))
+                if c and c < 5:
+                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                if c == 4 and row["emits_without_inference"]:
+                    item.setForeground(QBrush(QColor(_COLORS["warn"])))
+                self.hooks.setItem(r, c, item)
 
     def _apply_filter(self) -> None:
         self.model.filter = TraceFilter(level=self.requested_level() if self.requested_level() != "off" else "trace",

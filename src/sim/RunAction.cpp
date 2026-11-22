@@ -8,6 +8,7 @@
 #include "trech/sim/KleinNishina.hpp"
 #include "trech/sim/PhotonuclearKinematics.hpp"
 #include "trech/core/SimulationBudget.hpp"
+#include "trech/core/Trace.hpp"
 
 #include "trech/core/Config.hpp"
 #include "trech/js/DeterministicMath.h"
@@ -1873,6 +1874,10 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   copyGeometryIssues(options_, record);
   record.configUnknownKeys = cfg_.unknownKeys;
   record.hookPatchIgnoredPaths = activeHookInit_.ignoredPatchPaths;
+  // Observation-only: closes this batch's trace summary and stores its reference (null when off).
+  if (const auto traceRef = trace::batchSummary(activeRunId_); !traceRef.is_null()) {
+    record.traceJson = traceRef.dump();
+  }
   provenance_.write(record);
 }
 

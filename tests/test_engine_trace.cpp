@@ -313,6 +313,115 @@ int main() {
     expect(emitsPerEngine[0] == emitsPerEngine[1], "V8 and QuickJS emit the same values");
   }
 
+  // Batches (one Geant4 run each; a lab session has several): every batch summary covers only
+  // what happened since the previous one, the run summary covers the session, and the provenance
+  // reference is stable for identical batches.
+  {
+    trech::trace::Options batches;
+    batches.level = trech::trace::Level::Summary;
+    batches.path = (fixture.path() / "batches.jsonl").string();
+    trech::trace::configure(batches);
+    (void)runScenario(strictScript);
+    const auto first = trech::trace::batchSummary(0);
+    (void)runScenario(strictScript);
+    const auto second = trech::trace::batchSummary(1);
+    expect(first.value("schema", std::string()) == "trech_trace_ref_v1" && first.at("batch") == 1 &&
+               second.at("batch") == 2,
+           "batch references are numbered: " + first.dump());
+    expect(first.at("totals").value("calls", 0) == 4 && second.at("totals").value("calls", 0) == 4,
+           "each batch counts only its own calls: " + second.dump());
+    expect(first.at("summary_hash") == second.at("summary_hash") ||
+               first.at("summary_hash").get<std::string>().size() == 16,
+           "the reference carries a 16-hex summary hash");
+    expect(first.at("path") == batches.path && first.at("level") == "summary" && first.contains("verdict"),
+           "the reference names the trace file, level and verdict");
+    const auto session = trech::trace::summary();
+    expect(session.at("totals").value("calls", 0) == 8 && session.value("batches", 0) == 2,
+           "the run summary still covers the whole session: " + session.dump());
+    trech::trace::finish();
+    const auto lines = readTrace(batches.path);
+    std::size_t batchLines = 0;
+    for (const auto& r : lines) {
+      if (r.value("msg", std::string()) == "batch attribution summary") {
+        ++batchLines;
+        expect(r.at("data").at("batch") == batchLines && r.at("data").at("run_id") == batchLines - 1,
+               "batch records carry their index and run id: " + r.dump());
+      }
+    }
+    expect(batchLines == 2 && lines.back().value("msg", std::string()) == "run attribution summary",
+           "two batch summaries, then the run summary");
+    trech::trace::configure({});
+    expect(trech::trace::batchSummary(0).is_null(), "no batch reference when tracing is off");
+  }
+
+  // Purpose roles: a validation companion's functions (wrapped by the host while tracing) and
+  // TRECH_TRACE.role(...) blocks are tallied under `roles`, never as the scenario's own path.
+  {
+    const auto bundle = fixture.path() / "roles";
+    fs::create_directories(bundle);
+    write(bundle / "roles.validation.js", R"JS(
+globalThis.TRECH_CHECKS = globalThis.TRECH_CHECKS || {};
+TRECH_CHECKS["roles"] = {
+  observe(ctx, x) {
+    ctx.authored("reference_law");
+    return { graded: ctx.predict("absent_reference", { x }) === null, self: this === TRECH_CHECKS["roles"] };
+  },
+};
+)JS");
+    write(bundle / "roles.js", R"JS(
+globalThis.TRECH_CONFIG = { run: { nEvents: 2, seed: 7 }, determinism: { mode: "strict" } };
+globalThis.TRECH_HOOKS = {
+  onEventEnd(ctx) {
+    const check = TRECH_CHECKS["roles"].observe(ctx, 2);
+    const forced = TRECH_TRACE.role("reference", () => { TRECH_TRACE.authored("forced_reference"); return 3; });
+    let rejected = false;
+    try { TRECH_TRACE.role("decision", () => 0); } catch (e) { rejected = e instanceof TypeError; }
+    const own = ctx.predict("absent_model", { x: 1 });
+    if (own === null) ctx.authored("own_fallback");
+    ctx.emit("v", { check, forced, rejected, u: ctx.rng.uniform() });
+  },
+  onRunEnd(ctx) { ctx.emit("t", { n: ctx.runtime.nEvents }); },
+};
+)JS");
+    trech::trace::configure({});
+    const auto plain = runScenario(bundle / "roles.js");
+    trech::trace::Options roles;
+    roles.level = trech::trace::Level::Debug;
+    roles.path = (fixture.path() / "roles.jsonl").string();
+    trech::trace::configure(roles);
+    const auto traced = runScenario(bundle / "roles.js");
+    expect(traced.emits == plain.emits && traced.config == plain.config,
+           "roles never change emits or config");
+    expect(!plain.emits.empty() && plain.emits.front().find("\"rejected\":true") != std::string::npos &&
+               plain.emits.front().find("\"self\":true") != std::string::npos,
+           "an unknown role is rejected and wrapped companions keep `this`: " +
+               (plain.emits.empty() ? std::string() : plain.emits.front()));
+    const auto summary = trech::trace::summary();
+    expect(summary.at("calls").size() == 1 && summary.at("calls").at("predict").value("null_strict", 0) == 2,
+           "only the scenario's own predict is in `calls`: " + summary.dump());
+    expect(summary.at("authored").size() == 1 && summary.at("authored").value("own_fallback", 0) == 2,
+           "only the scenario's own law is in `authored`");
+    const auto& byRole = summary.at("roles");
+    expect(byRole.at("validation").at("calls").at("predict").value("null_strict", 0) == 2 &&
+               byRole.at("validation").at("authored").value("reference_law", 0) == 2 &&
+               byRole.at("reference").at("authored").value("forced_reference", 0) == 2,
+           "companion and role() work is tallied per role: " + byRole.dump());
+    expect(summary.at("totals").value("calls", 0) == 2 && summary.at("totals").value("role_calls", 0) == 2 &&
+               summary.at("totals").value("role_authored_reports", 0) == 4,
+           "role work stays out of the scenario totals");
+    expect(summary.at("hooks").at("onEventEnd").value("engine_calls", 0) == 2,
+           "role calls never count toward a hook's engine calls");
+    expect(summary.at("verdict").get<std::string>().find("Off the decision path") != std::string::npos,
+           "the verdict names the role work");
+    trech::trace::finish();
+    std::size_t stamped = 0;
+    for (const auto& r : readTrace(roles.path)) {
+      if (r.value("cat", std::string()) == "authored" && r.contains("role")) ++stamped;
+    }
+    expect(stamped >= 2, "authored records under a role carry `role`");
+    expect(trech::trace::role().empty(), "the role is restored after every block");
+  }
+
   // Off: no file, the API is silent, warn/error still reach stderr, results unchanged.
   trech::trace::configure({});
   {

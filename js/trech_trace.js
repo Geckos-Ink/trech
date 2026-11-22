@@ -16,6 +16,8 @@
 (function(root) {
   'use strict';
   var LEVELS = { off: 0, summary: 1, info: 2, debug: 3, trace: 4 };
+  // Purpose roles of code off the decision path (as in the engine's TRECH_TRACE.role).
+  var ROLES = ['validation', 'reference', 'teacher', 'forced'];
 
   function parseLevel(name) {
     var key = String(name === undefined || name === null ? '' : name).trim().toLowerCase();
@@ -57,6 +59,8 @@
     var seq = 0;
     var counters = Object.create(null);
     var authored = Object.create(null);
+    var roles = Object.create(null);
+    var role = '';
 
     function enabled(wanted, category) {
       var w = LEVELS[parseLevel(wanted === undefined ? 'info' : wanted)] || LEVELS.info;
@@ -66,6 +70,7 @@
     function record(lvl, category, message, data, severity) {
       var rec = { schema: 'trech_trace_v1', seq: 0, level: lvl, cat: category, msg: text(message) };
       if (severity) rec.severity = severity;
+      if (role) rec.role = role;
       if (data !== undefined) rec.data = JSON.parse(JSON.stringify(data === undefined ? null : data));
       if (!enabled(lvl, category)) {
         if (severity === 'warn' || severity === 'error') loud(rec);
@@ -105,14 +110,29 @@
     api.authored = function(law, detail) {
       if (level === 'off') return;
       var name = String(law === undefined ? 'unnamed' : law);
-      const uses = authored[name] = (authored[name] || 0) + 1;
+      var table = role ? (roles[role] = roles[role] || { authored: Object.create(null) }).authored : authored;
+      const uses = table[name] = (table[name] || 0) + 1;
       // Every use is counted; records are thinned to uses 1, 2, 4, 8, ... (as in the engine).
       if ((uses & (uses - 1)) === 0) record('debug', 'authored', name, detail === undefined ? { uses: uses } : { uses: uses, detail: detail }, '');
+    };
+    // role(role, fn): runs fn as validation/reference/teacher/forced code; its authored laws are
+    // counted under `roles` and its records carry `role`. An unknown role throws even when off.
+    api.role = function(name, fn) {
+      if (typeof fn !== 'function') throw new TypeError('TRECH_TRACE.role(role, fn) needs a function');
+      if (ROLES.indexOf(String(name)) < 0) {
+        throw new TypeError("TRECH_TRACE.role: unknown role '" + name + "' (expected " + ROLES.join(', ') + ')');
+      }
+      if (level === 'off') return fn();
+      var previous = role;
+      role = String(name);
+      try { return fn(); } finally { role = previous; }
     };
     api.host = opts.host || 'node';
     // Counters and authored-law counts so far (the Node analogue of the engine's run summary).
     api.summary = function() {
-      return JSON.parse(JSON.stringify({ counters: counters, authored: authored }));
+      var out = { counters: counters, authored: authored };
+      if (Object.keys(roles).length) out.roles = roles;
+      return JSON.parse(JSON.stringify(out));
     };
     api.createTrace = createTrace;
     api.parseSpec = parseSpec;

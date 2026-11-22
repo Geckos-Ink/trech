@@ -146,3 +146,36 @@ def compact(data: Any, limit: int = 240) -> str:
         return ""
     text = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
     return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def summary_kind(record: Dict[str, Any]) -> str:
+    """``"batch"`` for a per-batch attribution summary, ``"run"`` for the run summary, else ``""``."""
+    if record.get("cat") != "summary":
+        return ""
+    return "batch" if record.get("msg") == "batch attribution summary" else "run"
+
+
+HOOK_COLUMNS: Sequence[str] = ("Hook", "Invocations", "With engine", "Emits", "Without inference", "Backed")
+
+
+def hook_attribution(summary: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Per-hook rows of an attribution summary, the hooks whose emits had no engine result first.
+
+    ``backed`` is the share of the hook's emits that came from invocations with at least one
+    engine-backed ``ctx.*`` call (``None`` when the hook emitted nothing)."""
+    rows: List[Dict[str, Any]] = []
+    for hook, tally in ((summary or {}).get("hooks") or {}).items():
+        if not isinstance(tally, dict):
+            continue
+        emits = int(tally.get("emits", 0) or 0)
+        bare = int(tally.get("emits_without_inference", 0) or 0)
+        rows.append({
+            "hook": str(hook),
+            "invocations": int(tally.get("invocations", 0) or 0),
+            "invocations_with_engine": int(tally.get("invocations_with_engine", 0) or 0),
+            "emits": emits,
+            "emits_without_inference": bare,
+            "backed": (emits - bare) / emits if emits else None,
+        })
+    rows.sort(key=lambda r: (-r["emits_without_inference"], -r["emits"], r["hook"]))
+    return rows

@@ -187,6 +187,20 @@ test('plain Node gets the same TRECH_TRACE API from js/trech_trace.js', () => {
     [['trech_trace_v1', 'info', 'atomic', 'solved'], ['trech_trace_v1', 'debug', 'authored', 'fallback_law'], ['trech_trace_v1', 'debug', 'atomic', 's']]);
 });
 
+test('plain Node TRECH_TRACE.role tallies reference work apart and rejects unknown roles', () => {
+  const T = require('../../../js/trech_trace.js');
+  const lines = [];
+  const trace = T.createTrace({ level: 'debug', sink: (r) => lines.push(r) });
+  assert.equal(trace.role('validation', () => { trace.authored('reference_law'); return 4; }), 4);
+  trace.authored('own_law');
+  eq(trace.summary(), { counters: {}, authored: { own_law: 1 }, roles: { validation: { authored: { reference_law: 1 } } } });
+  eq(lines.map((r) => [r.msg, r.role || '']), [['reference_law', 'validation'], ['own_law', '']]);
+  assert.throws(() => trace.role('decision', () => 0), TypeError);
+  const off = T.createTrace({ level: 'off' });
+  assert.equal(off.role('forced', () => 7), 7);
+  assert.throws(() => off.role('decision', () => 0), TypeError);
+});
+
 test('store registers typed versions and refuses structure conflicts', () => {
   const ml = library();
   const dir = tmp();

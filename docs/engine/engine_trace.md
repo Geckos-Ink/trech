@@ -12,7 +12,9 @@ answered, how many returned nothing, and how many emitted records had no engine 
 them.
 
 The trace only observes. It never changes physics, random-number streams, emitted payloads, the
-config JSON or the config hash. It is off by default. You turn it on from the command line or
+config JSON or the config hash. A traced run's `run_end` provenance record gains a `trace`
+reference (level, file, summary hash, totals, verdict), so a run's record says how it was
+traced; untraced records are unchanged. It is off by default. You turn it on from the command line or
 the environment, never from the scenario.
 
 ## Turn it on
@@ -52,7 +54,7 @@ Each level includes everything below it.
 | Level | Records |
 | --- | --- |
 | `off` | Nothing (default). |
-| `summary` | Only the run attribution summary (counters are kept, no per-call records). |
+| `summary` | Only the attribution summaries: one per batch and one for the run (counters are kept, no per-call records). |
 | `info` | Run start (mode, models declared and loaded), each model load **or miss**, method-arbiter leader changes, hook exceptions, `ctx.log`/`TRECH_LOG` notes. |
 | `debug` | One record per hook invocation (engine calls, engine-backed calls, emits by tag, `ctx.authored` reports) and per method-arbiter step (policy, leader, methods selected, RMSE). |
 | `trace` | One record per `ctx.*` inference call with digests of its arguments and result. This level is large: filter it by category. |
@@ -115,6 +117,39 @@ onEventEnd(ctx) {
 - `TRECH_LOG(message, data?)` does the same while the scenario is being evaluated, before any
   hook runs.
 
+### Validation and reference code: roles
+
+The project principles let a scenario name or force a method only to **validate** it, and such
+code must be labelled and stay off the decision path. The trace keeps that code apart, so a
+validation companion that grades engine methods does not make the scenario look engine-backed,
+and a reference solver it runs does not look like the scenario's own law.
+
+- Functions of a `<name>.validation.js` companion (`TRECH_CHECKS["<name>"]`) run under the
+  `validation` role. While tracing, the host wraps each of them after loading the companion. You
+  do not need to change the companion.
+- Any other code can declare its role with `TRECH_TRACE.role(role, fn)`. The role is one of
+  `validation`, `reference`, `teacher` or `forced`; any other name throws a `TypeError`, with
+  the trace on or off. With the trace off, `role` only calls `fn`.
+
+```js
+// A forced reference run, labelled as such:
+const column = TRECH_TRACE.role("reference", () => solveReferenceColumn(state));
+```
+
+Under a role, records carry `"role": "<role>"`. The role's `ctx.*` calls and authored laws are
+counted under `roles` in the summary, not in `calls`, `authored` or the scenario totals. A role's
+engine call never makes a hook's emits count as engine-backed. The verdict ends with what ran off
+the decision path, for example on the lava lamp:
+
+```text
+1 of 1 ctx inference calls returned an engine result. 5 of 8 emits came from hook calls with no
+engine-backed inference. Off the decision path (validation/reference roles, not counted above):
+3 ctx calls and 0 authored-law uses; see `roles`.
+```
+
+Here the lamp's validation companion ran `ctx.evolveField` three times to grade the engine's
+field methods. Before roles existed, those calls were counted as the lamp's own engine calls.
+
 These reports come from the scenario's own declaration. The [scenario purity report](../validation/TRECH_current_scenarios_purity.md)
 remains the static audit of authored laws in the source. The trace adds what actually ran.
 
@@ -136,6 +171,7 @@ log.count("solves");                              // summed in the run summary a
 const v = log.span("solve", () => solve(x));      // debug record with its wall-clock duration
 TRECH_TRACE.info("…");                            // the default channel, category "script"
 TRECH_TRACE.authored("arrhenius_viscosity");      // same as ctx.authored
+TRECH_TRACE.role("reference", () => solve(x));    // counted under roles.reference, off the decision path
 TRECH_TRACE.level();                              // "off", "summary", "info", "debug" or "trace"
 console.log("plain", 2, { a: 1 });                // category "console", formatted like Node
 ```
@@ -148,6 +184,7 @@ console.log("plain", 2, { a: 1 });                // category "console", formatt
 | `count(name, amount = 1)` | summary `counters` | Named per channel: `<category>.<name>`. |
 | `span(name, fn, data?)` | debug | Returns `fn()`. The duration is written only to the trace and never returned to the script. |
 | `channel(category)` | — | A logger with its own category, which you can filter with `--trace debug:<category>`. |
+| `role(role, fn)` | — | Returns `fn()`, run as `validation`, `reference`, `teacher` or `forced` code. See [roles](#validation-and-reference-code-roles). |
 | `console.log/info/debug/trace/warn/error` | info/info/debug/trace/info+warn/info+error, `console` | Replaces QuickJS's missing console and V8's silent one, so both engines behave the same. |
 
 **Determinism.** None of these functions returns engine state or wall time to the script, apart
@@ -203,6 +240,34 @@ appear there under their categories. When the run ends, the panel shows the attr
 verdict. See [the Studio guide](../../studio/README.md#engine-trace-panel). The engine flushes
 every record so that a live reader sees it right away.
 
+## Batches and provenance
+
+Every Geant4 run ends with a **batch attribution summary** record: the same counts as the run
+summary, but only for that batch. A `trech run` has one batch; a `trech lab` session has one
+per `simulate`. The first batch also counts what happened before it (configuration and
+`onInit`), and each later batch counts what happened since the previous one. The last line of
+the file is still the run summary for the whole session.
+
+The same batch is referenced from the `run_end` record of `trech_provenance.jsonl` as `trace`:
+
+```json
+"trace": {"schema": "trech_trace_ref_v1", "level": "summary", "categories": [],
+          "path": "build/out_lab/trech_trace.jsonl", "batch": 2, "seq": 2,
+          "summary_hash": "cb816bd11bd30996",
+          "totals": {"calls": 1, "engine_backed": 1, "emits": 10, "emits_without_inference": 6, ...},
+          "verdict": "1 of 1 ctx inference calls returned an engine result. ..."}
+```
+
+`summary_hash` is the FNV-1a 64 hash of the batch summary JSON, so you can check that a trace file
+belongs to a provenance record. Two identical batches have the same hash. The reference is
+written only when the trace is on, and it never enters `config_json` or `config_hash`.
+
+```sh
+# Per-batch verdicts of a lab session
+jq -c 'select(.msg=="batch attribution summary") | {batch: .data.batch, emits: .data.totals.emits}' \
+  build/out_lab/trech_trace.jsonl
+```
+
 ## Example: read a trace
 
 ```sh
@@ -226,7 +291,5 @@ The record format is in the [output schema](output_schema.md#trech_tracejsonl).
 - Geant4 transport itself (steps, processes) and the inner stages of `ctx.evolve` and
   `ctx.cascade` are not traced separately. Their per-stage metadata appears in the result digest
   at `trace` level.
-- In a `trech lab` session, one summary covers the whole session. The summary is not split per
-  batch.
 
 Open work is tracked in the [core roadmap](../../AGENTS/engine/core/ROADMAP.md#priority-queue).

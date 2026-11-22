@@ -14,6 +14,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
+- **P2** · R5 · Test isolation: `pytest studio/tests/test_live_lab.py studio/tests/test_ui_panels.py` in one process aborts (`Fatal Python error: Aborted`) in `test_viewport_avoids_native_widget_on_headless_qt`; each file passes alone (3/3, 29/29). Reproduced on `f784978` (2026-11-22), so it predates the trace work. Find which Qt state the live-lab tests leave behind (likely a process or timer outliving its widget) and make the files order-independent. (found 2026-11-22)
 - **P2** · R6 · Compute-shader `fluid_frame` overlay so a shaken glass renders in the viewport, not only in offline MP4s. ([detail](#milestone-3--the-cascade-made-legible))
 - **P2** · R6 · Bundle checks: read declarations from a run snapshot (with source/config-hash comparison), asynchronous inspection, jump to the emit/score row behind a check. ([detail](#bundle-declared-validation-in-run-summary-2026-11-09))
 - **P2** · R6 · 3D Scene layer: highlight overlaps and re-parented/skipped volumes; an Outliner node for the medium box; keep marks across applied drafts. ([detail](#geometry-resolution-in-run-summary-2026-11-09))

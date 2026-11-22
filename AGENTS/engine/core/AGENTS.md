@@ -143,8 +143,17 @@ The observation-only engine trace (2026-11-22): a process-wide, mutex-guarded ve
   `configureTraceFromOptions` in [`RunOptions.cpp`](../../../src/core/RunOptions.cpp) resolves CLI
   over environment and defaults the file to `<output>/trech_trace.jsonl`; `main` configures it for
   `run`/`lab` only and a scope guard calls `finish` however the command ends.
-- **Contract:** never part of `TrechConfig`, the config JSON, the hash or provenance; never
-  changes a ctx result, RNG stream or emit. When off, `dispatchHook` installs the plain ctx
+- **Contract:** never part of `TrechConfig`, the config JSON or the hash; never
+  changes a ctx result, RNG stream or emit. Provenance carries only a conditional `run_end`
+  `trace` reference (`trech_trace_ref_v1` from `batchSummary(runId)`, called by
+  `TrechRunAction::EndOfRunAction` on the master): level, categories, path, batch index, seq,
+  summary hash, totals, verdict. Absent when off, so untraced records keep their bytes. Tallies
+  are kept twice (session and since-last-batch); `summary()` is the session.
+- **Roles:** `setRole`/`role`/`isRole` keep a thread-local purpose role (`validation`,
+  `reference`, `teacher`, `forced`; `configure` clears it). Records written under a role carry
+  `role`; `countCall`/`countAuthored` tally into `Tallies::roles` instead of the scenario's
+  `calls`/`authored`, and the summary adds `roles`, `totals.role_calls` and
+  `totals.role_authored_reports` (only when a role ran) and a verdict sentence. When off, `dispatchHook` installs the plain ctx
   functions (no wrapper). `test_engine_trace` asserts byte-identical config and emits traced vs
   untraced.
 - **Instrumented sites:** the JS host (attribution wrapper on each inference entry point, hook

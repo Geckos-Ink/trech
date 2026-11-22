@@ -43,6 +43,16 @@ Read the root principles and the parent handbook first; then open only the subca
   primitives return only undefined, booleans, the level name or an opaque span id; durations stay
   in the trace. `trech_engine_trace` runs the API scenario on QuickJS and, in a V8 build, on V8
   and requires identical records (minus span durations and the file path) and emits.
+- **Trace roles (2026-11-22).** `__TRECH_TRACE_ROLE(role)` sets the thread-local
+  `trace::setRole` and returns the previous role; the bootstrap's `TRECH_TRACE.role(role, fn)`
+  checks the label (`validation`/`reference`/`teacher`/`forced`, a `TypeError` otherwise, also
+  when off), calls `fn` directly when off, and restores the role in a `finally`. While a role is
+  set, `jsTracedCall` and `jsTraceAuthored` leave `callEngineCalls`/`callEngineBacked`/
+  `callAuthored` untouched, so a role's work never backs a hook's emits; `Trace` tallies it under
+  `roles`. `evalScenarioSource`, after evaluating a `.validation` sibling and only while tracing,
+  evaluates `TRECH_TRACE.__wrapCompanion(<stem>, "validation")`, which wraps each function of
+  `TRECH_CHECKS[<stem>]` (keeps `this` and arguments; marks `__trechRole`). Untraced runs install
+  no wrapper. `.ui`/`.view` companions are not wrapped.
 
 - **Dispatch trust counts remain separate.** `HookDispatchReport.starvedCount` and
   `scaleMismatchCount` count successful evaluations across all five inference APIs, independently

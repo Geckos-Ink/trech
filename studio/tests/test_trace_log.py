@@ -21,8 +21,8 @@ from PySide6.QtCore import QSettings  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from trech_studio.engine.locator import locate_engine  # noqa: E402
-from trech_studio.engine.trace_feed import (TraceFilter, TraceTail, describe, parse_categories,  # noqa: E402
-                                            trace_args, trace_spec)
+from trech_studio.engine.trace_feed import (TraceFilter, TraceTail, describe, hook_attribution,  # noqa: E402
+                                            parse_categories, summary_kind, trace_args, trace_spec)
 from trech_studio.ui.trace_log import TraceLogPanel  # noqa: E402
 
 _APP = QApplication.instance() or QApplication([])
@@ -108,6 +108,54 @@ def test_panel_requests_level_filters_live_and_shows_the_verdict(tmp_path):
     assert again.requested_level() == "trace"
 
 
+def _hooks(**tallies):
+    return {hook: {"invocations": inv, "invocations_with_engine": eng, "emits": emits,
+                   "emits_without_inference": bare} for hook, (inv, eng, emits, bare) in tallies.items()}
+
+
+def test_hook_attribution_orders_unbacked_hooks_first():
+    rows = hook_attribution({"hooks": _hooks(onRunStart=(1, 1, 3, 0), onEventEnd=(2, 0, 4, 4), onRunEnd=(1, 0, 0, 0))})
+    assert [r["hook"] for r in rows] == ["onEventEnd", "onRunStart", "onRunEnd"]
+    assert rows[0]["backed"] == 0.0 and rows[1]["backed"] == 1.0 and rows[2]["backed"] is None
+    assert hook_attribution(None) == []
+    assert summary_kind(_record(1, "summary", "summary", "batch attribution summary")) == "batch"
+    assert summary_kind(_record(2, "summary", "summary", "run attribution summary")) == "run"
+    assert summary_kind(_record(3, "info", "hook")) == ""
+
+
+def test_panel_shows_batches_then_the_run_per_hook(tmp_path):
+    panel = TraceLogPanel(settings=_settings(tmp_path), poll_ms=10)
+    out = tmp_path / "lab"
+    out.mkdir()
+    panel.begin(out, "lab")
+    trace = out / "trech_trace.jsonl"
+    with open(trace, "w") as stream:
+        stream.write(json.dumps(_record(1, "summary", "summary", "batch attribution summary",
+                                        data={"batch": 1, "run_id": 0, "verdict": "first batch",
+                                              "hooks": _hooks(onEventEnd=(2, 0, 4, 4))})) + "\n")
+    panel.poll()
+    assert panel.banner.text().startswith("Batch 1 attribution: first batch")
+    assert panel.summary() is None and len(panel.batch_summaries()) == 1
+    assert [r["hook"] for r in panel.hook_rows()] == ["onEventEnd"]
+    with open(trace, "a") as stream:
+        stream.write(json.dumps(_record(2, "summary", "summary", "batch attribution summary",
+                                        data={"batch": 2, "run_id": 1, "verdict": "second batch",
+                                              "hooks": _hooks(onEventEnd=(3, 3, 6, 0))})) + "\n")
+        stream.write(json.dumps(_record(3, "summary", "summary", "run attribution summary",
+                                        data={"batches": 2, "verdict": "whole session",
+                                              "hooks": _hooks(onEventEnd=(5, 3, 10, 4))})) + "\n")
+    panel.finish()
+    assert panel.banner.text().startswith("Run attribution (2 batches): whole session")
+    assert [panel.scope.itemText(i) for i in range(panel.scope.count())] == ["Run", "Batch 1", "Batch 2"]
+    assert panel.scope.currentText() == "Run" and panel.hook_rows()[0]["emits"] == 10
+    assert panel.hooks.rowCount() == 1 and panel.hooks.item(0, 5).text() == "60%"
+    panel.scope.setCurrentText("Batch 2")
+    assert panel.hook_rows()[0]["emits_without_inference"] == 0
+    assert panel.hooks.item(0, 4).text() == "0"
+    panel.clear()
+    assert panel.scope.count() == 0 and panel.hooks.rowCount() == 0
+
+
 def test_panel_off_adds_no_arguments_but_still_shows_an_inherited_trace(tmp_path):
     panel = TraceLogPanel(settings=_settings(tmp_path))
     panel.level.setCurrentText("off")
@@ -150,4 +198,10 @@ globalThis.TRECH_HOOKS = {
     cats = {panel.model.record(i)["cat"] for i in range(panel.record_count())}
     assert {"run", "demo", "console", "hook", "authored", "summary"} <= cats, cats
     assert panel.summary()["calls"]["predict"]["null_strict"] == 2
+    assert len(panel.batch_summaries()) == 1 and panel.batch_summaries()[0]["batch"] == 1
+    assert panel.hook_rows()[0]["hook"] == "onEventEnd" and panel.hook_rows()[0]["emits_without_inference"] == 2
     assert "TRECH trace summary" in run.stderr
+    provenance = [json.loads(line) for line in (out / "trech_provenance.jsonl").read_text().splitlines() if line]
+    run_end = [r for r in provenance if r["phase"] == "run_end"][-1]
+    assert run_end["trace"]["schema"] == "trech_trace_ref_v1" and run_end["trace"]["batch"] == 1
+    assert all("trace" not in r for r in provenance if r["phase"] != "run_end")
