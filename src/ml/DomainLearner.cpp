@@ -2,6 +2,9 @@
 
 #include <torch/torch.h>
 
+#include "trech/core/Trace.hpp"
+#include "trech/ml/MlTrace.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cstdio>
@@ -169,14 +172,27 @@ struct Mlp {
     h = at::tanh(at::addmm(params[3], h, params[2].t()));
     return at::addmm(params[5], h, params[4].t());
   }
-  void train(const at::Tensor& z, const at::Tensor& residual, const at::Tensor& w, std::size_t steps) {
+  // Returns the weighted loss before the first and after the last step when `losses` is given
+  // (the engine trace asks for it; reading a loss never changes the optimisation).
+  void train(const at::Tensor& z, const at::Tensor& residual, const at::Tensor& w, std::size_t steps,
+             std::pair<double, double>* losses = nullptr) {
     const auto total = w.sum();
     for (std::size_t s = 0; s < steps; ++s) {
       optimizer->zero_grad();
       const auto loss = ((forward(z) - residual).square().sum(1) * w).sum() / total;
+      if (losses && s == 0) losses->first = loss.item<double>();
       loss.backward();
       optimizer->step();
     }
+    if (losses) {
+      at::NoGradGuard guard;
+      losses->second = (((forward(z) - residual).square().sum(1) * w).sum() / total).item<double>();
+    }
+  }
+  std::int64_t parameterCount() const {
+    std::int64_t n = 0;
+    for (const auto& p : params) n += p.numel();
+    return n;
   }
   nlohmann::json toJson() const {
     nlohmann::json out = nlohmann::json::array();
@@ -611,7 +627,24 @@ struct DomainLearner::Impl {
       at::Tensor index = n > limit ? at::arange(0, n, (n + limit - 1) / limit, at::kLong) : at::arange(n, at::kLong);
       const auto z = x.z.index_select(0, index);
       const auto residual = (x.y - x.phi.mm(beta)).index_select(0, index);
-      leaf.mlp->train(z, residual, x.w.index_select(0, index), o.capacity.residualSteps);
+      if (trace::active()) {
+        std::pair<double, double> losses{0.0, 0.0};
+        leaf.mlp->train(z, residual, x.w.index_select(0, index), o.capacity.residualSteps, &losses);
+        mltrace::trainBurst("domain_learner.residual_mlp", o.capacity.residualSteps,
+                            {{"domain", leaf.id},
+                             {"rows", static_cast<std::int64_t>(leaf.rows())},
+                             {"rows_used", index.size(0)},
+                             {"features", d},
+                             {"targets", t},
+                             {"hidden", o.capacity.residualHidden},
+                             {"parameters", leaf.mlp->parameterCount()},
+                             {"optimizer", "adam"},
+                             {"learning_rate", 5e-3},
+                             {"loss_before", losses.first},
+                             {"loss_after", losses.second}});
+      } else {
+        leaf.mlp->train(z, residual, x.w.index_select(0, index), o.capacity.residualSteps);
+      }
     }
   }
 

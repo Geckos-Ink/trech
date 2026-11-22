@@ -40,6 +40,7 @@ std::string runUsage() {
       << "  trech inspect <experiment.js> [--param <name>=<json>]\n"
       << "  trech lab [<experiment.js>] [options]   (live session; a scenario's hooks run)\n"
       << "  trech arch <job.json> [--output <dir>] [--generator evolvo|classic] [--python <exe>]\n"
+      << "             [--trace <spec>] [--trace-file <f>] [--trace-stderr]\n"
       << "  trech budget [--features <n>] [--targets <n>]   (compute budget and model capacity, JSON)\n"
       << "Options:\n"
       << "  --macro <file>    Execute Geant4 macro in batch mode (run only)\n"
@@ -171,6 +172,33 @@ RunOptions parseRunOptions(int argc, char** argv) {
         } else {
           options.outputDir = value;
         }
+        continue;
+      }
+      // The engine trace also covers arch: the search's Python worker traces at the same level
+      // and its records are copied into <output>/trech_trace.jsonl (origin "python").
+      if (arg == "--trace" || arg == "--trace-file") {
+        if (i + 1 >= argc) {
+          options.valid = false;
+          options.error = "Missing value for " + arg + ".";
+          return options;
+        }
+        const std::string value = argv[++i];
+        if (arg == "--trace-file") {
+          options.traceFile = value;
+          continue;
+        }
+        try {
+          (void)trace::parseSpec(value);
+        } catch (const std::exception& error) {
+          options.valid = false;
+          options.error = std::string("Invalid --trace value: ") + error.what() + ".";
+          return options;
+        }
+        options.traceSpec = value;
+        continue;
+      }
+      if (arg == "--trace-stderr") {
+        options.traceStderr = true;
         continue;
       }
       options.valid = false;

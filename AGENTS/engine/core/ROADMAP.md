@@ -21,11 +21,43 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R6 · Studio engine trace residuals: link a trace row to its emit/timeline frame (`hook`+`event` → Emits tab), show the summary's `roles` (validation/reference work) in the Attribution tab, and change the level of a running live lab (today it applies from the next start). No committed reference capture of the panel yet. ([script logging and Studio panel](#script-logging-and-studio-trace-panel-2026-11-22), [batches and roles](#trace-batches-provenance-and-roles-2026-11-22))
 - **P3** · R3 · Library logging residuals: `trech_helpers.js` and the `.ui.js`/`.view.js` companions have no channel and no role. The host wraps only the functions of a validation companion's `TRECH_CHECKS[<stem>]` entry: a companion that registers under another key, or a scenario that runs a reference solver outside its companion without `TRECH_TRACE.role`, is still counted as the scenario's own path. ([library channels](#library-trace-channels-2026-11-22), [batches and roles](#trace-batches-provenance-and-roles-2026-11-22))
 - **P3** · R1 · Trace reference checks: the validation suite does not yet read the `run_end` `trace` reference or check its `summary_hash` against the trace file's batch record; a run that fails before `run_end` has no reference (only the trace file's run summary). ([batches and roles](#trace-batches-provenance-and-roles-2026-11-22))
-- **P3** · R5 · Engine trace Geant4 categories: physics list/process registration, per-run process tallies and geometry resolution as `geant4` trace records, so the base-of-truth side of a run is as visible as the inference side. ([engine trace](#engine-trace-2026-11-22))
+- **P3** · R5 · Geant4 trace depth: steps name the limiting process only, not the hadronic model or cross-section data set that sampled an interaction (`G4HadronicProcess` model/dataset of the step), and `NoProcess` steps (no defining process on the post-step point) are not explained. Geometry resolution issues are already in provenance but not yet mirrored as `geant4` records. ([library trace](#library-trace-geant4-torch-python-2026-11-22))
+- **P3** · R4 · Library trace residuals: Evolvo's per-epoch training inside a candidate is not traced (only each candidate's result; tracing inside needs an Evolvo hook, a first-party Evolvo change); the `tools/torch/*.py` study and build scripts outside the `trech_torch` package log only through the trainers they call; Node `tools/ml/lib/orchestrate.js` does not yet pass the trace to the Python trainers it spawns or import their records the way `trech arch` does; Studio's trace panel shows `tallies` only in the record detail, not as a table. ([library trace](#library-trace-geant4-torch-python-2026-11-22))
 - **P2** · R1 · Runtime (non-`onInit`) hooks cannot patch config, so ignored-override reporting covers `onInit` only; decide whether later hooks may patch at all before extending it. (dated records below)
 - **P2** · R5 · Sweep the three PubChem-dependent scenarios (`beaker_water_n_pentane`, its Studio variant, `testscenario_h2o_electrolysis_combustion`) through inspect/type/unknown-key checks once a PubChem cache is present. (dated records below)
 
 ## Delivery records
+
+<a name="library-trace-geant4-torch-python-2026-11-22"></a>
+
+- [x] Library trace: Geant4, Torch and the Python tools (2026-11-22). The trace now shows when and
+  how the base was simulated and what was inferred and trained. **Geant4**
+  (`src/sim/Geant4Trace.cpp`): kernel (physics list, threads, materials, volumes, cuts,
+  processes per particle), each run's beamOn and primary sources, events, tracks and steps
+  (`geant4`, `geant4_track`, `geant4_step`), with thread-local tallies per process, particle,
+  creator and volume flushed at each event end, and a Geant4 sentence in the verdict. **Torch in
+  the engine** (`src/ml/MlTrace.cpp`): model loads with backend, module structure and LibTorch
+  runtime; every forward pass (tallied per model, failures apart); each `ctx.learnDomains`
+  residual-network Adam burst with loss before/after; `trech arch`'s native classic training.
+  **Python** (`tools/torch/trech_torch/trace.py`): the same `trech_trace_v1` records with
+  `host: "python"` for numpy arrays and fits, torch training loops (start, epochs, end), exports
+  with SHA-256 and the Evolvo candidate results, used by six trainers and the architecture
+  search; `trech arch --trace` gives the worker the same level and imports its records
+  (`origin: "python"`) and tallies through `trace::childEnvironment`/`importRecords`. New
+  generic `trace::tally`. Verification: Release CTest 78/78 incl. new `trech_geant4_trace`
+  (serial and two workers: byte-identical scores/emits/event scores traced vs untraced, one
+  track and step record per tallied track/step, tallies equal the event step counts, provenance
+  reference) and `trech_python_trace` (API, numpy/torch records, `fit_mlp`/`fit_linear` weights
+  byte-identical on/off, env-configured child summary), `trech_torch_backends` (TorchScript load
+  and forward records, failure tally); V8 build (`trech_engine_trace`, `trech_torch_backends`,
+  `trech_geant4_trace`, also with `TRECH_JS_ENGINE=v8`; on V8 two untraced two-worker runs already
+  order their emits differently, the runtime P1 strict-MT replay item, so the Geant4 gate compares
+  two-worker emits as a set and scores byte for byte). End to end: Briggs–Rauscher at `trace` level,
+  `surrogate_generic_demo`, `optics_surrogate_demo` and the lava lamp (pinned budget) identical
+  traced vs untraced; a traced `trech arch` job imported 14 worker records, counted 180 Evolvo
+  candidate and 180 classic training steps, and produced the same TorchScript bytes and weights
+  as an untraced run. A dangling `items()` of a temporary in the first `importRecords` crashed
+  `trech arch` and was fixed before landing. Residuals queued above.
 
 <a name="trace-batches-provenance-and-roles-2026-11-22"></a>
 

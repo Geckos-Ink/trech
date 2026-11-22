@@ -1,4 +1,5 @@
 #include "trech/sim/EventAction.hpp"
+#include "trech/sim/Geant4Trace.hpp"
 #include "trech/sim/EventRecords.hpp"
 #include "trech/sim/RunAction.hpp"
 #include "trech/core/SimulationBudget.hpp"
@@ -82,9 +83,12 @@ void TrechEventAction::BeginOfEventAction(const G4Event* event) {
     }
   }
   ResetEvent();
+  sim::g4trace::eventStarted(event);
 }
 
 void TrechEventAction::EndOfEventAction(const G4Event* event) {
+  sim::g4trace::eventEnded(event, eventEdep_ / MeV, static_cast<double>(totalStepCount_),
+                           static_cast<double>(totalTrackCount_));
   const auto totalEdepMeV = eventEdep_ / MeV;
   const auto photonTrackLengthMm = opticalPhotonTrackLength_ / mm;
   const auto totalTrackLengthMm = totalTrackLength_ / mm;

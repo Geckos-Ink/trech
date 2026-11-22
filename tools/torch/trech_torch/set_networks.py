@@ -30,6 +30,8 @@ from __future__ import annotations
 import math
 from typing import Dict, List, Optional, Sequence
 
+from . import trace
+
 # NumPy is imported inside the functions that need it: the validator's static gates use the
 # pure-Python parts of this module under interpreters without NumPy.
 
@@ -212,6 +214,9 @@ def fit(x: np.ndarray, y: np.ndarray, spec: dict, *, epochs: int, lr: float, see
     net = build_torch(spec, y.shape[1], mask_threshold_z(spec, xmean, xstd))
     optim = torch.optim.Adam(net.parameters(), lr=lr)
     loss_fn = torch.nn.MSELoss()
+    trace.array("numpy", "set_network.x", x)
+    progress = trace.training("set_networks." + str(spec.get("kind", "set")), net, optim, epochs,
+                              rows=int(x.shape[0]), seed=seed).__enter__()
     for epoch in range(epochs):
         if lr_final_factor != 1.0:
             for group in optim.param_groups:
@@ -220,8 +225,11 @@ def fit(x: np.ndarray, y: np.ndarray, spec: dict, *, epochs: int, lr: float, see
         loss = loss_fn(net(xs), ys)
         loss.backward()
         optim.step()
+        if trace.active():
+            progress.epoch(epoch, loss.item())
         if not quiet and (epoch + 1) % max(1, epochs // 10) == 0:
             print(f"  epoch {epoch + 1}/{epochs}  loss = {loss.item():.6f}")
+    progress.__exit__(None, None, None)
     return net, (xmean, xstd, ymean, ystd)
 
 

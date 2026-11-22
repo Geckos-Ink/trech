@@ -75,6 +75,8 @@ from .dataset import (
     load_anchors,
 )
 
+from . import trace
+
 OUTPUT_FEATURE_COUNT = 3
 
 # Backwards-compatible aliases (older callers imported these from here).
@@ -130,14 +132,19 @@ def train(samples: List[OpticsSample], epochs: int, lr: float,
     model = _SurrogateMLP(INPUT_FEATURE_COUNT, hidden=hidden)
     optim = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = torch.nn.MSELoss()
-    for epoch in range(epochs):
-        optim.zero_grad()
-        pred = model(xs)
-        loss = loss_fn(pred, y_t)
-        loss.backward()
-        optim.step()
-        if not quiet and (epoch + 1) % max(1, epochs // 10) == 0:
-            print(f"  epoch {epoch + 1}/{epochs}  loss = {loss.item():.6f}")
+    trace.array("numpy", "optics.x", x.numpy())
+    trace.array("numpy", "optics.y", y.numpy())
+    with trace.training("train_optics_surrogate.mlp", model, optim, epochs, rows=len(samples), seed=seed) as progress:
+        for epoch in range(epochs):
+            optim.zero_grad()
+            pred = model(xs)
+            loss = loss_fn(pred, y_t)
+            loss.backward()
+            optim.step()
+            if trace.active():
+                progress.epoch(epoch, loss.item())
+            if not quiet and (epoch + 1) % max(1, epochs // 10) == 0:
+                print(f"  epoch {epoch + 1}/{epochs}  loss = {loss.item():.6f}")
     return model, mean, std
 
 
@@ -219,6 +226,7 @@ def export_torchscript(model: _SurrogateMLP, mean: torch.Tensor,
     wrapped.eval()
     scripted = torch.jit.script(wrapped)
     scripted.save(str(out_path))
+    trace.exported("torch", out_path, "torchscript")
 
 
 def write_manifest(samples: List[OpticsSample], out_path: Path,

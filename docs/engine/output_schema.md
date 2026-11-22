@@ -1136,7 +1136,8 @@ points at it through [`trace`](#trech_provenancejsonl). Each line is one record:
 | `schema` | string | `trech_trace_v1`. |
 | `seq` | integer | Order of writing within the file. With several Geant4 workers, the order across workers is not deterministic. |
 | `level` | string | `info`, `debug`, `trace` or `summary`. |
-| `cat` | string | Category: `trace`, `run`, `model`, `hook`, `scenario`, `authored`, `arbiter`, an inference entry point (`predict`, `cascade`, `evolve`, `react`, `interact`, `lift`, `detectDomains`, `learnDomains`, `evolveField`) or `summary`. |
+| `cat` | string | Category: `trace`, `run`, `model`, `hook`, `scenario`, `authored`, `arbiter`, an inference entry point (`predict`, `cascade`, `evolve`, `react`, `interact`, `lift`, `detectDomains`, `learnDomains`, `evolveField`), `geant4`, `geant4_track`, `geant4_step`, `torch`, `numpy`, `arch`, `python` or `summary`. |
+| `host` | string | `python` on records written by `trech_torch.trace`; absent on engine records. |
 | `msg` | string | A short description, the hook name, or the law name for `authored`. |
 | `severity` | string | `warn` or `error` for script warnings (`TRECH_TRACE.warn/error`, `console.warn/error`); absent otherwise. |
 | `hook`, `event`, `step` | string, integer, integer | The hook invocation that wrote the record (omitted outside a hook, or when not applicable). |
@@ -1161,6 +1162,9 @@ Payloads:
   and when graded `arbitrated_rmse`, `oracle_rmse`, `method_rmse`. A leader change (info) has
   `from`, `to`, `policy`, `methods`.
 - `scenario`: the `data` passed to `ctx.log` / `TRECH_LOG`; `authored`: the `detail`.
+- `geant4`, `geant4_track`, `geant4_step`, `torch` and the Python categories: see the
+  [engine trace guide](engine_trace.md#geant4-what-was-simulated-and-how) for each record. Records
+  copied from a Python worker carry `data.origin: "python"`.
 - `script`, `console` and channel categories (`TRECH_TRACE.channel(name)`): the `data` passed.
   A span record has `{span, duration_ms, data?}`.
 - `summary`, `batch attribution summary` (one per Geant4 run, written at its end): the same
@@ -1175,7 +1179,13 @@ Payloads:
   category reached its cap, `counters{<channel>.<name>:n}` when a script counted,
   `roles{<role>:{calls{<call>:{<outcome>:n}}, authored{<law>:n}, totals{calls, engine_backed,
   authored_reports}}}` plus `totals.role_calls` and `totals.role_authored_reports` when code ran
-  under a role (those are not in the other counts), and a plain-language `verdict`.
+  under a role (those are not in the other counts), `tallies{<section>:{<key>:n}}` (Geant4:
+  `geant4.events`, `geant4.steps_by_process`, `geant4.edep_mev_by_process`,
+  `geant4.tracks_by_particle`, `geant4.tracks_by_creator`, `geant4.steps_by_volume`; Torch:
+  `torch.forwards_by_model`, `torch.forward_failures_by_model`, `torch.train_steps_by_learner`,
+  `torch.train_bursts_by_learner`, and from Python workers also `torch.exports_by_format`,
+  `torch.candidates_by_stop_reason`, `numpy.fits_by_kind`, `numpy.arrays_by_name`), and a
+  plain-language `verdict`.
 
 ## trech_event_scores.jsonl
 

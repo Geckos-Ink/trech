@@ -11,6 +11,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <thread>
+#include <vector>
 
 namespace trech::trace {
 
@@ -46,7 +47,9 @@ struct Tallies {
   std::map<std::string, std::size_t> authored;
   std::map<std::string, double> counters;
   std::map<std::string, RoleTally> roles;
+  std::map<std::string, std::map<std::string, double>> tallies;
   void clear() {
+    tallies.clear();
     calls.clear();
     hooks.clear();
     authored.clear();
@@ -187,7 +190,9 @@ std::string verdict(const nlohmann::json& totals) {
   const std::size_t emits = get("emits");
   const std::size_t bare = get("emits_without_inference");
   std::ostringstream os;
-  if (calls == 0) {
+  if (calls == 0 && emits == 0) {
+    os << "No ctx inference call ran and nothing was emitted.";
+  } else if (calls == 0) {
     os << "No ctx inference call ran: every emitted value came from Geant4 tallies or "
           "scenario-authored JavaScript.";
   } else {
@@ -401,6 +406,14 @@ void spanEnd(std::uint64_t id, nlohmann::json data) {
   record(Level::Debug, span.category, span.name, std::move(payload));
 }
 
+void tally(std::string_view section, std::string_view key, double amount) {
+  if (!active()) return;
+  auto& s = state();
+  std::lock_guard<std::mutex> lock(s.mutex);
+  s.session.tallies[std::string(section)][std::string(key)] += amount;
+  s.batch.tallies[std::string(section)][std::string(key)] += amount;
+}
+
 void countCall(std::string_view call, std::string_view outcome) {
   if (!active()) return;
   auto& s = state();
@@ -444,6 +457,68 @@ void countModel(std::string_view name, bool loaded) {
   auto& s = state();
   std::lock_guard<std::mutex> lock(s.mutex);
   s.models[std::string(name)] = loaded;
+}
+
+std::vector<std::string> childEnvironment(const std::string& childPath) {
+  if (!active()) return {};
+  const auto& o = state().options;
+  std::string spec = levelName(o.level);
+  if (!o.categories.empty()) {
+    spec += ":";
+    bool first = true;
+    for (const auto& c : o.categories) {
+      spec += (first ? "" : ",") + c;
+      first = false;
+    }
+  }
+  return {"TRECH_TRACE=" + spec, "TRECH_TRACE_FILE=" + childPath, "TRECH_TRACE_STDERR=0"};
+}
+
+std::size_t importRecords(const std::string& childPath, std::string_view origin) {
+  if (!active()) return 0;
+  std::ifstream in(childPath);
+  if (!in) return 0;
+  std::size_t copied = 0;
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.empty()) continue;
+    const auto r = nlohmann::json::parse(line, nullptr, false);
+    if (!r.is_object()) continue;
+    const std::string cat = r.value("cat", std::string("script"));
+    nlohmann::json data = r.contains("data") ? r.at("data") : nlohmann::json(nullptr);
+    if (cat == "summary") {
+      // The child's own summary: its tallies and counters join this run's, and the record is
+      // kept as an info record so it never reads as this run's summary.
+      if (data.is_object()) {
+        // Copies, not temporaries: items() of a temporary would dangle in the range-for.
+        const nlohmann::json tallies = data.value("tallies", nlohmann::json::object());
+        const nlohmann::json counters = data.value("counters", nlohmann::json::object());
+        for (const auto& [section, entries] : tallies.items())
+          for (const auto& [key, n] : entries.items())
+            if (n.is_number()) tally(section, key, n.get<double>());
+        for (const auto& [name, n] : counters.items())
+          if (n.is_number()) countScript(name, n.get<double>());
+      }
+      record(Level::Info, origin, std::string(origin) + " worker summary", std::move(data));
+      ++copied;
+      continue;
+    }
+    Level level = Level::Info;
+    try {
+      level = parseLevel(r.value("level", std::string("info")));
+    } catch (const std::exception&) {
+    }
+    if (level == Level::Off || level == Level::Summary) level = Level::Info;
+    const std::string severity = r.value("severity", std::string());
+    if (!enabled(level, cat) && severity != "warn" && severity != "error") continue;
+    nlohmann::json payload = data.is_null() ? nlohmann::json::object() : nlohmann::json(data);
+    if (!payload.is_object()) payload = {{"value", std::move(payload)}};
+    payload["origin"] = std::string(origin);
+    if (r.contains("role")) payload["role"] = r.at("role");
+    record(level, cat, r.value("msg", std::string()), std::move(payload), severity);
+    ++copied;
+  }
+  return copied;
 }
 
 nlohmann::json digest(const nlohmann::json& value, std::size_t maxBytes) {
@@ -525,6 +600,51 @@ nlohmann::json summarizeLocked(const State& s, const Tallies& t) {
   nlohmann::json out = {{"totals", totals}, {"calls", calls},       {"hooks", hooks},
                         {"authored", authored}, {"models", models}, {"verdict", verdict(totals)}};
   if (!t.roles.empty()) out["roles"] = roles;
+  if (!t.tallies.empty()) out["tallies"] = t.tallies;
+  // The base of truth, in one sentence: what Geant4 simulated in this scope.
+  if (const auto g4 = t.tallies.find("geant4.events"); g4 != t.tallies.end()) {
+    const auto get = [&](const char* section) {
+      double n = 0.0;
+      if (const auto it = t.tallies.find(section); it != t.tallies.end())
+        for (const auto& [k, v] : it->second) n += v;
+      return n;
+    };
+    std::ostringstream os;
+    os << " Geant4 simulated " << static_cast<long long>(get("geant4.events")) << " events: "
+       << static_cast<long long>(get("geant4.tracks_by_particle")) << " tracks, "
+       << static_cast<long long>(get("geant4.steps_by_process")) << " steps";
+    if (const auto it = t.tallies.find("geant4.steps_by_process"); it != t.tallies.end() && !it->second.empty()) {
+      std::vector<std::pair<double, std::string>> top;
+      for (const auto& [k, v] : it->second) top.emplace_back(-v, k);
+      std::sort(top.begin(), top.end());
+      os << " (most steps: ";
+      for (std::size_t i = 0; i < top.size() && i < 3; ++i)
+        os << (i ? ", " : "") << top[i].second << " " << static_cast<long long>(-top[i].first);
+      os << ")";
+    }
+    os << ".";
+    out["verdict"] = out["verdict"].get<std::string>() + os.str();
+  }
+  if (const auto torch = t.tallies.find("torch.forwards_by_model"); torch != t.tallies.end()) {
+    double n = 0.0;
+    for (const auto& [k, v] : torch->second) n += v;
+    std::ostringstream os;
+    os << " Torch ran " << static_cast<long long>(n) << " forward passes over " << torch->second.size()
+       << " models";
+    if (const auto train = t.tallies.find("torch.train_steps_by_learner"); train != t.tallies.end()) {
+      double m = 0.0;
+      for (const auto& [k, v] : train->second) m += v;
+      os << " and " << static_cast<long long>(m) << " training steps";
+    }
+    os << ".";
+    out["verdict"] = out["verdict"].get<std::string>() + os.str();
+  } else if (const auto train = t.tallies.find("torch.train_steps_by_learner"); train != t.tallies.end()) {
+    double m = 0.0;
+    for (const auto& [k, v] : train->second) m += v;
+    std::ostringstream os;
+    os << " Torch ran " << static_cast<long long>(m) << " training steps.";
+    out["verdict"] = out["verdict"].get<std::string>() + os.str();
+  }
   if (!missing.empty()) out["models_missing"] = missing;
   if (!s.suppressed.empty()) out["suppressed_records"] = s.suppressed;
   if (!t.counters.empty()) out["counters"] = t.counters;
@@ -620,6 +740,22 @@ void finish() {
   if (report.contains("counters")) {
     for (const auto& [name, n] : report.at("counters").items()) {
       os << "  counter " << name << ": " << n.dump() << '\n';
+    }
+  }
+  if (report.contains("tallies")) {
+    // Largest entries first, at most six per section.
+    for (const auto& [section, entries] : report.at("tallies").items()) {
+      std::vector<std::pair<double, std::string>> rows;
+      for (const auto& [key, n] : entries.items()) rows.emplace_back(-n.get<double>(), key);
+      std::sort(rows.begin(), rows.end());
+      os << "  " << section << ":";
+      for (std::size_t i = 0; i < rows.size() && i < 6; ++i) {
+        std::ostringstream value;
+        value << -rows[i].first;
+        os << " " << rows[i].second << "=" << value.str();
+      }
+      if (rows.size() > 6) os << " (+" << rows.size() - 6 << " more)";
+      os << '\n';
     }
   }
   if (report.contains("models_missing")) {

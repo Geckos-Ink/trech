@@ -74,6 +74,8 @@ from .torchscript_io import write_torchscript_io  # noqa: F401  (re-exported)
 from .dataset import harvest_table
 from . import set_networks
 
+from . import trace
+
 
 def _split_cols(spec: str) -> List[str]:
     return [c.strip() for c in spec.split(",") if c.strip()]
@@ -130,6 +132,7 @@ def fit_linear(x: np.ndarray, y: np.ndarray, l2: float,
     ys = (y - ymean) / ystd
     n_in = xs.shape[1]
     a = xs.T @ xs + l2 * np.eye(n_in)
+    trace.linear_fit("numpy", "ridge_normal_equations", xs, ys, l2, solver="numpy.linalg.solve")
     w = np.linalg.solve(a, xs.T @ ys)  # [n_in, n_out]
     return w.T, np.zeros(y.shape[1]), (xmean, xstd, ymean, ystd)
 
@@ -193,16 +196,22 @@ def fit_mlp(x: np.ndarray, y: np.ndarray, hidden: int, epochs: int,
     net = torch.nn.Sequential(*layers)
     optim = torch.optim.Adam(net.parameters(), lr=lr)
     loss_fn = torch.nn.MSELoss()
-    for epoch in range(epochs):
-        if lr_final_factor != 1.0:
-            for group in optim.param_groups:
-                group["lr"] = lr * lr_final_factor ** (epoch / max(1, epochs - 1))
-        optim.zero_grad()
-        loss = loss_fn(net(xs), ys)
-        loss.backward()
-        optim.step()
-        if not quiet and (epoch + 1) % max(1, epochs // 10) == 0:
-            print(f"  epoch {epoch + 1}/{epochs}  loss = {loss.item():.6f}")
+    trace.array("numpy", "fit_mlp.x", x)
+    trace.array("numpy", "fit_mlp.y", y)
+    with trace.training("train_surrogate.mlp", net, optim, epochs, rows=int(x.shape[0]), seed=seed,
+                        loss="mse_standardized", lr_final_factor=lr_final_factor) as progress:
+        for epoch in range(epochs):
+            if lr_final_factor != 1.0:
+                for group in optim.param_groups:
+                    group["lr"] = lr * lr_final_factor ** (epoch / max(1, epochs - 1))
+            optim.zero_grad()
+            loss = loss_fn(net(xs), ys)
+            loss.backward()
+            optim.step()
+            if trace.active():
+                progress.epoch(epoch, loss.item())
+            if not quiet and (epoch + 1) % max(1, epochs // 10) == 0:
+                print(f"  epoch {epoch + 1}/{epochs}  loss = {loss.item():.6f}")
     return net, (xmean, xstd, ymean, ystd)
 
 
@@ -428,6 +437,7 @@ def _finish_generic_json(path: Path, model: dict, domain, scale_bands, holdout, 
         model["note"] = note
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
+    trace.exported("torch", path, "generic_json", outputs=model.get("output_features"))
 
 
 def export_torchscript(net, scalers, out_path: Path,
@@ -470,6 +480,7 @@ def export_torchscript(net, scalers, out_path: Path,
     scripted = torch.jit.script(wrapped)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     scripted.save(str(out_path))
+    trace.exported("torch", out_path, "torchscript", model=trace.model_summary(net) if trace.active() else None)
     return True
 
 

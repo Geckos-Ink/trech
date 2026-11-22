@@ -359,6 +359,7 @@ class GenericSurrogate {
   bool parseGroupLift(const void* jsonPtr);
 
   bool loadJson(const std::string& bytes);
+  bool loadImpl(const std::string& modelPath);
   // Complete `feature_units` maps for the declared names (absent block -> true).
   bool readFeatureUnits(const void* jsonPtr);
   // Named IO for a TorchScript module from `<modelPath>.io.json`; absent ->
@@ -418,6 +419,8 @@ class GenericSurrogate {
   bool valid_ = false;
 
   bool predictTorchVector(const double* inputs, std::size_t inputCount,
+                          std::vector<double>* out) const;
+  bool predictTorchVectorImpl(const double* inputs, std::size_t inputCount,
                           std::vector<double>* out) const;
   std::unique_ptr<torch::jit::Module> module_;
   int torchInputCount_ = 0;

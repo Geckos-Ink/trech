@@ -33,6 +33,8 @@ from typing import Dict, List, Optional, Sequence
 
 import numpy as np
 
+from . import trace
+
 REPO = Path(__file__).resolve().parents[3]
 DENSE_ACTIVATIONS = ("silu", "tanh", "relu", "sigmoid")
 ARCH_SCHEMA = "trech_evolved_arch_v1"
@@ -104,6 +106,17 @@ def search_architecture(
                     space.window = [min(space.window[0], k), max(space.window[1], k)]
     task = TorchTask(train, val, lr=lr, weight_decay=weight_decay, batch_size=batch_size,
                      hard_max_epochs=hard_max_epochs)
+    trace.announce("torch", "evolve_architecture")
+    trace.array("numpy", "arch.x", x)
+    trace.array("numpy", "arch.y", y)
+    if trace.active():
+        trace.record("info", "arch", "search start",
+                     {"rows": {"train": len(x), "selection": len(x_val)}, "inputs": x.shape[1], "outputs": y.shape[1],
+                      "generations": generations, "population": population, "patience": patience,
+                      "max_params": max_params, "max_rows": max_rows, "size_cost": size_cost, "lr": lr,
+                      "hard_max_epochs": hard_max_epochs, "ops": list(ops) if ops else None, "seed": seed,
+                      "seed_genomes": len(seed_genomes)})
+        task = TracedEvaluator(task, space)
     search = arch.ArchitectureSearch(space, task, seed=seed, population=population,
                                      size_cost=size_cost, knowledge=knowledge)
     progress = None if quiet else (lambda g: print(
@@ -111,6 +124,11 @@ def search_architecture(
         flush=True))
     report = search.run(generations=generations, patience=patience, max_evaluations=max_evaluations,
                         seconds=seconds, progress=progress, seeds=seed_genomes)
+    if trace.active():
+        trace.record("info", "arch", "search end",
+                     {"stop_reason": report.get("stop_reason"), "evaluations": report.get("evaluations"),
+                      "unique_architectures": report.get("unique_architectures"),
+                      "best": {k: (report["best"] or {}).get(k) for k in ("signature", "loss", "params", "score")}})
     if report["best"] is None or task.best_module is None:
         raise RuntimeError("no architecture trained to a finite validation loss")
     best = arch.ArchGenome.from_dict(report["best"]["genome"])
@@ -133,6 +151,44 @@ def search_architecture(
                 "engine_native": is_dense_chain(space, best)}
     return {"module": module, "genome": best, "space": space, "scalers": scalers, "report": report,
             "selected": selected}
+
+
+class TracedEvaluator:
+    """Observes every candidate the search trains (Evolvo's TorchTask) without changing it.
+
+    Attribute reads and writes go to the wrapped task, so the search's own use of it
+    (``epoch_stats``, ``best_module`` ...) is unchanged. Installed only while tracing."""
+
+    def __init__(self, inner, space) -> None:
+        object.__setattr__(self, "_inner", inner)
+        object.__setattr__(self, "_space", space)
+        object.__setattr__(self, "_count", 0)
+
+    def __getattr__(self, name):
+        return getattr(object.__getattribute__(self, "_inner"), name)
+
+    def __setattr__(self, name, value) -> None:
+        setattr(object.__getattribute__(self, "_inner"), name, value)
+
+    def __call__(self, space, genome, info):
+        inner = object.__getattribute__(self, "_inner")
+        result = inner(space, genome, info)
+        count = object.__getattribute__(self, "_count") + 1
+        object.__setattr__(self, "_count", count)
+        epochs = result.get("epochs") or len(result.get("train_curve") or []) or 0
+        trace.tally("torch.train_steps_by_learner", "evolvo.candidate", float(epochs))
+        trace.tally("torch.candidates_by_stop_reason", str(result.get("stop_reason", "unknown")))
+        level = "debug"
+        if trace.enabled(level, "arch"):
+            try:
+                described = space.describe(genome)
+            except Exception:  # noqa: BLE001 - a description never fails the search
+                described = None
+            trace.record(level, "arch", "candidate trained",
+                         {"candidate": count, "signature": info.get("signature"), "seed": info.get("seed"),
+                          "architecture": described, "params": result.get("params"), "loss": result.get("loss"),
+                          "epochs": epochs, "stop_reason": result.get("stop_reason")})
+        return result
 
 
 def _dense_plan(graph) -> Optional[List[tuple]]:

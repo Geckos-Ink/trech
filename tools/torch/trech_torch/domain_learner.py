@@ -27,6 +27,8 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+from . import trace
+
 SCHEMA = "trech_domain_learner_v1"
 
 
@@ -289,11 +291,14 @@ def specialize(state: dict, width: int, epochs: int, seed: int, min_rows: int,
         torch.nn.init.zeros_(net[4].bias)
         optimizer = torch.optim.Adam(net.parameters(), lr=3e-3)
         tr = torch.tensor(train)
-        for _ in range(epochs):
-            optimizer.zero_grad()
-            loss = ((net(zt[tr]) - rt[tr]) ** 2).mean()
-            loss.backward()
-            optimizer.step()
+        with trace.training("domain_learner.residual_mlp", net, optimizer, epochs, rows=len(train)) as progress:
+            for epoch in range(epochs):
+                optimizer.zero_grad()
+                loss = ((net(zt[tr]) - rt[tr]) ** 2).mean()
+                loss.backward()
+                optimizer.step()
+                if trace.active():
+                    progress.epoch(epoch, loss.item())
         with torch.no_grad():
             te = torch.tensor(test)
             ridge_mse = float((rt[te] ** 2).mean())

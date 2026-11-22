@@ -9,7 +9,9 @@ scenario wrote itself, often a fallback that runs when the engine returns nothin
 **engine trace** is a verbose log that you can configure. It records these decisions while the
 run happens. At the end it prints an *attribution summary*: how many inference calls the engine
 answered, how many returned nothing, and how many emitted records had no engine result behind
-them.
+them. It also records the libraries underneath: when Geant4 simulated what, with which
+physics, process by process; which learned models Torch loaded and ran; and how and on what data
+the engine and the Python tools trained (Torch and numpy).
 
 The trace only observes. It never changes physics, random-number streams, emitted payloads, the
 config JSON or the config hash. A traced run's `run_end` provenance record gains a `trace`
@@ -42,7 +44,7 @@ earlier hook, or from JavaScript the scenario wrote. Use the debug records and t
 
 | Option | Meaning |
 | --- | --- |
-| `--trace <level>[:<cat>,...]` | Level and optional category filter, e.g. `trace:predict,evolve`. `run` and `lab` only. |
+| `--trace <level>[:<cat>,...]` | Level and optional category filter, e.g. `trace:predict,evolve` or `trace:geant4_track`. `run`, `lab` and `arch` (`arch` also copies in its Python worker's records). |
 | `--trace-file <path>` | Write the JSONL somewhere other than `<output>/trech_trace.jsonl`. |
 | `--trace-stderr` | Also print every record as one line on stderr (`[trech:debug] hook onEventEnd#3 …`). |
 | `TRECH_TRACE`, `TRECH_TRACE_FILE`, `TRECH_TRACE_STDERR=1` | The same settings from the environment. CLI flags take precedence. Useful when Studio or a script launches `trech`. |
@@ -63,7 +65,10 @@ Each level includes everything below it.
 
 `run`, `model`, `hook`, `scenario`, `authored`, `arbiter`, and one per inference entry point:
 `predict`, `cascade`, `evolve`, `react`, `interact`, `lift`, `detectDomains`, `learnDomains`,
-`evolveField`. Script records use `script`, `console` or the name of a
+`evolveField`. The simulation and learning libraries have their own: `geant4`, `geant4_track`
+and `geant4_step` ([Geant4](#geant4-what-was-simulated-and-how)), `torch`
+([learned models and training](#torch-what-was-inferred-and-trained)), and from the Python
+tools `torch`, `numpy`, `arch` and `python` ([Python tools](#python-tools-torch-and-numpy)). Script records use `script`, `console` or the name of a
 [`TRECH_TRACE.channel`](#log-from-any-javascript-trech_trace-and-console). The category filter limits the records written. It never limits the summary
 counters, and the summary record is always written.
 
@@ -232,6 +237,87 @@ writes `warn` or `error`, so a library never prints on stderr when tracing is of
 are hot numeric primitives with no decisions to report. `trech_helpers.js` is not instrumented
 yet.
 
+## Geant4: what was simulated and how
+
+The base of truth is traced as well, so a trace shows when Geant4 ran, with which physics, and
+what it did. Nothing here changes the simulation: the records only read Geant4's state.
+
+| Level | Category | Records |
+| --- | --- | --- |
+| info | `geant4` | **kernel initialized**: Geant4 version, physics list (with its TRECH extensions, for example `QBBC+Optical`), threads, number of placed volumes, the materials (density, elements, state). **run start (beamOn)**: run id, events, seed, determinism and every primary source (particle, energy, direction, origin, spot, divergence, spread). **run end**: events and the particles seen. |
+| debug | `geant4` | Every placed volume (solid, material, mother, translation), the production-cut couples, the physics processes of the primaries and of common particles, and at run end of every particle seen. One **event simulated** record per event (deposit, steps, tracks, worker thread). |
+| trace | `geant4` | **event start** with the event's primaries (particle, energy, position). |
+| trace | `geant4_track` | **track start** (id, parent, particle, energy, creator process or `primary`, volume, position) and **track end** (process that ended it, steps, length, final energy). |
+| trace | `geant4_step` | One record per step; the message is the process that limited the step (`compt`, `eIoni`, `Transportation`...), with particle, volume, deposit, length and the energy before and after. |
+
+At every level the summary has `tallies` counted from all threads: `geant4.events`,
+`geant4.steps_by_process`, `geant4.edep_mev_by_process`, `geant4.tracks_by_particle`,
+`geant4.tracks_by_creator` and `geant4.steps_by_volume`. The verdict ends with one sentence on
+the base, for example:
+
+```text
+Geant4 simulated 3 events: 10 tracks, 21 steps (most steps: NoProcess 7, eIoni 7, compt 4).
+```
+
+Track and step records are capped at 20000 per category like any other, so filter them, for
+example `--trace trace:geant4_track`; the tallies are always complete. With QBBC, gamma's process
+list shows `GammaGeneralProc`, the wrapper that samples Compton, photoelectric and conversion;
+steps still name the sub-process that ran. While tracing, the engine also registers its tracking
+action (without track hooks) so that tracks are counted.
+
+## Torch: what was inferred and trained
+
+Category `torch` records the engine's learned models and its own training:
+
+- **model loaded / model load failed** (info): component (`generic_surrogate`,
+  `optics_surrogate`, `event_stratifier`), path, backend (`torchscript`, or the JSON law the
+  file holds: `dense`, `ridge_json`, `logistic_json`...), and for TorchScript the module's type,
+  parameter count, submodules and methods plus the LibTorch runtime (version, intra- and
+  inter-op threads, MKL, OpenMP, MPS).
+- **forward** (trace): one record per forward pass with the model and input and output digests.
+  `torch.forwards_by_model` counts every pass and `torch.forward_failures_by_model` the rejected
+  ones (non-finite input or output, wrong width).
+- **training burst** (debug): each time `ctx.learnDomains` trains a domain's residual network
+  with LibTorch Adam: domain, rows, features, targets, hidden width, parameters, steps, learning
+  rate and the loss before and after. `torch.train_steps_by_learner` sums the steps.
+- `trech arch` adds **classic reference trained** (category `arch`, debug) for each structure
+  of its native C++ reference family.
+
+The verdict adds, for example, `Torch ran 2 forward passes over 2 models and 48 training steps.`
+
+## Python tools: torch and numpy
+
+The training tools in [`tools/torch`](../../tools/torch) log through
+[`trech_torch.trace`](../../tools/torch/trech_torch/trace.py), which writes the same records
+(`schema` `trech_trace_v1`, plus `host: "python"`) and reads the same environment:
+
+```sh
+TRECH_TRACE=debug TRECH_TRACE_FILE=build/train_trace.jsonl \
+  build/render-venv/bin/python -m trech_torch.train_surrogate ...
+```
+
+| Category | Records |
+| --- | --- |
+| `torch` | **runtime** once per process (Python, numpy, torch, threads, CUDA/MPS, deterministic algorithms, default dtype). **training start** (learner, epochs, rows, seed, the model's layers and parameters, the optimizer and its settings), **epoch** (loss, learning rate; epochs 1, 2, 4, 8... and the last at debug, every epoch at trace, with the gradient norm), **training end** (steps, first/last/best loss). **model exported** (path, format, bytes, SHA-256). |
+| `numpy` | **array** (debug): shape, dtype, bytes, non-finite count, min/max/mean/std and constant columns of the data a fit saw. **fit** (debug): least-squares/ridge fits with design and target shapes, regularisation and the condition number. The event stratifier's numpy gradient descent is traced like a training loop. |
+| `arch` | Architecture search start and end, and **candidate trained** for every architecture Evolvo trains (architecture, parameters, epochs, loss, stop reason). |
+
+Traced learners: `train_surrogate` (MLP and ridge), `set_networks`, `train_optics_surrogate`,
+`train_event_stratifier`, `domain_learner` (publishing), and the Evolvo architecture search.
+A process writes a **python summary** when it exits: its tallies, counters and authored laws.
+Training gives the same weights with the trace on or off; the trace never draws random numbers.
+
+When `trech arch` runs with `--trace`, it starts its Python worker with the same level and
+categories and its own file (`<job>.worker.log.trace.jsonl`). When the worker ends, the engine
+copies the worker's records into `trech_trace.jsonl` with `origin: "python"` between **worker
+start** and **worker end** records (category `python`), and adds the worker's tallies to its
+summary:
+
+```text
+TRECH trace summary: No ctx inference call ran and nothing was emitted. Torch ran 160 forward passes over 2 models and 360 training steps.
+  torch.train_steps_by_learner: arch.classic_native=180 evolvo.candidate=180
+```
+
 ## Watch it live in Studio
 
 The **Engine trace** tab in Studio's bottom dock asks the engine for the level and categories
@@ -288,8 +374,12 @@ The record format is in the [output schema](output_schema.md#trech_tracejsonl).
   as engine-backed unless the scenario reports the law with `ctx.authored`.
 - A Geant4 tally read from `ctx.event` is ground truth, but the trace does not record those
   reads. Emits built only from tallies appear in `emits_without_inference`.
-- Geant4 transport itself (steps, processes) and the inner stages of `ctx.evolve` and
-  `ctx.cascade` are not traced separately. Their per-stage metadata appears in the result digest
-  at `trace` level.
+- The inner stages of `ctx.evolve` and `ctx.cascade` are not traced separately. Their
+  per-stage metadata appears in the result digest at `trace` level.
+- Geant4's internal model choices within a process (which hadronic model or cross-section data
+  set sampled an interaction) are not recorded; steps name the process only.
+- In the Python tools, Evolvo's per-epoch training inside a candidate is not traced (only each
+  candidate's result), and the scripts in `tools/torch/*.py` outside the `trech_torch` package
+  log only through the trainers they call.
 
 Open work is tracked in the [core roadmap](../../AGENTS/engine/core/ROADMAP.md#priority-queue).

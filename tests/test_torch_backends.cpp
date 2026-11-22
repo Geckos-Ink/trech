@@ -3,6 +3,7 @@
 // Real optional-backend integration, with synthetic numerical modules only.
 // Fixtures are authored in C++, so this gate needs no Python torch package.
 #include "trech/core/Provenance.hpp"
+#include "trech/core/Trace.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/OpticsSurrogate.hpp"
 #include "trech/ml/ScaleCascade.hpp"
@@ -146,6 +147,51 @@ void namedSidecar(const std::filesystem::path& directory) {
   require(stale.load(path.string()) && stale.inputNames().empty() && stale.ioSidecarSha256().empty() &&
           !stale.hasJointDomain() && !stale.domainMeasured() && stale.routingDomain().features.empty() &&
           !stale.predict({{"a", 1.0}}, &out), "Sidecar-free module must stay positional-only");
+}
+// Engine trace (category `torch`): a TorchScript load names its backend, module and LibTorch
+// runtime; every forward pass is tallied per model, failures apart; results never change.
+void traceRecords(const std::filesystem::path& directory) {
+  const auto model = directory / "traced.pt";
+  save(model, "def forward(self, x):\n    return x * 2.0 + 1.0\n");
+  trech::ml::GenericSurrogate plain;
+  std::vector<double> untraced;
+  require(plain.load(model.string()) && plain.predictVector({3, 4}, &untraced), "untraced fixture");
+  trech::trace::Options options;
+  options.level = trech::trace::Level::Trace;
+  options.path = (directory / "torch_trace.jsonl").string();
+  options.categories = {"torch"};
+  trech::trace::configure(options);
+  trech::ml::GenericSurrogate generic;
+  std::vector<double> traced;
+  require(generic.load(model.string()) && generic.predictVector({3, 4}, &traced) && traced == untraced,
+          "tracing changed a TorchScript result");
+  std::vector<double> rejected{99};
+  require(!generic.predictVector({std::numeric_limits<double>::quiet_NaN()}, &rejected), "NaN rejected");
+  const auto summary = trech::trace::summary();
+  trech::trace::finish();
+  const auto& tallies = summary.at("tallies");
+  require(tallies.at("torch.forwards_by_model").value("generic_surrogate:traced.pt", 0.0) == 1.0 &&
+              tallies.at("torch.forward_failures_by_model").value("generic_surrogate:traced.pt", 0.0) == 1.0,
+          "forward passes are tallied per model, failures apart");
+  require(summary.at("verdict").get<std::string>().find("Torch ran 1 forward passes") != std::string::npos,
+          "the verdict names the Torch work");
+  std::ifstream in(options.path);
+  std::string line;
+  bool loaded = false, forward = false;
+  while (std::getline(in, line)) {
+    const auto r = nlohmann::json::parse(line);
+    if (r.value("msg", std::string()) == "model loaded") {
+      const auto& d = r.at("data");
+      loaded = d.at("backend") == "torchscript" && d.at("runtime").contains("libtorch") &&
+               d.at("runtime").at("intra_op_threads").get<int>() >= 1 && d.at("model").contains("methods");
+    }
+    if (r.value("msg", std::string()) == "forward" && r.at("data").at("ok") == true) {
+      forward = r.at("data").at("outputs") == nlohmann::json::array({7.0, 9.0}) &&
+                r.at("data").at("input_size") == 2;
+    }
+  }
+  require(loaded && forward, "torch load and forward records carry backend, runtime and digests");
+  trech::trace::configure({});
 }
 } // namespace
 
@@ -296,6 +342,7 @@ int main() {
     require(!optics.load((directory / "missing.pt").string()) && !optics.loaded() &&
             optics.contentId().empty() && optics.contentSha256().empty() && optics.contentSizeBytes() == 0 &&
             !optics.predict(composition, &optical), "Failed optics reload retained a module");
+    traceRecords(directory);
     std::cout << "TorchScript loaders, lifecycle, strict gates and snapshot inference pass\n";
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';

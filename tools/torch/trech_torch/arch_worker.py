@@ -27,6 +27,8 @@ import time
 import traceback
 from pathlib import Path
 
+from . import trace
+
 REQUEST_SCHEMA = "trech_arch_request_v1"
 RESULT_SCHEMA = "trech_arch_result_v1"
 
@@ -119,6 +121,7 @@ def main(argv=None) -> int:
         _write(result_path, {**base, "status": "unavailable", "error": f"{type(exc).__name__}: {exc}"})
         print(f"arch_worker: unavailable: {exc}", file=sys.stderr)
         return 3
+    trace.announce("torch", "arch_worker")
     try:
         payload = run(json.loads(raw), sha)
     except Exception as exc:  # report every failure to the engine, then fail
@@ -129,6 +132,11 @@ def main(argv=None) -> int:
         _write(result_path, {**base, "status": "error", "error": "non-finite selection loss"})
         return 1
     _write(result_path, {**base, **payload})
+    # The JSON twin and TorchScript were recorded where they were written; add the rest.
+    for name, path in (payload.get("best", {}).get("exports") or {}).items():
+        if name in ("sidecar", "arch"):
+            trace.exported("torch", path, name)
+    trace.finish()
     return 0
 
 

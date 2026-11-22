@@ -48,6 +48,8 @@ public:
   void SetLabels(const std::string& predictable, const std::string& exceptional);
 
 private:
+  bool LoadImpl(const std::string& path);
+  bool PredictLabelImpl(const std::vector<float>& features, std::string* outLabel, float* outScore) const;
   // Standardised logistic model:
   //   p(exceptional) = sigmoid(bias + sum_i w_i * (x_i - mean_i) / std_i)
   // Populated when a .json model is loaded; needs no LibTorch.

@@ -58,6 +58,8 @@ from .dataset import (
     harvest_event_dataset,
 )
 
+from . import trace
+
 
 def fit_logistic(x: np.ndarray, y: np.ndarray, epochs: int, lr: float,
                  l2: float) -> tuple[np.ndarray, float, np.ndarray, np.ndarray]:
@@ -79,14 +81,20 @@ def fit_logistic(x: np.ndarray, y: np.ndarray, epochs: int, lr: float,
     sample_w = np.where(y > 0.5, w_pos, w_neg)
     w = np.zeros(d)
     b = 0.0
-    for _ in range(epochs):
-        z = xs @ w + b
-        p = 1.0 / (1.0 + np.exp(-np.clip(z, -30.0, 30.0)))
-        grad_z = sample_w * (p - y) / n
-        grad_w = xs.T @ grad_z + l2 * w
-        grad_b = float(grad_z.sum())
-        w -= lr * grad_w
-        b -= lr * grad_b
+    trace.array("numpy", "stratifier.x", x)
+    with trace.training("train_event_stratifier.logistic", epochs=epochs, category="numpy", rows=int(n),
+                        optimizer="full_batch_gradient_descent", lr=lr, l2=l2, positives=pos) as progress:
+        for epoch in range(epochs):
+            z = xs @ w + b
+            p = 1.0 / (1.0 + np.exp(-np.clip(z, -30.0, 30.0)))
+            grad_z = sample_w * (p - y) / n
+            grad_w = xs.T @ grad_z + l2 * w
+            grad_b = float(grad_z.sum())
+            w -= lr * grad_w
+            b -= lr * grad_b
+            if trace.active():
+                eps = 1e-12
+                progress.epoch(epoch, float(-(sample_w * (y * np.log(p + eps) + (1 - y) * np.log(1 - p + eps))).mean()))
     return w, b, mean, std
 
 
@@ -182,6 +190,7 @@ def export_torchscript(w: np.ndarray, b: float, mean: np.ndarray,
     scripted = torch.jit.script(module)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     scripted.save(str(out_path))
+    trace.exported("torch", out_path, "torchscript")
     return True
 
 

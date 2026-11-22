@@ -1,4 +1,7 @@
 #include "trech/ml/OpticsSurrogate.hpp"
+
+#include "trech/core/Trace.hpp"
+#include "trech/ml/MlTrace.hpp"
 #include "trech/core/Provenance.hpp"
 
 #include <torch/script.h>
@@ -81,6 +84,15 @@ bool OpticsSurrogate::loadRidgeJson(const std::string& bytes) {
 }
 
 bool OpticsSurrogate::load(const std::string& path) {
+  const bool ok = loadImpl(path);
+  if (trace::active()) {
+    mltrace::modelLoaded("optics_surrogate", path, module_ ? "torchscript" : (ridge_.valid ? "ridge_json" : "none"),
+                         ok, note_, module_ ? mltrace::describe(*module_) : nlohmann::json(nullptr));
+  }
+  return ok;
+}
+
+bool OpticsSurrogate::loadImpl(const std::string& path) {
   modelPath_ = path;
   note_.clear();
   contentId_.clear();
@@ -146,6 +158,18 @@ bool OpticsSurrogate::loaded() const {
 
 bool OpticsSurrogate::predict(const std::vector<float>& composition,
                               std::array<float, 3>* out) const {
+  const bool ok = predictImpl(composition, out);
+  if (trace::active()) {
+    std::vector<double> y;
+    if (ok && out) y = {(*out)[0], (*out)[1], (*out)[2]};
+    mltrace::forward("optics_surrogate", modelPath_, module_ ? "torchscript" : "ridge_json",
+                     std::vector<double>(composition.begin(), composition.end()), y, ok);
+  }
+  return ok;
+}
+
+bool OpticsSurrogate::predictImpl(const std::vector<float>& composition,
+                                  std::array<float, 3>* out) const {
   if (!out) {
     return false;
   }

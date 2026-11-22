@@ -149,6 +149,14 @@ The observation-only engine trace (2026-11-22): a process-wide, mutex-guarded ve
   `TrechRunAction::EndOfRunAction` on the master): level, categories, path, batch index, seq,
   summary hash, totals, verdict. Absent when off, so untraced records keep their bytes. Tallies
   are kept twice (session and since-last-batch); `summary()` is the session.
+- **Tallies and children:** `tally(section, key, n)` (session and batch; summary `tallies`; the
+  verdict adds a Geant4 sentence when `geant4.events` exists and a Torch one for
+  `torch.forwards_by_model`/`torch.train_steps_by_learner`; stderr prints the top six per
+  section). `childEnvironment(path)` gives a child process the same level and categories in
+  its own file; `importRecords(path, origin)` copies its records (new `seq`, `data.origin`,
+  this trace's filter and caps) and folds a child `summary`'s tallies and counters, recording it
+  as `<origin> worker summary`. Used by `ArchitectureGenerator::runPythonModule`; `trech arch`
+  accepts `--trace`.
 - **Roles:** `setRole`/`role`/`isRole` keep a thread-local purpose role (`validation`,
   `reference`, `teacher`, `forced`; `configure` clears it). Records written under a role carry
   `role`; `countCall`/`countAuthored` tally into `Tallies::roles` instead of the scenario's

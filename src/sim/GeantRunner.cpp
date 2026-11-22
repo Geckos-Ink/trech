@@ -1,4 +1,5 @@
 #include "trech/sim/GeantRunner.hpp"
+#include "trech/sim/Geant4Trace.hpp"
 #include "trech/core/LabSession.hpp"
 #include "trech/core/SimulationBudget.hpp"
 #include "trech/core/Provenance.hpp"
@@ -438,6 +439,7 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
   }
 
   runManager->Initialize();
+  trech::sim::g4trace::kernelInitialized(cfg, options.physicsList, runManager->GetNumberOfThreads());
 
   if (!cfg.geometry.refuseOn.empty()) {
     const auto refused =

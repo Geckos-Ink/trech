@@ -41,7 +41,13 @@ Read the root principles and the parent handbook first; then open only the subca
   type. The `test_torch_backends` gate creates real synthetic TorchScript modules in C++, covering all
   three loaders, strict stratification, failed reloads and positional snapshot inference.
   GenericSurrogate's two positional APIs validate full finite tensors before publishing and
-  return false on interpreter failures. A `<model>.pt.io.json` sidecar bound by
+  return false on interpreter failures. Engine trace (`torch` category,
+  [`src/ml/MlTrace.cpp`](../../../src/ml/MlTrace.cpp)): each `load` is `load` → private
+  `loadImpl` plus `mltrace::modelLoaded` (backend, `describe(Module)`, `torchRuntime()`), each
+  forward (`predictInto`'s JSON path, `predictTorchVector` → `predictTorchVectorImpl`,
+  `OpticsSurrogate::predict` → `predictImpl`, `PredictLabel` → `PredictLabelImpl`) reports
+  `mltrace::forward`; `DomainLearner`'s residual `Mlp::train` reports a `trainBurst` with the
+  loss before/after (read only while tracing). `test_torch_backends` checks the records. A `<model>.pt.io.json` sidecar bound by
   `model_sha256` gives a module named IO, units, measured coverage and carried accuracy
   ([inference handbook](../../engine/inference/AGENTS.md)). Platform/model-deployment limits remain in the [dependency roadmap](ROADMAP.md).
 - **QuickJS vs Node/V8 differential:** `scripts/js_engine_differential.py` (+ the Node host

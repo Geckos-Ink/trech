@@ -66,6 +66,8 @@ class OpticsSurrogate {
       double densityGcm3);
 
  private:
+  bool loadImpl(const std::string& modelPath);
+  bool predictImpl(const std::vector<float>& compositionVector, std::array<float, 3>* out) const;
   // Standardised ridge model: n = bias + sum_i w_i * (x_i - mean_i) / std_i.
   // Populated when a .json model is loaded; needs no LibTorch.
   struct RidgeModel {

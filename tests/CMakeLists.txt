@@ -291,6 +291,12 @@ if (Python3_Interpreter_FOUND)
     NAME trech_ml_model_audit
     COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_ml_model_validation.py
   )
+  # Python side of the engine trace (trech_torch.trace): API, numpy/torch records, and trained
+  # weights byte-identical with the trace on and off.
+  add_test(
+    NAME trech_python_trace
+    COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_python_trace.py
+  )
   # Fresh-run re-check report staleness: fails when a re-checked committed model or its
   # recipe changed since docs/validation/ml_model_recheck.json was produced (no NumPy needed).
   add_test(
@@ -387,6 +393,14 @@ if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_lab_geometry_refusal.py"
       "$<TARGET_FILE:trech>")
   set_tests_properties(trech_lab_geometry_refusal PROPERTIES TIMEOUT 300)
+endif()
+# Engine trace, Geant4 side: kernel/run/event/track/step records and tallies from a real kernel,
+# serial and with two workers, traced vs untraced byte identity, run_end provenance reference.
+if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
+  add_test(NAME trech_geant4_trace
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_geant4_trace.py"
+      "$<TARGET_FILE:trech>")
+  set_tests_properties(trech_geant4_trace PROPERTIES TIMEOUT 300)
 endif()
 # Scenario-backed lab with --watch: on-disk hook edits reloaded before the next batch, a
 # kernel-bound edit refused once while the batches continue on the same kernel.

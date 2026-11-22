@@ -149,6 +149,7 @@ add_library(trech_ml
   src/ml/FeaturePipeline.cpp
   src/ml/Stratifier.cpp
   src/ml/TorchScriptStub.cpp
+  src/ml/MlTrace.cpp
   src/ml/OnlineEventStats.cpp
   src/ml/OpticsSurrogate.cpp
   src/ml/GenericSurrogate.cpp
@@ -270,6 +271,7 @@ if (TRECH_ENABLE_GEANT4)
 
     add_library(trech_sim
       src/sim/GeantRunner.cpp
+      src/sim/Geant4Trace.cpp
       src/sim/DetectorConstruction.cpp
       src/sim/ActionInitialization.cpp
       src/sim/PrimaryGeneratorAction.cpp

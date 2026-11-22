@@ -172,6 +172,12 @@ Structures are canonical: a uniform per-layer spelling normalizes to `{width, de
 activation}` so identities predating per-layer plans are unchanged. `tools/ml/lib/` is Node-only.
 `load.js` evaluates definition files in a `vm` sandbox with a time limit. The sandbox has
 `TRECH_TRACE`, `TRECH_LOG` and `console` from [`js/trech_trace.js`](../../../js/trech_trace.js)
+(the Python trainers have the same API in [`trech_torch/trace.py`](../../../tools/torch/trech_torch/trace.py):
+env-configured, `host: "python"` records, `array`/`linear_fit` for numpy, `training(...)` context
+with `epoch(i, loss)`, `exported`, `announce` runtime, `role`, tallies and a `python summary` at
+exit; `evolve_architecture.TracedEvaluator` wraps Evolvo's `TorchTask` only while tracing and
+forwards attribute reads/writes; gate `tests/test_python_trace.py`, CTest `trech_python_trace`;
+the Node loader sandbox uses
 `createTrace` (level from `$TRECH_TRACE`, default info; warn/error always kept); the result's
 `logs` keeps one text line per record (the pre-trace format for plain `console.log`) and `records`
 the `trech_trace_v1` objects. `store.js` is the

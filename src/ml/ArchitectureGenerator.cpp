@@ -14,6 +14,7 @@
 #include <unordered_set>
 
 #include "trech/core/Provenance.hpp"
+#include "trech/core/Trace.hpp"
 #include "trech/js/DeterministicMath.h"
 #include "trech/ml/GenericSurrogate.hpp"
 
@@ -654,6 +655,19 @@ WorkerRun runPythonModule(const std::string& python, const std::string& module,
     envStrings.push_back(entry);
   }
   envStrings.push_back("PYTHONPATH=" + joined + (previous.empty() ? "" : ":" + previous));
+  // While the engine traces, the worker traces at the same level into its own file (it never
+  // inherits the engine's file), which is imported below with origin "python".
+  const std::string childTrace = logPath + ".trace.jsonl";
+  if (trace::active()) {
+    envStrings.erase(std::remove_if(envStrings.begin(), envStrings.end(),
+                                    [](const std::string& e) { return e.rfind("TRECH_TRACE", 0) == 0; }),
+                     envStrings.end());
+    for (auto& e : trace::childEnvironment(childTrace)) envStrings.push_back(std::move(e));
+    std::error_code ignored;
+    std::filesystem::remove(childTrace, ignored);
+    trace::record(trace::Level::Info, "python", "worker start",
+                  {{"python", python}, {"module", module}, {"args", args}, {"trace_file", childTrace}});
+  }
   envStrings.push_back("PYTHONDONTWRITEBYTECODE=1");
   std::vector<char*> envp;
   for (auto& s : envStrings) envp.push_back(s.data());
@@ -700,6 +714,12 @@ WorkerRun runPythonModule(const std::string& python, const std::string& module,
   if (WIFEXITED(status)) run.exitCode = WEXITSTATUS(status);
   else if (WIFSIGNALED(status)) run.exitCode = 128 + WTERMSIG(status);
   if (run.timedOut) run.error = "worker exceeded " + std::to_string(timeoutSeconds) + " s";
+  if (trace::active()) {
+    const std::size_t imported = trace::importRecords(childTrace, "python");
+    trace::record(trace::Level::Info, "python", "worker end",
+                  {{"module", module}, {"exit_code", run.exitCode}, {"timed_out", run.timedOut},
+                   {"seconds", run.seconds}, {"records_imported", imported}});
+  }
   return run;
 #endif
 }
@@ -726,6 +746,16 @@ ArchitectureOutcome ArchitectureGenerator::generate(const ArchitectureJob& job, 
   std::vector<NativeFit> fits;
   for (const auto& structure : classicStructures(job)) fits.push_back(trainClassicNative(job, structure));
   for (const auto& fit : fits) {
+    if (trace::active()) {
+      // Native C++ Adam (no LibTorch): the classic reference family the search must beat.
+      trace::tally("torch.train_steps_by_learner", "arch.classic_native", fit.epochs);
+      trace::record(trace::Level::Debug, "arch", "classic reference trained",
+                    {{"structure", fit.structure.name}, {"widths", fit.structure.widths},
+                     {"activation", fit.structure.activation}, {"params", fit.structure.params},
+                     {"epochs", fit.epochs}, {"best_epoch", fit.bestEpoch}, {"stop_reason", fit.stopReason},
+                     {"selection_loss", fit.selectionLoss}, {"score", fit.score},
+                     {"optimizer", "adam (native C++)"}});
+    }
     classic.push_back({{"structure", fit.structure.name}, {"params", fit.structure.params},
                        {"selection_loss", fit.selectionLoss}, {"score", fit.score}, {"epochs", fit.epochs},
                        {"best_epoch", fit.bestEpoch}, {"stop_reason", fit.stopReason},

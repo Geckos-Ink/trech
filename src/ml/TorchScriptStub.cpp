@@ -1,5 +1,8 @@
 #include "trech/ml/TorchScriptStub.hpp"
 
+#include "trech/core/Trace.hpp"
+#include "trech/ml/MlTrace.hpp"
+
 #include "trech/ml/FeaturePipeline.hpp"
 #include "trech/core/Provenance.hpp"
 
@@ -114,6 +117,15 @@ void TorchScriptStub::reset(const std::string& path) {
 }
 
 bool TorchScriptStub::Load(const std::string& path) {
+  const bool ok = LoadImpl(path);
+  if (trace::active()) {
+    mltrace::modelLoaded("event_stratifier", path, module_ ? "torchscript" : (logistic_.valid ? "logistic_json" : "none"),
+                         ok, note_, module_ ? mltrace::describe(*module_) : nlohmann::json(nullptr));
+  }
+  return ok;
+}
+
+bool TorchScriptStub::LoadImpl(const std::string& path) {
   reset(path);
   if (modelPath_.empty()) {
     note_ = "empty modelPath";
@@ -180,6 +192,20 @@ bool TorchScriptStub::loaded() const {
 bool TorchScriptStub::PredictLabel(const std::vector<float>& features,
                                    std::string* outLabel,
                                    float* outScore) const {
+  float score = -1.0f;
+  const bool ok = PredictLabelImpl(features, outLabel, outScore ? outScore : &score);
+  if (trace::active()) {
+    std::vector<double> y;
+    if (ok) y.push_back(outScore ? *outScore : score);
+    mltrace::forward("event_stratifier", modelPath_, module_ ? "torchscript" : "logistic_json",
+                     std::vector<double>(features.begin(), features.end()), y, ok);
+  }
+  return ok;
+}
+
+bool TorchScriptStub::PredictLabelImpl(const std::vector<float>& features,
+                                       std::string* outLabel,
+                                       float* outScore) const {
   if (!outLabel) {
     return false;
   }

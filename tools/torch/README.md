@@ -28,6 +28,21 @@ schema-checked harvester, `trech_torch/dataset.py`, whose schemas are locked to
 the C++ side (`FeaturePipeline` `trech_event_features_v1` and
 `OpticsSurrogate::kCompositionElements`).
 
+## Tracing training (torch and numpy)
+
+Every trainer here logs to the [engine trace](../../docs/engine/engine_trace.md#python-tools-torch-and-numpy)
+through `trech_torch.trace` when `TRECH_TRACE` is set: the numerical runtime, the arrays a fit
+saw, each training loop's model, optimizer and loss per epoch, numpy least-squares fits, and
+every exported model with its SHA-256. For example:
+
+```bash
+TRECH_TRACE=debug TRECH_TRACE_FILE=build/train_trace.jsonl \
+  build/render-venv/bin/python -m trech_torch.train_surrogate --help
+```
+
+The trace never changes the trained weights (`tests/test_python_trace.py` checks this). Off
+by default.
+
 ## C++ backend checks
 
 LibTorch is a required engine dependency, and this package's environment is the required

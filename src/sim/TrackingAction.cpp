@@ -1,4 +1,5 @@
 #include "trech/sim/TrackingAction.hpp"
+#include "trech/sim/Geant4Trace.hpp"
 
 #include "trech/js/JsRuntime.hpp"
 #include "trech/sim/RunAction.hpp"
@@ -72,6 +73,7 @@ bool registersTrackHook(const TrechConfig& cfg) {
 }
 
 void TrechTrackingAction::PreUserTrackingAction(const G4Track* track) {
+  sim::g4trace::trackStarted(track);
   auto* runAction = currentRunAction();
   if (!track || !runAction || !runAction->HookOnTrackStartEnabled() ||
       !runAction->RecordHookOnTrackStart()) {
@@ -88,6 +90,7 @@ void TrechTrackingAction::PreUserTrackingAction(const G4Track* track) {
 }
 
 void TrechTrackingAction::PostUserTrackingAction(const G4Track* track) {
+  sim::g4trace::trackEnded(track);
   auto* runAction = currentRunAction();
   if (!track || !runAction || !runAction->HookOnTrackEndEnabled() ||
       !runAction->RecordHookOnTrackEnd()) {

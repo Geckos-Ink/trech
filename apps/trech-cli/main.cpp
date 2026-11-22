@@ -268,13 +268,14 @@ int main(int argc, char** argv) {
     return options.valid ? 0 : 2;
   }
 
-  // The trace covers run and lab (inspect/arch/budget stay silent). Its run-end summary is
+  // The trace covers run, lab and arch (inspect/budget stay silent). Its run-end summary is
   // written however the command ends, including on an error.
   struct TraceFinish {
     ~TraceFinish() { trech::trace::finish(); }
   } traceFinish;
   try {
-    if (options.command == trech::CliCommand::Run || options.command == trech::CliCommand::Lab) {
+    if (options.command == trech::CliCommand::Run || options.command == trech::CliCommand::Lab ||
+        options.command == trech::CliCommand::Arch) {
       trech::configureTraceFromOptions(options);
     }
     if (!options.jsEngine.empty()) {

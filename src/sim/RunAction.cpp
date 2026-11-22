@@ -1,4 +1,5 @@
 #include "trech/sim/RunAction.hpp"
+#include "trech/sim/Geant4Trace.hpp"
 #include "trech/sim/HookRegistration.hpp"
 
 #include "trech/sim/EventHistogram.hpp"
@@ -806,6 +807,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
     return;
   }
   eventRecords_->beginRun(orderedOutput_);
+  sim::g4trace::runStarted(run, cfg_, activeNEvents_, static_cast<unsigned long long>(activeSeed_));
   RecordHookOnInit();
   RecordHookOnRunStart();
   DispatchHook("onRunStart");
@@ -1874,6 +1876,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   copyGeometryIssues(options_, record);
   record.configUnknownKeys = cfg_.unknownKeys;
   record.hookPatchIgnoredPaths = activeHookInit_.ignoredPatchPaths;
+  sim::g4trace::runEnded(run, activeNEvents_);
   // Observation-only: closes this batch's trace summary and stores its reference (null when off).
   if (const auto traceRef = trace::batchSummary(activeRunId_); !traceRef.is_null()) {
     record.traceJson = traceRef.dump();

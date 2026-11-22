@@ -1,4 +1,7 @@
 #include "trech/ml/GenericSurrogate.hpp"
+
+#include "trech/core/Trace.hpp"
+#include "trech/ml/MlTrace.hpp"
 #include "trech/core/Provenance.hpp"
 
 #include <torch/script.h>
@@ -931,6 +934,17 @@ bool GenericSurrogate::loadTorchIoSidecar(const std::string& moduleSha256) try {
 }
 
 bool GenericSurrogate::load(const std::string& path) {
+  const bool ok = loadImpl(path);
+  if (trace::active()) {
+    mltrace::modelLoaded("generic_surrogate", path,
+                         module_ ? "torchscript" : (valid_ ? networkKind() : "none"), ok, note_,
+                         module_ ? mltrace::describe(*module_)
+                                 : nlohmann::json{{"inputs", inputNames_}, {"outputs", outputNames_}});
+  }
+  return ok;
+}
+
+bool GenericSurrogate::loadImpl(const std::string& path) {
   modelPath_ = path;
   modelId_.clear();
   contentId_.clear();
@@ -1174,6 +1188,18 @@ std::vector<double>* GenericSurrogate::predictSet(const double* z,
 bool GenericSurrogate::predictTorchVector(const double* inputs,
                                           std::size_t inputCount,
                                           std::vector<double>* out) const {
+  const bool ok = predictTorchVectorImpl(inputs, inputCount, out);
+  if (trace::active()) {
+    mltrace::forward("generic_surrogate", modelPath_, "torchscript",
+                     std::vector<double>(inputs, inputs + inputCount),
+                     ok && out ? *out : std::vector<double>(), ok);
+  }
+  return ok;
+}
+
+bool GenericSurrogate::predictTorchVectorImpl(const double* inputs,
+                                          std::size_t inputCount,
+                                          std::vector<double>* out) const {
   if (!module_) return false;
   std::vector<float> features;
   features.reserve(inputCount);
@@ -1263,6 +1289,11 @@ bool GenericSurrogate::predictInto(const double* inputs,
     // Decode every output before publishing any: an overflowing link must not
     // leave a partially written state update in the caller's buffer.
     std::copy(current->begin(), current->end(), out);
+    if (trace::active()) {
+      mltrace::forward("generic_surrogate", modelPath_, networkKind(),
+                       std::vector<double>(inputs, inputs + inputCount),
+                       std::vector<double>(out, out + outCount), true);
+    }
     return true;
   }
   std::vector<double> decoded;

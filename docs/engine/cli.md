@@ -23,7 +23,7 @@ and `--viz-all` also captures non-optical trajectories. `run` also supports a Ge
 `--macro` or interactive `--ui` when the corresponding Geant4 support is available.
 Use a separate `--output` directory per run to make comparisons easy.
 
-`--trace <level>[:<categories>]` (`run` and `lab`) turns on the observation-only
+`--trace <level>[:<categories>]` (`run`, `lab` and `arch`) turns on the observation-only
 [engine trace](engine_trace.md). The levels are `summary`, `info`, `debug` and `trace`. The
 trace writes `<output>/trech_trace.jsonl`, or the file named by `--trace-file`, and prints an
 attribution summary on stderr at the end. `--trace-stderr` also prints every record. The

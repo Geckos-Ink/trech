@@ -1,4 +1,5 @@
 #include "trech/sim/SteppingAction.hpp"
+#include "trech/sim/Geant4Trace.hpp"
 
 #include "trech/sim/EventAction.hpp"
 #include "trech/sim/KleinNishina.hpp"
@@ -209,6 +210,7 @@ std::string opticalBoundaryClass(const G4Track* track) {
 }  // namespace
 
 void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
+  sim::g4trace::step(step);  // observation-only; returns at once when the trace is off
   const auto* track = step->GetTrack();
   const auto edep = step->GetTotalEnergyDeposit();
   // Class of the particle taking this step (primaries included), shared by the

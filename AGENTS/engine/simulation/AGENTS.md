@@ -13,6 +13,16 @@ Read the root principles and the parent handbook first; then open only the subca
 What Geant4 covers as base truth, what it does not model by design (and which TRECH layer replaces it),
 and pending migration items for the pinned checkout: [`docs/engine/GEANT4_features_and_limits.md`](../../../docs/engine/GEANT4_features_and_limits.md).
 
+- **Geant4 trace (2026-11-22).** [`src/sim/Geant4Trace.cpp`](../../../src/sim/Geant4Trace.cpp)
+  (`trech::sim::g4trace`) is the only Geant4 instrumentation: one guarded call each from
+  `GeantRunner` (after `Initialize`: `kernelInitialized`), the master `RunAction` begin/end
+  (`runStarted`, `runEnded`, before `batchSummary`), `EventAction` begin/end, `TrackingAction`
+  pre/post and `SteppingAction`. Categories `geant4` (info/debug/trace), `geant4_track` and
+  `geant4_step` (trace). Step/track counts go into a thread-local `ThreadTally` flushed into
+  `trace::tally` at each event end (no mutex on the step path); `runEnded` flushes the master's.
+  It only reads Geant4 state. `ActionInitialization` also registers `TrechTrackingAction` while
+  tracing (its hooks stay off unless a track hook is declared). End-to-end gate:
+  `tests/test_geant4_trace.py` (CTest `trech_geant4_trace`, serial and two workers).
 - **Post-`Initialize` carriers are pre-allocated before `SetUserInitialization`.** `derivedOptics`,
   `analyticChecks`, `materialProbes` are `shared_ptr` carriers on `RunOptions` filled after Geant4
   `Initialize` (tables built) in [`src/sim/GeantRunner.cpp`](../../../src/sim/GeantRunner.cpp) and paired

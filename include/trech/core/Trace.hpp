@@ -21,6 +21,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -109,6 +110,11 @@ void countScript(std::string_view name, double amount);
 std::uint64_t spanBegin(std::string_view category, std::string_view name);
 void spanEnd(std::uint64_t id, nlohmann::json data = nullptr);
 
+// Named tallies of what the base and the learners did (Geant4 steps per process, tracks per
+// particle, Torch forwards per model, training steps...): summed per `section` and `key`, listed in
+// the batch and run summaries as `tallies{section:{key:amount}}`. No-op when off.
+void tally(std::string_view section, std::string_view key, double amount = 1.0);
+
 // Attribution counters for the run summary (kept at every level above Off).
 void countCall(std::string_view call, std::string_view outcome);
 void countHook(std::string_view hook, std::size_t emits, std::size_t engineBackedCalls,
@@ -120,6 +126,15 @@ void countModel(std::string_view name, bool loaded);
 // Compact copy of a JSON value: scalars kept, strings/arrays/objects truncated, depth-limited,
 // bounded by `maxBytes` of serialized output.
 nlohmann::json digest(const nlohmann::json& value, std::size_t maxBytes);
+
+// Child-process tracing (the Python workers the engine starts). childEnvironment returns the
+// TRECH_TRACE / TRECH_TRACE_FILE / TRECH_TRACE_STDERR entries that make a child write the same
+// level and categories into `childPath` (empty when off). importRecords then copies that file's
+// records into this trace with a new `seq` and `origin` (e.g. "python"), applying this trace's
+// level, categories and caps, and folds the child summary's `tallies` and `counters` into the
+// batch and run summaries. Returns the number of records copied.
+std::vector<std::string> childEnvironment(const std::string& childPath);
+std::size_t importRecords(const std::string& childPath, std::string_view origin);
 
 // The run summary: attribution per ctx call, per hook, authored laws, models, suppressed records,
 // and a short plain-language verdict.
