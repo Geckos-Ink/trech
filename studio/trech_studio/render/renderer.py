@@ -63,7 +63,7 @@ def _rotation_matrix(deg: Tuple[float, float, float]) -> np.ndarray:
     my = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]], dtype=np.float32)
     mz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]], dtype=np.float32)
     r = np.eye(4, dtype=np.float32)
-    r[:3, :3] = mz @ my @ mx
+    r[:3, :3] = (mz @ my @ mx).T  # Geant4 turns the solid by R^T (scene.model.euler_matrix)
     return r
 
 

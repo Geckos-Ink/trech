@@ -16,7 +16,6 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R6 · All-scenario render parity: moving apparatus meshes, scalar colour bars, chart/text overlays, simultaneous streams and an all-family capture matrix. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P2** · R6 · Transform gizmos (translate/rotate/scale) on the selected volume. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics. Undo/redo landed 2026-11-22; nested creation and reparenting landed 2026-11-23 (parent control, parent-composed viewport placement). Custom material definitions and per-field engine diagnostics remain. ([detail](#milestone-2--real-time-scenario-editing))
-- **P2** · R6 · Rotation sense against Geant4: the engine passes `rotateX`→`rotateY`→`rotateZ` as the `G4RotationMatrix*` of `G4PVPlacement`, which Geant4 applies as the mother frame's rotation relative to the daughter (a passive rotation), while Studio draws and composes `Rz·Ry·Rx` as an active rotation. If so, Studio shows every non-symmetric rotated volume (and children of a rotated parent) mirrored in angle. Unverified: confirm with a Geant4 run (a rotated thin slab hit by a pencil beam, or `G4Navigator` world transforms dumped beside the viz scene) before changing either side. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Callback-bearing scene round-trip: reconstruct typed declarations (`TRECH_VALUE`), companions and callback source so a run that registered hooks can be exported; `scene_to_config` still refuses `hooks.registered`. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Code editor: inline error markers, dynamic aliases/computed properties, template interpolation and complete config-schema completion (from Milestone 0). ([detail](../ROADMAP.md#milestone-0--the-basis-this-scaffold-landed-2026-07-11))
 - **P3** · R6 · Dependency packaging refuses model files the recorded run never opened (strict mode or a disabled optics/stratifier loader records no SHA-256), so such transport runs cannot be exported with their declared model; files a model names internally are not followed. ([detail](#milestone-2--real-time-scenario-editing))
@@ -119,6 +118,16 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   offsets its parent). `test_scene_hierarchy.py` covers composition through a rotated parent,
   the engine fallbacks, nested creation with export and reparenting into a later volume.
   Studio pytest 358/358.
+- [x] **Rotation sense matches Geant4 (2026-11-23):** Studio (`scene.model.euler_matrix`, the
+  renderer's `_rotation_matrix`) and `tools/viz` now draw `(Rz·Ry·Rx)ᵀ`, the rotation
+  `G4PVPlacement` gives a volume when handed the engine's frame rotation. Evidence: the Geant4
+  probe `tests/fixtures/rotation_sense/rotation_sense_probe.js` (100 MeV protons, slab at
+  `[25, −35, 40]`) deposits 112 MeV at the `Rᵀ` point and ~1e-21 MeV at the active, reversed-order
+  and negated-angle points; a pad nested in a frame at `[0, 0, 30]` deposits 157 MeV on the `Rᵀ`
+  side and 0.27 MeV on the other. Studio pytest 359/359 and `tools/viz` 20/20 (render venv) carry
+  both anchors; the old `tools/viz` assertion (+Z to −Y for `[90, 0, 0]`) was the active sense and
+  is now +Y. No bundled scenario rotates a shape that is not symmetric under the change, so no
+  reference media changed.
 - [ ] Inspector extensions: custom material definitions, per-field engine diagnostics and crash
   recovery. Current
   Inspector drafts require a matching, exportable transport run; callback/model-bearing scenarios

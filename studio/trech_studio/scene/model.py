@@ -153,16 +153,25 @@ BUILTIN_PARENTS = frozenset({"world", "medium", "mediumbox", "medium_box"})
 
 
 def euler_matrix(rotation_deg: Vec3) -> Mat3:
-    """The renderer's Euler rotation ``Rz @ Ry @ Rx`` for a volume's ``rotation_deg``."""
+    """The rotation Geant4 gives a volume with ``rotation_deg``: ``(Rz @ Ry @ Rx)^T``.
+
+    The engine builds ``R = Rz @ Ry @ Rx`` (``G4RotationMatrix`` ``rotateX``, ``rotateY``,
+    ``rotateZ``) and passes it to ``G4PVPlacement``, which takes it as the rotation of the mother
+    frame relative to the daughter, so the solid itself is turned by ``R^T``. A Geant4 pencil-beam
+    probe confirmed it (2026-11-23): a slab authored at ``(25, -35, 40)`` deposited 112 MeV only
+    where ``R^T`` puts it (see ``docs/studio/studio_authoring.md``). ``js/trech_geometry.js``
+    uses the same rule for its overlap bounds.
+    """
     rx, ry, rz = (math.radians(d) for d in rotation_deg)
     cx, sx = math.cos(rx), math.sin(rx)
     cy, sy = math.cos(ry), math.sin(ry)
     cz, sz = math.cos(rz), math.sin(rz)
-    return (
+    r = (
         (cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx),
         (sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx),
         (-sy, cy * sx, cy * cx),
     )
+    return tuple(tuple(r[j][i] for j in range(3)) for i in range(3))  # type: ignore[return-value]
 
 
 def _mat_mul(a: Mat3, b: Mat3) -> Mat3:
@@ -390,7 +399,7 @@ class SceneModel:
         placements = self.world_placements()
         for v in drawn:
             he_local = v.half_extent_mm()
-            # World rotation (parents composed, Rz @ Ry @ Rx each). The AABB half extent after
+            # World rotation (parents composed, (Rz @ Ry @ Rx)^T each). The AABB half extent after
             # rotation is abs(R) @ local_half_extent.
             rotation, position = placements[v.name.lower()]
             he = tuple(

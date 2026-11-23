@@ -27,10 +27,27 @@ def test_world_placement_composes_a_rotated_parent():
                       shape=Shape(type="box", size_mm=(2., 2., 2.)))
     placed = _scene(holder, core).world_placements()
     rotation, position = placed["core"]
-    assert position == pytest.approx((10., 5., 0.), abs=1e-12)   # 90 deg about z maps +x to +y
-    assert rotation[0][1] == pytest.approx(-1.) and rotation[1][0] == pytest.approx(1.)
+    # Geant4 turns a volume by (Rz Ry Rx)^T, so an authored +90 deg about z maps +x to -y.
+    assert position == pytest.approx((10., -5., 0.), abs=1e-12)
+    assert rotation[0][1] == pytest.approx(1.) and rotation[1][0] == pytest.approx(-1.)
     lo, hi = _scene(holder, core).bounds_mm()
-    assert lo[1] == pytest.approx(-2.) and hi[1] == pytest.approx(6.)  # holder and core both fit
+    assert lo[1] == pytest.approx(-6.) and hi[1] == pytest.approx(2.)  # holder and core both fit
+
+
+def test_rotation_sense_matches_the_geant4_pencil_beam_probes():
+    """Anchors from Geant4 runs (2026-11-23): 100 MeV protons along +z deposited energy only
+    where Studio now draws the volume (docs/studio/studio_authoring.md, rotation sense)."""
+    slab = VolumeNode("slab", "G4_WATER", parent="world", rotation_deg=(25., -35., 40.),
+                      shape=Shape(type="box", size_mm=(100., 4., 4.)))
+    rotation, _ = _scene(slab).world_placements()["slab"]
+    tip = tuple(40. * rotation[i][0] for i in range(3))   # 40 mm along the slab's local +x
+    assert tip == pytest.approx((25.10, -30.73, -5.06), abs=0.01)  # beam here: 112 MeV, elsewhere ~0
+    frame = VolumeNode("frame", "G4_AIR", parent="world", rotation_deg=(0., 0., 30.),
+                       shape=Shape(type="box", size_mm=(120., 120., 20.)))
+    pad = VolumeNode("pad", "G4_WATER", parent="frame", position_mm=(40., 0., 0.),
+                     shape=Shape(type="box", size_mm=(10., 10., 10.)))
+    _, position = _scene(frame, pad).world_placements()["pad"]
+    assert position == pytest.approx((34.64, -20.0, 0.), abs=0.01)  # beam here: 157 MeV; at +20: 0.27
 
 
 def test_unknown_later_and_builtin_parents_place_in_the_world_like_the_engine():
@@ -60,9 +77,10 @@ def test_inspector_creates_a_nested_volume_and_exports_its_parent(window):  # no
     assert [v["name"] for v in volumes] == ["sample", "core"]
     assert volumes[1]["placement"]["parent"] == "sample"
     assert "parent" not in volumes[0]["placement"]   # an untouched recorded volume keeps its bytes
-    # The sample is rotated 10 deg about y, so the child sits on the sample's tilted axis.
+    # The sample is rotated 10 deg about y (by R^T, as Geant4 places it), so the child sits on
+    # the sample's tilted axis.
     position = window._scene.world_placements()["core"][1]
-    assert position == pytest.approx((5 * math.sin(math.radians(10.)), 0., 5 * math.cos(math.radians(10.))))
+    assert position == pytest.approx((-5 * math.sin(math.radians(10.)), 0., 5 * math.cos(math.radians(10.))))
 
 
 def test_reparenting_offers_neither_the_volume_nor_its_descendants(window):  # noqa: F811

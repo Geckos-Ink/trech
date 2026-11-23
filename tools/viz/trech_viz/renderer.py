@@ -65,7 +65,12 @@ def _build_sphere(volume: Volume):
 
 
 def _rotation_matrix(degrees: Tuple[float, float, float]) -> np.ndarray:
-    """Geant4/Studio-compatible Euler rotation (Rz @ Ry @ Rx)."""
+    """The rotation Geant4 gives a volume: (Rz @ Ry @ Rx)^T.
+
+    DetectorConstruction passes R = Rz @ Ry @ Rx to G4PVPlacement, which takes it as the mother
+    frame's rotation, so the solid is turned by R^T (confirmed by a Geant4 pencil-beam probe,
+    2026-11-23; Studio's scene.model.euler_matrix and js/trech_geometry.js use the same rule).
+    """
     rx, ry, rz = (math.radians(value) for value in degrees)
     cx, sx = math.cos(rx), math.sin(rx)
     cy, sy = math.cos(ry), math.sin(ry)
@@ -74,7 +79,7 @@ def _rotation_matrix(degrees: Tuple[float, float, float]) -> np.ndarray:
     my = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]], dtype=float)
     mz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]], dtype=float)
     result = np.eye(4, dtype=float)
-    result[:3, :3] = mz @ my @ mx
+    result[:3, :3] = (mz @ my @ mx).T
     return result
 
 

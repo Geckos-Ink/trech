@@ -127,9 +127,13 @@ def test_shared_render_hints_and_tube_rotation():
     ])
     assert hints["shell"] and hints["emissive"] and hints["opacity"] == 0.2
     assert np.allclose(hints["color"], [1.0, 122 / 255.0, 24 / 255.0])
-    # Local +Z becomes global -Y for Geant4's +90-degree X placement convention.
+    # Geant4 turns the solid by R^T: an authored +90-degree X rotation takes local +Z to global
+    # +Y (a Geant4 pencil-beam probe confirmed the inverse sense, 2026-11-23).
     rotated = _rotation_matrix((90.0, 0.0, 0.0)) @ np.array([0.0, 0.0, 1.0, 0.0])
-    assert np.allclose(rotated[:3], [0.0, -1.0, 0.0], atol=1e-7)
+    assert np.allclose(rotated[:3], [0.0, 1.0, 0.0], atol=1e-7)
+    # The probe's slab at (25, -35, 40): its +X axis at 40 mm reaches where the beam deposited.
+    tip = 40.0 * (_rotation_matrix((25.0, -35.0, 40.0)) @ np.array([1.0, 0.0, 0.0, 0.0]))[:3]
+    assert np.allclose(tip, [25.10, -30.73, -5.06], atol=0.01)
 
 
 def test_classic_fluid_neck_raises_midpoint_density_without_moving_centres():

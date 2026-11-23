@@ -64,7 +64,10 @@ used for edits; the `scene_parent` control nests a new volume (default world) or
 existing one, offering only parents that cannot form a cycle. Pose is relative to the parent.
 `SceneModel.world_placements()` composes a volume with a parent declared earlier (unknown, later
 and built-in parents place it in the world, matching `resolveParentVolume`); the renderer's model
-matrices and `bounds_mm` use it. The volume inspector removes a leaf volume from the draft.
+matrices and `bounds_mm` use it. Rotations are `(Rz·Ry·Rx)ᵀ` (`euler_matrix`), the sense
+`G4PVPlacement` gives the engine's frame rotation, confirmed by
+`tests/fixtures/rotation_sense/rotation_sense_probe.js`; keep `tools/viz` and
+`js/trech_geometry.js` (overlap bounds) on the same rule. The volume inspector removes a leaf volume from the draft.
 The writer rejects case-insensitive name collisions, new names reserved for built-in parents,
 and removal of a parent still referenced by a child.
 Apply builds a detached candidate, validates it through the same lossless writer, and only then

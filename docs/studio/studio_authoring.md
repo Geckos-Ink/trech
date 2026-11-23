@@ -83,7 +83,20 @@ frame: a `core` at `0, 0, 5` inside a `holder` placed at `10, 0, 0` sits at `10,
 world. The viewport draws and frames volumes through their parents (since 2026-11-23; before,
 Studio drew every volume as if it were placed in the world, which misplaced recorded nested
 volumes whose parent is offset). On export the writer orders volumes parents first, so a volume
-may be nested in one listed after it. **Remove volume from draft** is available in the volume
+may be nested in one listed after it.
+
+**Rotation sense.** `rotationDeg: [x, y, z]` turns a volume by `(Rz·Ry·Rx)ᵀ`, the inverse of
+the active Euler rotation. The engine builds `R = Rz·Ry·Rx` and hands it to Geant4's
+`G4PVPlacement`, which reads it as the rotation of the parent's frame relative to the volume. So an
+authored `[0, 0, 30]` turns a volume by −30° about z: a long box's +x axis then points to
+`(cos 30°, −sin 30°)`. Studio and `tools/viz` drew the active rotation until 2026-11-23, which
+showed every rotated volume that is not symmetric about its rotation, and every child of a rotated
+parent, turned the wrong way. A Geant4 probe settled it. In
+[`tests/fixtures/rotation_sense/rotation_sense_probe.js`](../../tests/fixtures/rotation_sense/rotation_sense_probe.js),
+a 100 MeV proton beam deposits 112 MeV only where `Rᵀ` places a slab authored at `[25, −35, 40]`,
+and about 1e-21 MeV at the points the other conventions predict. Bundled scenarios rotate only
+cylinders by `[90, 0, 0]`, which look the same either way, so no committed reference image
+changes. Engine physics is unchanged. **Remove volume from draft** is available in the volume
 Inspector. Remove any child volumes first. Names must be unique regardless of case.
 
 Apply updates the viewport and Outliner as an authored draft. Recorded trajectories/frames and
