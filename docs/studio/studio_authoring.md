@@ -74,7 +74,16 @@ leave the scene unchanged. Materials are selected from the current scene; TRECH 
 names, materials, geometry overlaps and physics when the exported scenario is run.
 
 Select World and choose **Add primitive volume…** to place a named box, sphere, tube or
-cylinder directly in the world. **Remove volume from draft** is available in the volume
+cylinder. Its **parent** is the world by default; choose the medium box or any existing volume to
+nest it. A selected volume's **parent** control reparents it: the list offers default (the medium
+box if the scene has one, else the world), the world, the medium box and every volume that is
+neither the selected one nor nested inside it, so a cycle cannot be built. **Position in parent**
+and **rotation in parent** are relative to the parent, as Geant4 places a volume in its parent's
+frame: a `core` at `0, 0, 5` inside a `holder` placed at `10, 0, 0` sits at `10, 0, 5` in the
+world. The viewport draws and frames volumes through their parents (since 2026-11-23; before,
+Studio drew every volume as if it were placed in the world, which misplaced recorded nested
+volumes whose parent is offset). On export the writer orders volumes parents first, so a volume
+may be nested in one listed after it. **Remove volume from draft** is available in the volume
 Inspector. Remove any child volumes first. Names must be unique regardless of case.
 
 Apply updates the viewport and Outliner as an authored draft. Recorded trajectories/frames and

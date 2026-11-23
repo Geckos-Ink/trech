@@ -146,6 +146,34 @@ class RenderHint:
         return hint
 
 
+Mat3 = Tuple[Vec3, Vec3, Vec3]
+
+# Parents the engine resolves to a box centred on the origin with no rotation.
+BUILTIN_PARENTS = frozenset({"world", "medium", "mediumbox", "medium_box"})
+
+
+def euler_matrix(rotation_deg: Vec3) -> Mat3:
+    """The renderer's Euler rotation ``Rz @ Ry @ Rx`` for a volume's ``rotation_deg``."""
+    rx, ry, rz = (math.radians(d) for d in rotation_deg)
+    cx, sx = math.cos(rx), math.sin(rx)
+    cy, sy = math.cos(ry), math.sin(ry)
+    cz, sz = math.cos(rz), math.sin(rz)
+    return (
+        (cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx),
+        (sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx),
+        (-sy, cy * sx, cy * cx),
+    )
+
+
+def _mat_mul(a: Mat3, b: Mat3) -> Mat3:
+    return tuple(tuple(sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3))
+                 for i in range(3))  # type: ignore[return-value]
+
+
+def _mat_vec(a: Mat3, v: Vec3) -> Vec3:
+    return tuple(sum(a[i][k] * v[k] for k in range(3)) for i in range(3))  # type: ignore[return-value]
+
+
 @dataclass
 class VolumeNode:
     """One placed volume in the scene tree."""
@@ -323,6 +351,28 @@ class SceneModel:
         emissive = 1.0 if (hint.emissive or vol.is_emitter or vol.forced_white) else 0.0
         return rgba, (float(reflectance), float(gloss), float(emissive), 0.0)
 
+    def world_placements(self) -> Dict[str, Tuple[Mat3, Vec3]]:
+        """Each volume's rotation and position in the world frame, keyed by lower-case name.
+
+        A volume's ``position_mm``/``rotation_deg`` are relative to its parent, as Geant4 places
+        a daughter in its mother's frame. The parent must be declared earlier, as the engine
+        builds volumes in list order: a missing, unknown or later-declared parent, and the
+        built-in world and medium box (both centred on the origin, unrotated), place the volume
+        in the world frame, which is where the engine's parent fallback puts it.
+        """
+        placed: Dict[str, Tuple[Mat3, Vec3]] = {}
+        for v in self.volumes:
+            rotation = euler_matrix(v.rotation_deg)
+            position = tuple(float(x) for x in v.position_mm)
+            parent = placed.get(v.parent.lower()) if v.parent.lower() not in BUILTIN_PARENTS else None
+            if parent is not None:
+                parent_rotation, parent_position = parent
+                offset = _mat_vec(parent_rotation, position)
+                position = tuple(parent_position[i] + offset[i] for i in range(3))
+                rotation = _mat_mul(parent_rotation, rotation)
+            placed.setdefault(v.name.lower(), (rotation, position))  # type: ignore[arg-type]
+        return placed
+
     def bounds_mm(self) -> Tuple[Vec3, Vec3]:
         """Axis-aligned bounds for camera fitting.
 
@@ -337,23 +387,16 @@ class SceneModel:
             return ((-half, -half, -half), (half, half, half))
         lo = [float("inf"), float("inf"), float("inf")]
         hi = [float("-inf"), float("-inf"), float("-inf")]
+        placements = self.world_placements()
         for v in drawn:
             he_local = v.half_extent_mm()
-            rx, ry, rz = (math.radians(d) for d in v.rotation_deg)
-            cx, sx = math.cos(rx), math.sin(rx)
-            cy, sy = math.cos(ry), math.sin(ry)
-            cz, sz = math.cos(rz), math.sin(rz)
-            # Same Euler order as the renderer/Geant4 path: Rz @ Ry @ Rx. The AABB half extent
-            # after rotation is abs(R) @ local_half_extent.
-            rotation = (
-                (cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx),
-                (sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx),
-                (-sy, cy * sx, cy * cx),
-            )
+            # World rotation (parents composed, Rz @ Ry @ Rx each). The AABB half extent after
+            # rotation is abs(R) @ local_half_extent.
+            rotation, position = placements[v.name.lower()]
             he = tuple(
                 sum(abs(rotation[i][j]) * he_local[j] for j in range(3)) for i in range(3)
             )
             for i in range(3):
-                lo[i] = min(lo[i], v.position_mm[i] - he[i])
-                hi[i] = max(hi[i], v.position_mm[i] + he[i])
+                lo[i] = min(lo[i], position[i] - he[i])
+                hi[i] = max(hi[i], position[i] + he[i])
         return ((lo[0], lo[1], lo[2]), (hi[0], hi[1], hi[2]))

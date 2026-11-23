@@ -59,8 +59,12 @@ Source controls read the full recorded config; optional `Beam` draft overrides r
 facts omitted by the viz schema. Unchanged source defaults stay omitted, and edits overlay only
 changed beam fields so untouched energy, spectrum and polarization remain exact. Directions must
 be finite/nonzero, spreads finite/nonnegative, and divergence at most 180 degrees.
-The World inspector adds world-level boxes, spheres, tubes and cylinders through the same
-volume fields used for edits. The volume inspector removes a leaf volume from the draft.
+The World inspector adds boxes, spheres, tubes and cylinders through the same volume fields
+used for edits; the `scene_parent` control nests a new volume (default world) or reparents an
+existing one, offering only parents that cannot form a cycle. Pose is relative to the parent.
+`SceneModel.world_placements()` composes a volume with a parent declared earlier (unknown, later
+and built-in parents place it in the world, matching `resolveParentVolume`); the renderer's model
+matrices and `bounds_mm` use it. The volume inspector removes a leaf volume from the draft.
 The writer rejects case-insensitive name collisions, new names reserved for built-in parents,
 and removal of a parent still referenced by a child.
 Apply builds a detached candidate, validates it through the same lossless writer, and only then

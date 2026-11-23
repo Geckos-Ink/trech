@@ -67,10 +67,19 @@ def _rotation_matrix(deg: Tuple[float, float, float]) -> np.ndarray:
     return r
 
 
-def _model_matrix(vol: VolumeNode) -> np.ndarray:
-    t = np.eye(4, dtype=np.float32)
-    t[:3, 3] = np.asarray(vol.position_mm, dtype=np.float32)
-    return (t @ _rotation_matrix(vol.rotation_deg)).astype(np.float32)
+def _model_matrix(vol: VolumeNode, placement=None) -> np.ndarray:
+    """Model matrix in the world frame. ``placement`` is the volume's entry from
+    ``SceneModel.world_placements()`` (parents composed); without it the volume's own placement
+    is used, which is the world frame only for a volume placed in the world or medium box."""
+    if placement is None:
+        t = np.eye(4, dtype=np.float32)
+        t[:3, 3] = np.asarray(vol.position_mm, dtype=np.float32)
+        return (t @ _rotation_matrix(vol.rotation_deg)).astype(np.float32)
+    rotation, position = placement
+    m = np.eye(4, dtype=np.float32)
+    m[:3, :3] = np.asarray(rotation, dtype=np.float32)
+    m[:3, 3] = np.asarray(position, dtype=np.float32)
+    return m
 
 
 class _GpuVolume:
@@ -511,13 +520,14 @@ class SceneRenderer:
 
     def _upload_scene(self, scene: SceneModel) -> None:
         self._volumes = []
+        placements = scene.world_placements()
         for vol in scene.volumes:
             if vol.is_hidden:                       # authored viz_hidden render hint
                 continue
             data = meshgen.for_shape(vol.shape, self._detail)
             vbo = self._upload(data.vertices, wgpu.BufferUsage.VERTEX)
             ibo = self._upload(data.indices, wgpu.BufferUsage.INDEX | wgpu.BufferUsage.COPY_DST)
-            model = _model_matrix(vol)
+            model = _model_matrix(vol, placements[vol.name.lower()])
             color, params = scene.volume_surface(vol)
             uniform, bind_group = self._make_object_uniform(model, color, params)
             obj = _GpuVolume(vbo, ibo, data.index_count, uniform, bind_group)

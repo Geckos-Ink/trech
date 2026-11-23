@@ -15,7 +15,8 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R6 · Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab`, and live batches redraw the viewport instead of only logging to the console (engine reinitialization is a runtime P1). Options-panel `params`, saved-edit reloads (`--watch`) and generation/refusal logging landed 2026-11-21 in **Run ▸ Start live lab**; a status widget for the active generation and a timed batch loop at `lab.targetHz` are still missing. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · All-scenario render parity: moving apparatus meshes, scalar colour bars, chart/text overlays, simultaneous streams and an all-family capture matrix. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P2** · R6 · Transform gizmos (translate/rotate/scale) on the selected volume. ([detail](#milestone-2--real-time-scenario-editing))
-- **P2** · R6 · Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics. Undo/redo landed 2026-11-22. The writer already orders and validates reparented/nested volumes (2026-11-22); the Inspector has no parent control yet. ([detail](#milestone-2--real-time-scenario-editing))
+- **P2** · R6 · Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics. Undo/redo landed 2026-11-22; nested creation and reparenting landed 2026-11-23 (parent control, parent-composed viewport placement). Custom material definitions and per-field engine diagnostics remain. ([detail](#milestone-2--real-time-scenario-editing))
+- **P2** · R6 · Rotation sense against Geant4: the engine passes `rotateX`→`rotateY`→`rotateZ` as the `G4RotationMatrix*` of `G4PVPlacement`, which Geant4 applies as the mother frame's rotation relative to the daughter (a passive rotation), while Studio draws and composes `Rz·Ry·Rx` as an active rotation. If so, Studio shows every non-symmetric rotated volume (and children of a rotated parent) mirrored in angle. Unverified: confirm with a Geant4 run (a rotated thin slab hit by a pencil beam, or `G4Navigator` world transforms dumped beside the viz scene) before changing either side. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Callback-bearing scene round-trip: reconstruct typed declarations (`TRECH_VALUE`), companions and callback source so a run that registered hooks can be exported; `scene_to_config` still refuses `hooks.registered`. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Code editor: inline error markers, dynamic aliases/computed properties, template interpolation and complete config-schema completion (from Milestone 0). ([detail](../ROADMAP.md#milestone-0--the-basis-this-scaffold-landed-2026-07-11))
 - **P3** · R6 · Dependency packaging refuses model files the recorded run never opened (strict mode or a disabled optics/stratifier loader records no SHA-256), so such transport runs cannot be exported with their declared model; files a model names internally are not followed. ([detail](#milestone-2--real-time-scenario-editing))
@@ -108,8 +109,18 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   flag; loading another scene clears the history. Studio pytest covers the pure history and the
   window flow (`test_scene_history.py`, `test_scene_editing.py`), including real key events: a
   focused Inspector field keeps Ctrl+Z for its own text, and the scene undoes otherwise.
-- [ ] Inspector extensions: nested primitive creation and reparenting, custom material
-  definitions, per-field engine diagnostics and crash recovery. Current
+- [x] **Nested creation and reparenting (2026-11-23):** the Inspector's **parent** control
+  (`scene_parent`) nests a new volume or reparents an existing one; it offers the default, the
+  world, the medium box and every volume that is not the selected one or its descendant.
+  `SceneModel.world_placements()` composes each volume with a parent declared earlier (an
+  unknown, later or built-in parent places it in the world, as the engine does), and the renderer
+  and camera bounds use it. Before this, Studio drew every volume at its local placement, which
+  misplaced recorded nested volumes with an offset parent (none of the bundled nested scenarios
+  offsets its parent). `test_scene_hierarchy.py` covers composition through a rotated parent,
+  the engine fallbacks, nested creation with export and reparenting into a later volume.
+  Studio pytest 358/358.
+- [ ] Inspector extensions: custom material definitions, per-field engine diagnostics and crash
+  recovery. Current
   Inspector drafts require a matching, exportable transport run; callback/model-bearing scenarios
   continue through the source editor and typed Options.
 - [ ] **Real-time lab loop:** inspector edits become `{"action":"patch",…}` commands to a live

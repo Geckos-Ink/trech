@@ -182,6 +182,7 @@ class Inspector(QScrollArea):
                     kind = "volume"
                 else:
                     vol = candidate.volume_by_name(name)
+                vol.parent = self._fields["parent"].currentData() or ""
                 vol.material = self._fields["material"].currentText()
                 vol.position_mm = vector("position")
                 vol.rotation_deg = vector("rotation")
@@ -274,7 +275,42 @@ class Inspector(QScrollArea):
             self._layout.addWidget(note)
         self._layout.addStretch(1)
 
+    def _parent_field(self, form, vol: VolumeNode) -> None:
+        """Parent choice: the default (medium box if the scene has one, else the world), the
+        world, the medium box, or any volume that is neither this one nor nested inside it.
+        The writer reorders volumes so a parent is built before its children."""
+        own = vol.name.lower()
+        children: dict = {}
+        for v in self._scene.volumes:
+            children.setdefault(v.parent.lower(), []).append(v.name.lower())
+        nested, stack = set(), [own] if own else []
+        while stack:
+            for child in children.get(stack.pop(), []):
+                if child not in nested:
+                    nested.add(child)
+                    stack.append(child)
+        field = QComboBox(self._body)
+        field.setObjectName("scene_parent")
+        field.addItem("default (medium box, else world)", "")
+        field.addItem("world", "world")
+        if self._scene.medium_size_mm:
+            field.addItem("medium box", "medium")
+        for v in self._scene.volumes:
+            key = v.name.lower()
+            if key and key != own and key not in nested:
+                field.addItem(v.name, v.name)
+        index = field.findData(vol.parent)
+        if index < 0 and vol.parent.lower() in ("mediumbox", "medium_box"):
+            index = field.findData("medium")
+        if index < 0 and vol.parent:  # an unresolved recorded parent stays selectable as it is
+            field.addItem(vol.parent, vol.parent)
+            index = field.count() - 1
+        field.setCurrentIndex(max(index, 0))
+        self._fields["parent"] = field
+        form.addRow("parent", field)
+
     def _volume_fields(self, form, vol: VolumeNode) -> None:
+        self._parent_field(form, vol)
         self._material_field(form, "material", "material", vol.material)
         shape = QComboBox(self._body)
         shape.addItems(["box", "sphere", "tube", "cylinder"])
@@ -285,8 +321,8 @@ class Inspector(QScrollArea):
         self._number_field(form, "outer R (mm)", "outer_radius", vol.shape.outer_radius_mm)
         self._number_field(form, "inner R (mm)", "inner_radius", vol.shape.inner_radius_mm)
         self._number_field(form, "length (mm)", "length", vol.shape.length_mm)
-        self._vector_field(form, "position (mm)", "position", vol.position_mm)
-        self._vector_field(form, "rotation (deg)", "rotation", vol.rotation_deg)
+        self._vector_field(form, "position in parent (mm)", "position", vol.position_mm)
+        self._vector_field(form, "rotation in parent (deg)", "rotation", vol.rotation_deg)
 
         def shape_fields(kind):
             self._fields["size"].setEnabled(kind == "box")
@@ -299,10 +335,10 @@ class Inspector(QScrollArea):
 
     def _show_new_volume(self) -> None:
         self._clear()
-        form = self._section("New world volume")
+        form = self._section("New volume")
         self._text_field(form, "name", "name", "")
         self._volume_fields(form, VolumeNode(
-            name="", material=self._scene.world_material,
+            name="", material=self._scene.world_material, parent="world",
             shape=Shape(type="box", size_mm=(1., 1., 1.), outer_radius_mm=.5, length_mm=1.)))
         self._apply_button("new_volume", "", label="Add to scene draft")
         cancel = QPushButton("Cancel", self._body)
@@ -332,6 +368,7 @@ class Inspector(QScrollArea):
             remove.clicked.connect(lambda: self._remove_volume(name))
             self._layout.addWidget(remove)
         else:
+            form.addRow("parent", QLabel(vol.parent or "default"))
             form.addRow("material", QLabel(vol.material))
             form.addRow("shape", QLabel(vol.shape.type))
             form.addRow("size (mm)", QLabel(_fmt_vec(vol.shape.size_mm)))
