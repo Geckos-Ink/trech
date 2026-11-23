@@ -47,6 +47,16 @@ implementation as the running path, with the Lean definition beside it for valid
   cancel exactly before `dt` and it keeps its value) in `trech_formal_laws`; a finite
   `ctx.evolve` call reports `nonFiniteSteps: 0` at the JS boundary (`trech_js_runtime`).
 - Verification: Debug CTest 80/80.
+- Found in a Release (V8) build: `StateEvolution.cpp` and `PairInteraction.cpp` were not
+  compiled with `-ffp-contract=off`, so `x + r·dt` fused into one FMA. That broke
+  `evolve.bounded_step_within_bounds` and `evolve.unclipped_step_exact` by 1 ulp (failing in
+  every optimised build since the bounded-step change; the Debug runs could not show it) and
+  turned `inf − inf` into `inf`. Both sources are now pinned like the other engine ML sources.
+  Release CTest 80/80, V8 focused set 4/4. Effect on `glass_from_sand` (Release, budget
+  pinned): the physical state moved by at most 1 ulp (`mean_temperature_k`, once in 150
+  frames); only the validation companion's field-evolution grading emits shifted further, as
+  they already do between two runs of one binary. `lava_lamp` unchanged. No reference media
+  regenerated.
 - Queued: a run-level counter and trace warning.
 
 ## Decayed prequential scores (2026-11-23)

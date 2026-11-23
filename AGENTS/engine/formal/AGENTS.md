@@ -142,6 +142,12 @@ conservation, exponential attenuation from a constant interaction rate, energy c
   relative seen on macOS arm64), so the check allows 2e-15 relative and an exact-equality
   negative control shows the gap. The lattice check allows 1e-13 relative over 300 steps (2.1e-14
   seen). Tighten a tolerance only with evidence; never loosen one to make a check pass.
+- **Run the conformance test in an optimised build too.** A Debug build never fuses
+  multiply-add, so it cannot show a source that does. Every source that calls a proved function
+  (`BoundedStep.hpp`, `DecayedScore.hpp`, the lattice kernels, the arbiter) is compiled with
+  `-ffp-contract=off` (`CMakeLists.txt`); `StateEvolution.cpp` and `PairInteraction.cpp` were
+  missing until 2026-11-23, and in Release a fused `x + r·dt` broke the bounded-step checks by
+  1 ulp and turned `inf − inf` into `inf`.
 - **Engine methods route through the proved function.** `ctx.react` draws only through
   `selectTransitionChannel`, `ctx.evolve` and `ctx.interact` step and clamp only through
   `boundedEulerStep`/`clampToBounds` (`ml/BoundedStep.hpp`) and count steps outside the
