@@ -11,6 +11,7 @@
 #include "trech/core/LatticeKinetic.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/ml/BoundedStep.hpp"
+#include "trech/ml/DecayedScore.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/GroupHierarchy.hpp"
@@ -881,6 +882,100 @@ void arbiterPairs() {
   expect(leads);
 }
 
+void decayPairs() {
+  // Trech.Methods.Decay.decayed_eq_sum on decayedUpdate: the fold equals sum lam^age x.
+  {
+    std::vector<double> folded, closed;
+    for (double lam : {1.0, 0.97, 0.8, 0.5}) {
+      double score = 0.0;
+      std::vector<double> x;
+      for (int t = 0; t < 120; ++t) {
+        x.push_back(std::sin(0.37 * t) * (1.0 + 0.1 * t) - 0.2);
+        score = trech::ml::decayedUpdate(lam, score, x.back());
+        double sum = 0.0;
+        for (int u = 0; u <= t; ++u) sum += std::pow(lam, t - u) * x[static_cast<std::size_t>(u)];
+        folded.push_back(score);
+        closed.push_back(sum);
+      }
+    }
+    expect(formal::checkAgreement("decay.closed_form", "Trech.Methods.Decay.decayed_eq_sum", folded, closed, 1e-12, 1e-13));
+  }
+  // The arbiter's leader ranking. Two methods, references y = x, the fallback biased: "good"
+  // errs by 0.01, "bad" by 0.05 (+ 0.02 on every fifth call). good is no worse on every call it
+  // shares with bad, so it ranks first (decayedMean_lt); the exported ew_log / ew_calls equal
+  // the closed forms of the recorded call RMSEs (floor 1e-6, no output scale).
+  auto run = [](bool goodAbstainsOnEasyCalls, std::vector<double>& logs, std::vector<double>& closed) {
+    trech::ml::MethodArbiterOptions o;
+    o.methods = {"good", "bad"};
+    o.features = {"x"};
+    o.fallback = "bad";
+    trech::ml::MethodArbiter arbiter(o);
+    const double lam = o.policyForgetting;
+    const std::size_t n = 32;
+    std::array<double, 2> ewLog{0.0, 0.0}, ewCalls{0.0, 0.0};
+    std::string leader;
+    for (int call = 0; call < 30; ++call) {
+      // Easy calls (even): bad errs by 1e-4; good abstains in the counterexample run.
+      const bool easy = call % 2 == 0;
+      const double goodErr = 0.01, badErr = easy && goodAbstainsOnEasyCalls ? 1e-4 : 0.05 + (call % 5 == 0 ? 0.02 : 0.0);
+      trech::ml::MethodArbiterBatch b;
+      b.time = call;
+      b.count = n;
+      for (std::size_t e = 0; e < n; ++e) {
+        const double x = static_cast<double>(e) / static_cast<double>(n);
+        b.features.push_back(x);
+        const double good = easy && goodAbstainsOnEasyCalls ? std::numeric_limits<double>::quiet_NaN() : x + goodErr;
+        b.predictions.insert(b.predictions.end(), {good, x - badErr});
+        b.reference.push_back(x);
+      }
+      const auto r = arbiter.step(b);
+      leader = r.leader;
+      for (std::size_t m = 0; m < 2; ++m) {
+        const bool predicted = std::isfinite(r.callRmse[m]);
+        ewLog[m] = lam * ewLog[m] + (predicted ? std::log(r.callRmse[m] + 1e-6) : 0.0);
+        ewCalls[m] = lam * ewCalls[m] + (predicted ? 1.0 : 0.0);
+      }
+    }
+    const auto state = arbiter.exportState(false);
+    for (std::size_t m = 0; m < 2; ++m) {
+      logs.push_back(state.at("ew_log")[m].get<double>());
+      logs.push_back(state.at("ew_calls")[m].get<double>());
+      closed.push_back(ewLog[m]);
+      closed.push_back(ewCalls[m]);
+    }
+    return leader;
+  };
+  std::vector<double> logs, closed;
+  const std::string shared = run(false, logs, closed);
+  const std::string abstaining = run(true, logs, closed);
+  expect(formal::checkAgreement("decay.arbiter_scores", "Trech.Methods.Decay.decayed_eq_sum", logs, closed, 1e-12, 1e-12));
+  formal::LawCheck leads;
+  leads.law = "decay.dominant_leads";
+  leads.leanDeclaration = "Trech.Methods.Decay.decayedMean_lt";
+  leads.kind = "invariant";
+  leads.samples = 1;
+  leads.passed = shared == "good";
+  if (!leads.passed) { leads.violations = 1; leads.detail = "leader " + shared; }
+  expect(leads);
+  // decayedMean_needs_common_calls on the engine: good is better on every call both predicted,
+  // but abstains on the easy ones, so the ranking (correctly, per its definition) leads with bad.
+  formal::LawCheck common;
+  common.law = "decay.needs_common_calls";
+  common.leanDeclaration = "Trech.Methods.Decay.decayedMean_needs_common_calls";
+  common.kind = "invariant";
+  common.samples = 1;
+  common.passed = abstaining == "bad";
+  if (!common.passed) { common.violations = 1; common.detail = "leader " + abstaining; }
+  expect(common);
+  // Negative control: a fold without the decay is not the decayed closed form.
+  {
+    double score = 0.0, sum = 0.0;
+    for (int t = 0; t < 20; ++t) score = trech::ml::decayedUpdate(1.0, score, 1.0);
+    for (int u = 0; u < 20; ++u) sum += std::pow(0.8, 19 - u);
+    expect(formal::checkAgreement("decay.negative_control", "", {score}, {sum}, 1e-12, 1e-13), false);
+  }
+}
+
 void javascriptPairs() {
   // The JS classic implementations: their own checks, then agreement with the C++ ones.
   const auto root = std::filesystem::path(TRECH_SOURCE_DIR);
@@ -1064,6 +1159,7 @@ int main() {
     groupPairs();
     leastSquaresPairs();
     arbiterPairs();
+    decayPairs();
     javascriptPairs();
     runRecordContract();
     const auto sample = formal::checkProbabilityVector("probability.example", "", {0.25, 0.25, 0.5}, 1e-15);

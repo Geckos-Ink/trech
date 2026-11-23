@@ -19,12 +19,13 @@ Contract: [formal-laws handbook](../AGENTS/engine/formal/AGENTS.md).
 | [`Trech/Methods/LeastSquares.lean`](Trech/Methods/LeastSquares.lean) | `Trech.Methods.LeastSquares` | [`LeastSquaresStatistics.hpp`](../include/trech/ml/LeastSquaresStatistics.hpp), called by [`DomainLearner.cpp`](../src/ml/DomainLearner.cpp) (split score) |
 | [`Trech/Methods/PairInteraction.lean`](Trech/Methods/PairInteraction.lean) | `Trech.Methods.PairInteraction` | [`PairInteraction.cpp`](../src/ml/PairInteraction.cpp) (antisymmetric exchange) |
 | [`Trech/Methods/Arbiter.lean`](Trech/Methods/Arbiter.lean) | `Trech.Methods.Arbiter` | [`MethodArbiter.cpp`](../src/ml/MethodArbiter.cpp) |
+| [`Trech/Methods/Decay.lean`](Trech/Methods/Decay.lean) | `Trech.Methods.Decay` | [`DecayedScore.hpp`](../include/trech/ml/DecayedScore.hpp), called by [`MethodArbiter.cpp`](../src/ml/MethodArbiter.cpp) (decayed prequential scores and the leader ranking) |
 
 [`laws.json`](laws.json) lists the pairs. `tests/test_formal_law_pairs.py` checks that both sides
 exist and cite each other; `tests/test_formal_laws.cpp` runs the classic code against each
 statement. Neither needs Lean.
 
-**Status (2026-11-23): all 52 theorems compile and use only the standard axioms**
+**Status (2026-11-23): all 58 theorems compile and use only the standard axioms**
 (`propext`, `Classical.choice`, `Quot.sound`), with Lean `v4.37.0-rc1` and Mathlib
 `90e6eec`, on macOS arm64. Transition counts are proved over mathematical integers.
 Checks for real-valued proofs state a tolerance where the classic results round.

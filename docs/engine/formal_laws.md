@@ -8,7 +8,7 @@ statement written in Lean (a *theorem*) is accepted only with a proof that Lean'
 [Mathlib](https://github.com/leanprover-community/mathlib4) is the community library of
 mathematics written in Lean, from real analysis to linear algebra and probability.
 
-**Status (2026-11-23): fourteen law pairs exist and their 52 Lean theorems are verified.** The
+**Status (2026-11-23): fifteen law pairs exist and their 58 Lean theorems are verified.** The
 classic code of each pair is checked against its Lean statement by an ordinary test, without
 Lean. The Lean files compile with Lean `v4.37.0-rc1` and the pinned Mathlib, and every theorem
 rests only on Lean's three standard axioms. The transition count proof uses mathematical
@@ -78,6 +78,7 @@ Lean file and theorems, and the classic sources.
 | Group assembly (`ctx.lift`) | `Trech.Methods.Group`: one lifting level puts every element in exactly one group, the group weights add up to the total weight, and (when no group weighs zero) weight times centroid summed over the groups equals the elements' weighted first moment, so total weight and centre of weight are the same at every level | `src/ml/GroupHierarchy.cpp` | the three-level lift fixtures with unequal weights, plus an explicit first level, 18 levels in all: every element has one parent, weights agree within `1e-14` relative (2.8e-14 absolute seen) and moments within `1e-13`; a zero-weight group, whose centroid is NaN, fails on purpose |
 | Domain-learner split score (`ctx.learnDomains`) | `Trech.Methods.LeastSquares`: for any coefficients β, the weighted squared error equals `c − 2β·b + β·Aβ` computed from the rows' summed statistics (`A = Σ w φφᵀ`, `b = Σ w φ y`, `c = Σ w y²`); statistics of disjoint row sets add, so prefix sums score every cut; and two separately fitted sides never do worse than one shared fit (with the learner's per-side ridge terms, by at most the penalty the shared fit pays), which is why splits need a penalty. The learner's acceptance test `n·log(S/S₀) + penalty < 0` accepts a split exactly when its error `S` is below `S₀·exp(−penalty/n)`, so never when the error does not fall | `include/trech/ml/LeastSquaresStatistics.hpp`, called by `src/ml/DomainLearner.cpp` | 240 weighted rows, a quadratic basis and two targets, 9 cuts: the statistic score matches the direct error within `1e-12·c` (6.5e-16 seen; the form cancels `c` against `2β·b`, so the bound is relative to `c`), left plus right statistics match the total, exact side fits never exceed the parent and ridge side fits stay within the ridge bound; the acceptance test agrees with the threshold on 60 (n, penalty, error) cases and rejects all 15 that do not lower the error; a sign error on the cross term fails on purpose |
 | Method arbiter scoring | `Trech.Methods.Arbiter`: the squared error is minimised exactly by the mean prediction (a *strictly proper* score), and ranking by `log(error + floor)` keeps the error order | `src/ml/MethodArbiter.cpp` | 40 noisy graded calls with an unbiased method and two biased ones: the unbiased one scores lowest and leads, although the declared fallback is a biased one |
+| Decayed prequential scores (arbiter, `ctx.evolveField`) | `Trech.Methods.Decay`: a score updated once per graded call by `s ← λs + x` equals `Σ λ^age·x` (each call weighted by the forgetting factor to the power of its age), and for `λ ≥ 0` it is monotone in every call's value. When two methods predicted in the same calls, the one no worse on every call ranks no worse by decayed mean log error, and strictly first when strictly better on one call; when they did not, the ranking can invert | `include/trech/ml/DecayedScore.hpp`, called by `src/ml/MethodArbiter.cpp` | the update folded over 120 values at four forgetting factors matches the closed form within `1e-12` absolute plus `1e-13` relative (1.8e-14 seen); the arbiter's exported `ew_log` and `ew_calls` equal the closed form of its recorded call errors, exactly; a method better on every call leads although the fallback is the other one; a method that abstains on easy calls does not lead, as the counterexample says |
 
 The attenuation row shows why the real-versus-float caveat matters. Over the reals,
 `exp(-μ(x+y)) = exp(-μx)·exp(-μy)` exactly. In doubles the two sides differ by about two units
@@ -100,8 +101,20 @@ A scoring rule is *proper* when a method scores best, on average, by predicting 
 expected value instead of a shifted one. The arbiter grades methods by squared error, and the
 theorem proves that over any weighted set of references the mean prediction beats every
 other value by exactly `(total weight)·(shift)²`. So the arbiter cannot reward a biased
-method that happens to look stable. The theorem covers one weighted set of references; the
-arbiter's leader ranks by an average of log errors across calls, which it does not cover.
+method that happens to look stable. The theorem covers one weighted set of references.
+
+Across calls the arbiter keeps *decayed* scores: after every graded call each score is
+multiplied by the forgetting factor `λ` (0.8 by default) and the call's contribution is added.
+`Trech.Methods.Decay` proves that this is a weighted sum in which a call `k` calls old weighs
+`λ^k`, so the decayed mean squared error is the weighted score above and stays proper. The
+leader is the method with the lowest decayed mean of log call error, averaged over the calls
+in which it predicted. If two methods predicted in the same calls and one is never worse,
+it ranks first. The guarantee needs the shared calls. For example, if method B predicts in two
+calls with log errors 0 and 10 and method A only in the second with 9, A is better where both
+predicted but its mean (9) is above B's (5), so B leads. A method that abstains where the
+problem is easy can therefore rank behind one it beats wherever both answer; whether the
+leader should rank on shared calls only is an open decision in the
+[formal-laws roadmap](../../AGENTS/engine/formal/ROADMAP.md#priority-queue).
 
 The engine also runs the lattice hypothesis checks itself. Each time it builds a lattice for
 field evolution it checks the velocity set's moments, the opposite-direction table and the
@@ -211,7 +224,7 @@ python3 scripts/check_lean_laws.py
 ```
 
 The last command builds the package and prints one line per theorem with the axioms it uses,
-ending with `52/52 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
+ending with `58/58 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
 an added axiom makes it fail. Add `--report build/lean_audit.json` to also save the audit
 as JSON: the Lean version, toolchain and Mathlib revision, the SHA-256 hash of `laws.json` and
 of every Lean file, one combined hash of all of them, and each theorem's axioms. A run reads it

@@ -12,3 +12,4 @@ public import Trech.Methods.Group
 public import Trech.Methods.LeastSquares
 public import Trech.Methods.PairInteraction
 public import Trech.Methods.Arbiter
+public import Trech.Methods.Decay

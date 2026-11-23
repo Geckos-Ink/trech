@@ -21,8 +21,9 @@ error learners' `log(error + floor)` targets, and the leader ranking by decayed 
 error).
 
 Scope: the theorems cover one weighted sample (one graded call, or decayed weights over many).
-The leader ranks by the decayed mean of log call RMSE, a geometric mean across calls, which
-these statements do not cover.
+The leader ranks by the decayed mean of log call RMSE, a geometric mean across calls;
+`Trech.Methods.Decay` covers that ranking (and shows the decayed mean squared error is this
+score with weights `λ^age`).
 
 Conformance: `tests/test_formal_laws.cpp` runs the classic arbiter on noisy references with a
 mean-predicting method and two biased ones and checks that the mean method leads and has the

@@ -172,6 +172,27 @@
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["arbiter.mean_scores_lowest", "arbiter.mean_leads"]}
     },
     {
+      "id": "arbiter.decayed_scores",
+      "role": "method_property",
+      "statement": "A score updated once per graded call by s <- lam s + x equals sum lam^(T-1-t) x_t after T calls (so a decayed mean is a weighted mean with weights lam^age) and, for lam >= 0, is monotone in each contribution; when two methods predicted in the same calls, the one no worse on every call has a decayed mean log error no greater, strictly so when strictly better on one weighted call (lam > 0); without shared calls the ranking can invert.",
+      "lean": {
+        "file": "formal/Trech/Methods/Decay.lean",
+        "declarations": [
+          "Trech.Methods.Decay.decayed_eq_sum",
+          "Trech.Methods.Decay.decayed_mono",
+          "Trech.Methods.Decay.decayed_nonneg",
+          "Trech.Methods.Decay.decayedMean_le",
+          "Trech.Methods.Decay.decayedMean_lt",
+          "Trech.Methods.Decay.decayedMean_needs_common_calls"
+        ]
+      },
+      "classic": [
+        {"path": "include/trech/ml/DecayedScore.hpp", "cites": "Trech.Methods.Decay"},
+        {"path": "src/ml/MethodArbiter.cpp", "cites": "Trech.Methods.Decay"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["decay.closed_form", "decay.arbiter_scores", "decay.dominant_leads", "decay.needs_common_calls"]}
+    },
+    {
       "id": "evolve.bounded_explicit_step",
       "role": "method_property",
       "statement": "Over the reals, the engine's bounded explicit step clamp(x + r dt) to ordered declared bounds lo <= hi always lies in [lo, hi] and equals the unclamped step when that already lies inside; the unclamped increment is linear in dt and additive over consecutive steps at one rate.",

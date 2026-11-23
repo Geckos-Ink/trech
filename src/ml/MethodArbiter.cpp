@@ -2,6 +2,7 @@
 
 #include "trech/core/Trace.hpp"
 #include "trech/ml/ComputeBudget.hpp"
+#include "trech/ml/DecayedScore.hpp"
 
 #include <algorithm>
 #include <array>
@@ -285,18 +286,21 @@ MethodArbiterResult MethodArbiter::stepUntraced(const MethodArbiterBatch& b) {
     s.sumSq[m] += callSq[m]; s.count[m] += callN[m]; s.commonSq[m] += callCommonSq[m];
     r.callRmse[m] = rmseOf(callSq[m], callN[m]);
     if (s.frozen) continue;
-    s.ewSq[m] = s.o.policyForgetting * s.ewSq[m] + callSq[m];
-    s.ewN[m] = s.o.policyForgetting * s.ewN[m] + callN[m];
-    s.ewLog[m] *= s.o.policyForgetting; s.ewCalls[m] *= s.o.policyForgetting;
-    if (callN[m] > 0) { s.ewLog[m] += s.toLog(r.callRmse[m]); s.ewCalls[m] += 1.0; }
+    // Trech.Methods.Decay: each score is sum forgetting^age x (decayed_eq_sum). The leader ranks
+    // by ewLog/ewCalls, the call weight being 1 where the method predicted (decayedMean_le).
+    const double lam = s.o.policyForgetting, predicted = callN[m] > 0 ? 1.0 : 0.0;
+    s.ewSq[m] = decayedUpdate(lam, s.ewSq[m], callSq[m]);
+    s.ewN[m] = decayedUpdate(lam, s.ewN[m], callN[m]);
+    s.ewLog[m] = decayedUpdate(lam, s.ewLog[m], predicted > 0 ? s.toLog(r.callRmse[m]) : 0.0);
+    s.ewCalls[m] = decayedUpdate(lam, s.ewCalls[m], predicted);
   }
   s.common += callCommon;
   s.arbitratedSq += arbitratedSq; s.oracleSq += oracleSq; s.graded += g;
   r.arbitratedRmse = std::sqrt(arbitratedSq / g); r.oracleRmse = std::sqrt(oracleSq / g);
   if (!s.frozen) {
     const double tiny = g * s.floor * s.floor;
-    s.policyScore = s.o.policyForgetting * s.policyScore + std::log((policySq[0] + tiny) / (policySq[1] + tiny));
-    for (std::size_t p = 0; p < 2; ++p) s.policyTotal[p] = s.o.policyForgetting * s.policyTotal[p] + policySq[p];
+    s.policyScore = decayedUpdate(s.o.policyForgetting, s.policyScore, std::log((policySq[0] + tiny) / (policySq[1] + tiny)));
+    for (std::size_t p = 0; p < 2; ++p) s.policyTotal[p] = decayedUpdate(s.o.policyForgetting, s.policyTotal[p], policySq[p]);
     // Evidence distinguishes the methods once their decayed mean errors differ above the floor.
     double lo = std::numeric_limits<double>::infinity(), hi = 0.0;
     for (std::size_t m = 0; m < M; ++m)
@@ -321,8 +325,8 @@ MethodArbiterResult MethodArbiter::stepUntraced(const MethodArbiterBatch& b) {
       batches[m].time = b.time;
       const auto learned = s.learners[m]->update(batches[m]);
       if (learned.scored && !learned.routedRmse.empty() && std::isfinite(learned.routedRmse[0])) {
-        s.learnerSq[m] = s.o.policyForgetting * s.learnerSq[m] + learned.routedRmse[0] * learned.routedRmse[0];
-        s.learnerW[m] = s.o.policyForgetting * s.learnerW[m] + 1.0;
+        s.learnerSq[m] = decayedUpdate(s.o.policyForgetting, s.learnerSq[m], learned.routedRmse[0] * learned.routedRmse[0]);
+        s.learnerW[m] = decayedUpdate(s.o.policyForgetting, s.learnerW[m], 1.0);
       }
       for (const auto& d : learned.domains) {
         if (!d.elements) continue;
