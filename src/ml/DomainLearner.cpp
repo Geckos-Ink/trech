@@ -3,6 +3,7 @@
 #include <torch/torch.h>
 
 #include "trech/core/Trace.hpp"
+#include "trech/ml/LeastSquaresStatistics.hpp"
 #include "trech/ml/MlTrace.hpp"
 
 #include <algorithm>
@@ -962,9 +963,9 @@ struct DomainLearner::Impl {
         const auto m = static_cast<int64_t>(at.size());
         const auto aL = aCum.slice(0, 0, m), bL = bCum.slice(0, 0, m), cL = cCum.slice(0, 0, m);
         const auto aR = aCum[m].unsqueeze(0) - aL, bR = bCum[m].unsqueeze(0) - bL, cR = cCum[m] - cL;
+        // Lean pair Trech.Methods.LeastSquares (include/trech/ml/LeastSquaresStatistics.hpp).
         auto sse = [&](const at::Tensor& a, const at::Tensor& b, const at::Tensor& c) {
-          const auto betas = at::linalg_solve(regularized(a), b);
-          return c - 2.0 * (betas * b).sum({1, 2}) + (betas * a.bmm(betas)).sum({1, 2});
+          return sseFromStatistics(a, b, c, at::linalg_solve(regularized(a), b));
         };
         return toVector((sse(aL, bL, cL) + sse(aR, bR, cR)).clamp_min(0.0));
       };

@@ -14,6 +14,7 @@
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/GroupHierarchy.hpp"
+#include "trech/ml/LeastSquaresStatistics.hpp"
 #include "trech/ml/MethodArbiter.hpp"
 #include "trech/ml/PairInteraction.hpp"
 #include "trech/ml/StateEvolution.hpp"
@@ -23,6 +24,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -712,6 +714,88 @@ void groupPairs() {
          false);
 }
 
+void leastSquaresPairs() {
+  // Trech.Methods.LeastSquares on sseFromStatistics, the domain learner's split score: weighted
+  // rows with a quadratic basis and two targets, scored from statistics at 9 cuts (prefix sums
+  // for the left side, total minus prefix for the right) and directly from residuals.
+  const int64_t n = 240, p = 4, t = 2;
+  std::uint64_t state = 0x9e3779b97f4a7c15ULL;
+  auto uniform = [&]() {
+    state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+    return static_cast<double>(state >> 11) / 9007199254740992.0;
+  };
+  std::vector<double> phiData, yData, wData;
+  for (int64_t i = 0; i < n; ++i) {
+    const double x = 4.0 * uniform() - 2.0, z = uniform();
+    phiData.insert(phiData.end(), {1.0, x, x * x, z});
+    yData.push_back((x < 0.3 ? 1.5 * x : 3.0 - x) + 0.1 * (uniform() - 0.5));
+    yData.push_back(2.0 * z * z + 0.05 * (uniform() - 0.5));
+    wData.push_back(0.25 + uniform());
+  }
+  const auto opts = at::TensorOptions().dtype(at::kDouble);
+  const auto phi = at::from_blob(phiData.data(), {n, p}, opts).clone();
+  const auto y = at::from_blob(yData.data(), {n, t}, opts).clone();
+  const auto w = at::from_blob(wData.data(), {n}, opts).clone();
+  auto stats = [&](int64_t a, int64_t b) {
+    const auto ph = phi.slice(0, a, b), yy = y.slice(0, a, b), wc = w.slice(0, a, b).unsqueeze(1);
+    return std::array<at::Tensor, 3>{(ph * wc).t().mm(ph), (ph * wc).t().mm(yy), (yy.square() * wc).sum()};
+  };
+  auto direct = [&](int64_t a, int64_t b, const at::Tensor& beta) {
+    const auto r = y.slice(0, a, b) - phi.slice(0, a, b).mm(beta);
+    return (r.square() * w.slice(0, a, b).unsqueeze(1)).sum().item<double>();
+  };
+  auto ridge = [&](const at::Tensor& a) { return a + 1e-6 * at::eye(p, opts); };
+  const auto total = stats(0, n);
+  std::vector<double> fromStats, fromRows, scale, sumParts, sumWhole, splitError, parentError;
+  for (int64_t cut = 24; cut < n; cut += 24) {
+    const auto left = stats(0, cut), right = stats(cut, n);
+    for (int s = 0; s < 3; ++s) {  // gram_union, moment_union, yy_union
+      const auto parts = (left[static_cast<std::size_t>(s)] + right[static_cast<std::size_t>(s)]).flatten();
+      const auto whole = total[static_cast<std::size_t>(s)].flatten();
+      for (int64_t k = 0; k < parts.numel(); ++k) {
+        sumParts.push_back(parts[k].item<double>());
+        sumWhole.push_back(whole[k].item<double>());
+      }
+    }
+    // The learner's form: prefix sums and total minus prefix, batched over [left, right].
+    const auto a = at::stack({left[0], total[0] - left[0]});
+    const auto b = at::stack({left[1], total[1] - left[1]});
+    const auto c = at::stack({left[2], total[2] - left[2]});
+    const auto betas = at::linalg_solve(ridge(a), b);
+    const auto scores = trech::ml::sseFromStatistics(a, b, c, betas);
+    const double rows[2] = {direct(0, cut, betas[0]), direct(cut, n, betas[1])};
+    for (int side = 0; side < 2; ++side) {
+      fromStats.push_back(scores[side].item<double>());
+      fromRows.push_back(rows[side]);
+      scale.push_back(c[side].item<double>());
+    }
+    // split_le_parent at exact least-squares minimisers.
+    const auto exact = at::linalg_solve(a, b);
+    const auto parentBeta = at::linalg_solve(total[0], total[1]);
+    splitError.push_back(direct(0, cut, exact[0]) + direct(cut, n, exact[1]));
+    parentError.push_back(direct(0, n, parentBeta));
+  }
+  // sse_eq_stat within eps-scale cancellation of c: |stat - direct| <= 1e-12 * c.
+  double worst = 0.0;
+  for (std::size_t i = 0; i < fromStats.size(); ++i)
+    worst = std::max(worst, std::abs(fromStats[i] - fromRows[i]) / scale[i]);
+  expect(formal::checkAgreement("least_squares.sse_from_statistics", "Trech.Methods.LeastSquares.sse_eq_stat",
+                                {worst}, {0.0}, 1e-12, 0.0));
+  expect(formal::checkAgreement("least_squares.statistics_add", "Trech.Methods.LeastSquares.gram_union", sumParts,
+                                sumWhole, 1e-12, 1e-13));
+  std::vector<double> margin;
+  for (std::size_t i = 0; i < splitError.size(); ++i) margin.push_back(parentError[i] - splitError[i]);
+  expect(formal::checkWithinBounds("least_squares.split_le_parent", "Trech.Methods.LeastSquares.split_le_parent",
+                                   margin, std::vector<double>(margin.size(), -1e-12),
+                                   std::vector<double>(margin.size(), std::numeric_limits<double>::infinity()), 0.0));
+  // Negative control: the score with a wrong sign on the cross term is not the error.
+  const auto a = total[0].unsqueeze(0), b = total[1].unsqueeze(0), c = total[2].unsqueeze(0);
+  const auto beta = at::linalg_solve(ridge(a), b);
+  const double wrong = (c + 2.0 * (beta * b).sum({1, 2}) + (beta * a.bmm(beta)).sum({1, 2}))[0].item<double>();
+  expect(formal::checkAgreement("least_squares.sign_negative_control", "", {wrong}, {direct(0, n, beta[0])}, 1e-9, 0.0),
+         false);
+}
+
 void arbiterPairs() {
   // Trech.Methods.Arbiter.squaredScore_mean_lt on the engine's MethodArbiter: with noisy references,
   // the method that predicts the conditional mean scores lowest and leads; biased methods lose.
@@ -944,6 +1028,7 @@ int main() {
     evolvePairs();
     setPoolPairs();
     groupPairs();
+    leastSquaresPairs();
     arbiterPairs();
     javascriptPairs();
     runRecordContract();

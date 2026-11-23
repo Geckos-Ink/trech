@@ -9,5 +9,6 @@ public import Trech.Methods.Transition
 public import Trech.Methods.Evolve
 public import Trech.Methods.SetPool
 public import Trech.Methods.Group
+public import Trech.Methods.LeastSquares
 public import Trech.Methods.PairInteraction
 public import Trech.Methods.Arbiter
