@@ -212,6 +212,24 @@
         {"path": "src/ml/GenericSurrogate.cpp", "cites": "Trech.Methods.SetPool"}
       ],
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["set.permutation_invariance", "set.absent_element_ignored", "set.shared_slot_standardisation"]}
+    },
+    {
+      "id": "group.assembly_conserves",
+      "role": "method_property",
+      "statement": "One lifting level puts every element in exactly one group; the group weights add up to the population's total weight, and when no group weighs zero the groups' weighted first moment (weight times centroid) equals the elements', so total weight and centre of weight are the same at every level.",
+      "lean": {
+        "file": "formal/Trech/Methods/Group.lean",
+        "declarations": [
+          "Trech.Methods.Group.mem_group_unique",
+          "Trech.Methods.Group.sum_groupWeight",
+          "Trech.Methods.Group.groupWeight_mul_centroid",
+          "Trech.Methods.Group.sum_weight_centroid"
+        ]
+      },
+      "classic": [
+        {"path": "src/ml/GroupHierarchy.cpp", "cites": "Trech.Methods.Group"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["group.member_unique", "group.weight_conserved", "group.moment_conserved"]}
     }
   ]
 }

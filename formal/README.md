@@ -15,6 +15,7 @@ Contract: [formal-laws handbook](../AGENTS/engine/formal/AGENTS.md).
 | [`Trech/Methods/Transition.lean`](Trech/Methods/Transition.lean) | `Trech.Methods.Transition` | [`DiscreteTransition.cpp`](../src/ml/DiscreteTransition.cpp) (channel probabilities and count conservation) |
 | [`Trech/Methods/Evolve.lean`](Trech/Methods/Evolve.lean) | `Trech.Methods.Evolve` | [`BoundedStep.hpp`](../include/trech/ml/BoundedStep.hpp), called by [`StateEvolution.cpp`](../src/ml/StateEvolution.cpp) and [`PairInteraction.cpp`](../src/ml/PairInteraction.cpp) (bounded explicit step) |
 | [`Trech/Methods/SetPool.lean`](Trech/Methods/SetPool.lean) | `Trech.Methods.SetPool` | [`GenericSurrogate.cpp`](../src/ml/GenericSurrogate.cpp) (set-network pooling and message passing) |
+| [`Trech/Methods/Group.lean`](Trech/Methods/Group.lean) | `Trech.Methods.Group` | [`GroupHierarchy.cpp`](../src/ml/GroupHierarchy.cpp) (group assembly of `ctx.lift`) |
 | [`Trech/Methods/PairInteraction.lean`](Trech/Methods/PairInteraction.lean) | `Trech.Methods.PairInteraction` | [`PairInteraction.cpp`](../src/ml/PairInteraction.cpp) (antisymmetric exchange) |
 | [`Trech/Methods/Arbiter.lean`](Trech/Methods/Arbiter.lean) | `Trech.Methods.Arbiter` | [`MethodArbiter.cpp`](../src/ml/MethodArbiter.cpp) |
 
@@ -22,7 +23,7 @@ Contract: [formal-laws handbook](../AGENTS/engine/formal/AGENTS.md).
 exist and cite each other; `tests/test_formal_laws.cpp` runs the classic code against each
 statement. Neither needs Lean.
 
-**Status (2026-11-23): all 40 theorems compile and use only the standard axioms**
+**Status (2026-11-23): all 44 theorems compile and use only the standard axioms**
 (`propext`, `Classical.choice`, `Quot.sound`), with Lean `v4.37.0-rc1` and Mathlib
 `6ebcce3733`, on macOS arm64. Transition counts are proved over mathematical integers.
 Checks for real-valued proofs state a tolerance where the classic results round.

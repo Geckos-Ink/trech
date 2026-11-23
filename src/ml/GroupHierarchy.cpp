@@ -51,6 +51,9 @@ const char* groupingName(GroupLevelSpec::Grouping grouping) {
   return "all";
 }
 
+// Lean pair Trech.Methods.Group (formal/Trech/Methods/Group.lean): every element gets one
+// parent, and the summed group weights and weighted centroids below keep the level's total
+// weight and weighted first moment (for groups of nonzero weight).
 // Partition `pop` into ordered groups. Returns false (with a reason) when the
 // grouping cannot be formed from what the population carries.
 bool partition(const Population& pop, const GroupLevelSpec& spec,

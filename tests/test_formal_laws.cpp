@@ -13,6 +13,7 @@
 #include "trech/ml/BoundedStep.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/ml/GroupHierarchy.hpp"
 #include "trech/ml/MethodArbiter.hpp"
 #include "trech/ml/PairInteraction.hpp"
 #include "trech/ml/StateEvolution.hpp"
@@ -622,6 +623,95 @@ void setPoolPairs() {
                                 {loaded ? 1.0 : 0.0, noted ? 1.0 : 0.0}, {0.0, 1.0}, 0.0, 0.0));
 }
 
+void groupPairs() {
+  // Trech.Methods.Group on GroupHierarchy::run: the committed three-level lift fixtures (cell,
+  // block and system models) with unequal member weights, and an explicit first level. At each
+  // level every lower element has one parent, the group weights add up to the lower total, and
+  // the weighted first moment of the groups (weight times centroid) equals the lower one.
+  const std::string dir = std::string(TRECH_SOURCE_DIR) + "/tests/fixtures/ml_group_hierarchy/";
+  trech::ml::GenericSurrogate cell, block, system;
+  if (!cell.load(dir + "cell.json") || !block.load(dir + "block.json") || !system.load(dir + "system.json")) {
+    throw std::runtime_error("Group-lift fixtures failed to load");
+  }
+  using Spec = trech::ml::GroupLevelSpec;
+  std::vector<Spec> levels(3);
+  levels[0] = {"cell", trech::ml::DimensionScale::kNano, &cell, Spec::Grouping::kCell, cell.groupLift().cellSize, {}, 0.0};
+  levels[1] = {"block", trech::ml::DimensionScale::kMicro, &block, Spec::Grouping::kCell, block.groupLift().cellSize, {}, 0.0};
+  levels[2] = {"system", trech::ml::DimensionScale::kMeso, &system, Spec::Grouping::kAll, 0.0, {}, 4.0};
+  const auto expected = nlohmann::json::parse(std::ifstream(dir + "expected.json"));
+  std::vector<double> parentsOk, lowerWeight, groupWeight, lowerMoment, groupMoment;
+  std::size_t levelsChecked = 0;
+  auto checkRun = [&](const trech::ml::GroupLiftInput& input, const std::vector<Spec>& specs, bool requireAll) {
+    const auto run = trech::ml::GroupHierarchy::run(input, specs);
+    if (requireAll && run.levelsRun != specs.size()) throw std::runtime_error("Group lift stopped: " + run.stopReason);
+    std::vector<double> w = input.weights, p = input.positions;
+    for (const auto& lr : run.levels) {
+      if (!lr.ran) break;
+      std::vector<long long> seen(lr.groups, 0);
+      bool ok = lr.parent.size() == w.size();
+      for (long long g : lr.parent) {
+        ok = ok && g >= 0 && static_cast<std::size_t>(g) < lr.groups;
+        if (ok) ++seen[static_cast<std::size_t>(g)];
+      }
+      for (std::size_t g = 0; ok && g < lr.groups; ++g) ok = seen[g] == lr.memberCount[g] && seen[g] > 0;
+      parentsOk.push_back(ok ? 1.0 : 0.0);
+      lowerWeight.push_back(formal::compensatedSum(w.data(), w.size()));
+      groupWeight.push_back(formal::compensatedSum(lr.weights.data(), lr.weights.size()));
+      for (int a = 0; a < 3; ++a) {
+        double lower = 0.0, upper = 0.0;
+        for (std::size_t i = 0; i < w.size(); ++i) lower += w[i] * p[i * 3 + static_cast<std::size_t>(a)];
+        for (std::size_t g = 0; g < lr.groups; ++g) upper += lr.weights[g] * lr.positions[g * 3 + static_cast<std::size_t>(a)];
+        lowerMoment.push_back(lower);
+        groupMoment.push_back(upper);
+      }
+      w = lr.weights;
+      p = lr.positions;
+      ++levelsChecked;
+    }
+  };
+  for (const auto& c : expected.at("cases")) {
+    trech::ml::GroupLiftInput input;
+    input.featureNames = {"q"};
+    input.features = c.at("features").at("q").get<std::vector<double>>();
+    input.count = input.features.size();
+    input.hasPositions = true;
+    const auto x = c.at("positions").at("x").get<std::vector<double>>();
+    const auto y = c.at("positions").at("y").get<std::vector<double>>();
+    const auto z = c.at("positions").at("z").get<std::vector<double>>();
+    for (std::size_t i = 0; i < input.count; ++i) {
+      input.positions.insert(input.positions.end(), {x[i], y[i], z[i]});
+      input.weights.push_back(0.5 + 0.37 * static_cast<double>(i % 5));
+    }
+    input.context["g"] = c.at("context").at("g").get<double>();
+    checkRun(input, levels, true);
+    auto explicitLevels = levels;  // an explicit first level: groups of four by index
+    explicitLevels[0].grouping = Spec::Grouping::kExplicit;
+    explicitLevels[0].length = 1.0;
+    for (std::size_t i = 0; i < input.count; ++i) explicitLevels[0].groupIds.push_back(static_cast<long long>(i / 4));
+    checkRun(input, explicitLevels, false);
+  }
+  if (levelsChecked < 6) throw std::runtime_error("Group-lift conformance checked too few levels");
+  expect(formal::checkAgreement("group.member_unique", "Trech.Methods.Group.mem_group_unique", parentsOk,
+                                std::vector<double>(parentsOk.size(), 1.0), 0.0, 0.0));
+  expect(formal::checkAgreement("group.weight_conserved", "Trech.Methods.Group.sum_groupWeight", lowerWeight,
+                                groupWeight, 0.0, 1e-14));
+  expect(formal::checkAgreement("group.moment_conserved", "Trech.Methods.Group.sum_weight_centroid", lowerMoment,
+                                groupMoment, 1e-13, 1e-13));
+  // Negative control: a group whose members weigh zero has no centroid (NaN), the excluded case.
+  trech::ml::GroupLiftInput zero;
+  zero.count = 2;
+  zero.featureNames = {"q"};
+  zero.features = {1.0, 2.0};
+  zero.hasPositions = true;
+  zero.positions = {0.2, 0.2, 0.2, 0.4, 0.4, 0.4};
+  zero.weights = {0.0, 0.0};
+  zero.context["g"] = 0.0;
+  const auto run = trech::ml::GroupHierarchy::run(zero, {levels[0]});
+  expect(formal::checkAgreement("group.zero_weight_negative_control", "", {run.levels.at(0).positions.at(0)}, {0.3},
+                                1e-12, 0.0),
+         false);
+}
+
 void arbiterPairs() {
   // Trech.Methods.Arbiter.squaredScore_mean_lt on the engine's MethodArbiter: with noisy references,
   // the method that predicts the conditional mean scores lowest and leads; biased methods lose.
@@ -853,6 +943,7 @@ int main() {
     pairConservation();
     evolvePairs();
     setPoolPairs();
+    groupPairs();
     arbiterPairs();
     javascriptPairs();
     runRecordContract();
