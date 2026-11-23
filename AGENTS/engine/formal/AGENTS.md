@@ -17,8 +17,10 @@ compile with Lean `v4.37.0-rc1` and Mathlib `90e6eec` and depend only on the sta
 axioms (`propext`, `Classical.choice`, `Quot.sound`), checked by the opt-in
 `trech_formal_lean_build`. The count proof uses mathematical integers. The exchange proof uses
 reals, with classic conformance tested before bound clipping at `1e-15` relative. The
-engine runs three classic checks itself: `Lattice` checks its pair's hypotheses once per build
-(`lawChecks()`, trace category `formal`), and a run with a `compton_energy_transfer` analytic
+engine runs four classic checks itself: `Lattice` checks its pair's hypotheses once per build
+(`lawChecks()`, trace category `formal`), a run with a `beer_lambert` analytic check records
+`attenuation.memoryless` at Geant4's own attenuation coefficient (`sim/AttenuationLaw.hpp`,
+2e-15 relative), and a run with a `compton_energy_transfer` analytic
 check records `energy.step_balance` over every first Compton scatter and
 `compton.momentum_balance` (the `Trech.Laws.TwoBody` hypothesis) over those whose products are all
 tracks, read from Geant4's step record in `SteppingAction` (`sim/EnergyBalance.hpp`; relative

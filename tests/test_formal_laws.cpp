@@ -19,6 +19,7 @@
 #include "trech/ml/MethodArbiter.hpp"
 #include "trech/ml/PairInteraction.hpp"
 #include "trech/ml/StateEvolution.hpp"
+#include "trech/sim/AttenuationLaw.hpp"
 #include "trech/sim/EnergyBalance.hpp"
 #include "trech/sim/KleinNishina.hpp"
 
@@ -204,6 +205,20 @@ void attenuationPairs() {
                                 split, 0.0, 2e-15));
   expect(formal::checkAgreement("attenuation.memoryless_exact_negative_control", "", joint, split, 0.0, 0.0),
          false);
+  // The run-end engine check at a coefficient near water's at 100 keV and the analytic scenario's
+  // 50 mm path, plus a strongly attenuating one; a wrong split (exp(-mu x) + exp(-mu y)) fails.
+  expect(trech::sim::attenuation_law::memorylessAtCoefficients({{0.0171, 50.0}, {2.5, 3.0}}));
+  {
+    std::vector<double> joint, wrong;
+    for (int k = 1; k <= 9; ++k) {
+      const double x = 5.0 * k, y = 50.0 - x;
+      joint.push_back(std::exp(-0.0171 * (x + y)));
+      wrong.push_back(std::exp(-0.0171 * x) + std::exp(-0.0171 * y));
+    }
+    expect(formal::checkAgreement("attenuation.split_sum_negative_control", "", joint, wrong, 0.0,
+                                  trech::sim::attenuation_law::kRelativeTolerance),
+           false);
+  }
 }
 
 // D2Q9 on a periodic nx * ny box, population-major as LatticeKinetic.hpp expects.

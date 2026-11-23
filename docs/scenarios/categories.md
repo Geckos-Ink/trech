@@ -92,7 +92,7 @@ fast and fully graded. Keep all of them.
 | Rank | Scenario | Grade | Evidence | What only it covers | Verdict |
 | --- | --- | --- | --- | --- | --- |
 | 1 | [`analytic_compton_transfer`](../../examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js) | V | 1 suite case | The only companion that records a formal-law verdict (Klein–Nishina, four-momentum) in `law_checks`. | Core |
-| 2 | [`analytic_beer_lambert`](../../examples/scenarios/analytic_beer_lambert/analytic_beer_lambert.js) | V | 4 suite cases | Exponential attenuation, also a declared formal law. | Core |
+| 2 | [`analytic_beer_lambert`](../../examples/scenarios/analytic_beer_lambert/analytic_beer_lambert.js) | V | 4 suite cases | Exponential attenuation, also a declared formal law; its family gate requires the engine check `attenuation.memoryless` at Geant4's own coefficient. | Core |
 | 3 | [`analytic_pair_production`](../../examples/scenarios/analytic_pair_production/analytic_pair_production.js) | V | 5 suite cases | Pair threshold and branching, photonuclear branching and final-state closure. | Core |
 | 4 | [`analytic_photo_fraction`](../../examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js) | V | 2 suite cases | Photoelectric branching across an energy sweep. | Core |
 | 5 | [`analytic_csda_range`](../../examples/scenarios/analytic_csda_range/analytic_csda_range.js) | V | 1 suite case | Charged-particle range against integrated stopping power. The only charged-particle cross-check. | Core |

@@ -21,12 +21,14 @@ TRECH_VALIDATIONS["analytic_beer_lambert"] = {
     }
   ],
   "family_case": "analytic_beer_lambert_cross_check",
-  "family_summary": "Every Beer-Lambert analytic check is available and within the scenario tolerance; worst relative error at most 5%.",
+  "family_summary": "Every Beer-Lambert analytic check is available and within the scenario tolerance; worst relative error at most 5%; the engine law check attenuation.memoryless (Trech.Laws.Attenuation.survival_add at Geant4's own attenuation coefficient over cuts of the check's path) is recorded in law_checks and passes.",
   "family_checks": [
     {"id": "checks_present", "phase": "run_end", "field": "analytic_checks[*]", "aggregate": "count", "op": "ge", "expected": 1},
     {"id": "all_available", "phase": "run_end", "field": "analytic_checks[*].available", "aggregate": "all", "op": "eq", "expected": true},
     {"id": "all_within_tolerance", "phase": "run_end", "field": "analytic_checks[*].within_tolerance", "aggregate": "all", "op": "eq", "expected": true},
-    {"id": "worst_relative_error", "phase": "run_end", "field": "analytic_checks[*].relative_error", "aggregate": "max", "op": "le", "expected": 0.05}
+    {"id": "worst_relative_error", "phase": "run_end", "field": "analytic_checks[*].relative_error", "aggregate": "max", "op": "le", "expected": 0.05},
+    {"id": "engine_laws_recorded", "phase": "run_end", "field": "law_checks[?origin=engine]", "aggregate": "count", "op": "ge", "expected": 1},
+    {"id": "engine_laws_hold", "phase": "run_end", "field": "law_checks[?origin=engine].passed", "aggregate": "all", "op": "eq", "expected": true}
   ],
   "physics_status": "configuration_or_transport",
   "limitations": "",

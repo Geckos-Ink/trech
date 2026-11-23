@@ -185,6 +185,17 @@ statements about real numbers, not the floating-point code (see above).
 The Compton scenario's family gate grades the recorded checks too: `formal_laws_recorded` needs
 at least two `validation` records and `formal_laws_hold` needs all of them to pass.
 
+**Attenuation at Geant4's own coefficient.** In a run with a `beer_lambert` analytic check,
+the engine takes the attenuation coefficient `μ` it computed from Geant4's cross sections for
+that check, and the check's path `L`, and records the engine check `attenuation.memoryless`: it
+evaluates `exp(−μ(x+y))` against `exp(−μx)·exp(−μy)` for the cuts `x = L·k/10` (k = 1…9,
+`y = L − x`) and for `x = y = L`, within `2e-15` relative (the record's `tolerance` field holds
+only the absolute part, `0`). The `analytic_beer_lambert` scenario (100 keV gamma, 50 mm of
+water) gets `μ = 0.01704/mm` and agrees within `5.6e-17`. The check reads nothing from the run
+and changes nothing in it; the scenario's family gate requires it (`engine_laws_recorded`,
+`engine_laws_hold`). The companion itself cannot run it, because `μ` exists only once Geant4
+has built its tables.
+
 **Energy balance from Geant4's own steps.** In a run with a `compton_energy_transfer` analytic
 check, the engine reads each primary photon's first Compton scatter from Geant4's step record:
 the photon's energy before and after, the kinetic energy of every secondary the step created,

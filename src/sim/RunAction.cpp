@@ -20,6 +20,7 @@
 #include "trech/ml/OnlineEventStats.hpp"
 #include "trech/ml/Stratifier.hpp"
 #include "trech/sim/AnalyticCrossCheck.hpp"
+#include "trech/sim/AttenuationLaw.hpp"
 #include "trech/sim/MaterialProbe.hpp"
 #include "trech/sim/MolecularOptics.hpp"
 #include "trech/sim/NuclearCycleAnalyzer.hpp"
@@ -1058,6 +1059,14 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
       check.detail = "first-Compton step: p_pre != p_post + sum p_secondary (relative, per component)";
     }
     formal::recordRunCheck(check, "engine");
+  }
+  if (options_.analyticChecks) {
+    // Trech.Laws.Attenuation.survival_add at Geant4's own coefficients (AttenuationLaw.hpp).
+    std::vector<std::pair<double, double>> muAndPath;
+    for (const auto& result : *options_.analyticChecks)
+      if (result.type == "beer_lambert" && result.available && result.muTotalPerMm > 0.0)
+        muAndPath.push_back({result.muTotalPerMm, result.pathLengthMm});
+    if (!muAndPath.empty()) formal::recordRunCheck(sim::attenuation_law::memorylessAtCoefficients(muAndPath), "engine");
   }
   // Law checks performed since the previous run end (engine lattices, validation companions;
   // onRunEnd already ran). Written only when there are any, so other runs keep their bytes.

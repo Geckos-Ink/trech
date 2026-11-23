@@ -431,6 +431,35 @@ class BundleFamilyExports(unittest.TestCase):
                 os.environ["TRECH_BIN"] = old
 
 
+    def test_beer_lambert_case_requires_engine_law_check(self):
+        case = next(c for c in cases.ALL_CASES if c.name == "analytic_beer_lambert_cross_check")
+        check = {"type": "beer_lambert", "available": True, "within_tolerance": True, "label": "bl",
+                 "classical_predicted": 0.4265, "geant4_measured": 0.4271, "relative_error": 0.0014}
+        law = {"origin": "engine", "law": "attenuation.memoryless", "passed": True}
+        old = os.environ.get("TRECH_BIN")
+        os.environ["TRECH_BIN"] = str(_trech())
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                run = Path(tmp) / cases.RUN_ANALYTIC_BEER_LAMBERT
+                run.mkdir()
+                for recorded, status, failed in (([law], "pass", None),
+                                                 ([dict(law, passed=False)], "fail", "engine_laws_hold"),
+                                                 (None, "fail", "engine_laws_recorded")):
+                    row = {"phase": "run_end", "n_events": 10, "analytic_checks": [check]}
+                    if recorded is not None:
+                        row["law_checks"] = recorded
+                    _write_jsonl(run / "trech_scores.jsonl", [row])
+                    result = case.evaluate(RunContext(runs={cases.RUN_ANALYTIC_BEER_LAMBERT: RunOutputs.load(run)}))
+                    self.assertEqual(result.status, status, failed)
+                    self.assertIn("analytic_beer_lambert.validation.js", result.notes[0])
+                    if failed:
+                        self.assertIn(failed, result.notes[0])
+        finally:
+            if old is None:
+                os.environ.pop("TRECH_BIN", None)
+            else:
+                os.environ["TRECH_BIN"] = old
+
     def test_compton_case_verdict_follows_declared_statistics(self):
         case = next(c for c in cases.ALL_CASES if c.name == "analytic_compton_transfer_cross_check")
         check = {"type": "compton_energy_transfer", "available": True, "within_tolerance": True,
