@@ -29,7 +29,8 @@ struct LawCheck {
   std::size_t samples = 0;
   std::size_t violations = 0;
   double maxAbsError = 0.0;      // largest deviation found (0 when every sample holds exactly)
-  double tolerance = 0.0;
+  double tolerance = 0.0;         // absolute tolerance (agreement) or the check's own bound
+  double relativeTolerance = 0.0; // agreement only: |a - b| <= tolerance + this x max(|a|, |b|)
   bool passed = false;
   std::string detail;            // first violation, or empty
 

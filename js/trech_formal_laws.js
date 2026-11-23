@@ -120,6 +120,7 @@
   // Agreement between two classic implementations (or a classic one and a reference table).
   function checkAgreement(law, lean, a, b, absTolerance, relTolerance) {
     const r = record(law, lean, "agreement", absTolerance);
+    if (relTolerance) r.relative_tolerance = relTolerance;  // as the C++ record: only when nonzero
     if (a.length !== b.length) {
       violate(r, 0, "implementations returned different sample counts");
       return done(r);

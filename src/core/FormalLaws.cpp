@@ -40,7 +40,7 @@ LawCheck finish(LawCheck check) {
 }  // namespace
 
 nlohmann::json LawCheck::toJson() const {
-  return {{"law", law},
+  nlohmann::json out = {{"law", law},
           {"lean_declaration", leanDeclaration},
           {"lean_status", "not_checked_by_this_check"},
           {"kind", kind},
@@ -50,6 +50,9 @@ nlohmann::json LawCheck::toJson() const {
           {"tolerance", tolerance},
           {"passed", passed},
           {"detail", detail}};
+  // Only agreement checks with a relative bound carry it, so other records keep their bytes.
+  if (relativeTolerance != 0.0) out["relative_tolerance"] = relativeTolerance;
+  return out;
 }
 
 double compensatedSum(const double* values, std::size_t count) {
@@ -126,6 +129,7 @@ LawCheck checkProbabilityVector(const std::string& law, const std::string& lean,
 LawCheck checkAgreement(const std::string& law, const std::string& lean, const std::vector<double>& a,
                         const std::vector<double>& b, double absTolerance, double relTolerance) {
   LawCheck check = start(law, lean, "agreement", absTolerance);
+  check.relativeTolerance = relTolerance;
   if (a.size() != b.size()) {
     note(check, 0.0, "implementations returned different sample counts");
     return finish(check);
@@ -242,6 +246,7 @@ void recordRunCheck(const LawCheck& check, const std::string& origin) {
     m.check.violations = 0;
     m.check.maxAbsError = 0.0;
     m.check.tolerance = 0.0;
+    m.check.relativeTolerance = 0.0;
     m.check.passed = true;
   }
   ++m.count;
@@ -249,6 +254,7 @@ void recordRunCheck(const LawCheck& check, const std::string& origin) {
   m.check.violations += check.violations;
   if (!(check.maxAbsError <= m.check.maxAbsError)) m.check.maxAbsError = check.maxAbsError;  // NaN sticks
   m.check.tolerance = std::max(m.check.tolerance, check.tolerance);
+  m.check.relativeTolerance = std::max(m.check.relativeTolerance, check.relativeTolerance);
   m.check.passed = m.check.passed && check.passed;
   keepFirst(check.passed ? m.passingDetail : m.failingDetail, check.detail);
 }

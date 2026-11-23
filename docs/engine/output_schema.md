@@ -384,9 +384,10 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   `compton.momentum_balance` in a run with a `compton_energy_transfer` analytic check, whose
   `max_abs_error` and `tolerance` are relative to the step's largest energy or momentum term;
   the momentum `tolerance` is the largest per-scatter rounding bound used, or
-  `attenuation.memoryless` in a run with a `beer_lambert` analytic check, whose `tolerance` field
-  holds the absolute part `0` of its `2e-15` relative bound) and from validation
-  companions (`origin: "validation"`, through `TRECH_FORMAL_LAWS.record`). Checks with the same
+  `attenuation.memoryless` in a run with a `beer_lambert` analytic check) and from validation
+  companions (`origin: "validation"`, through `TRECH_FORMAL_LAWS.record`). An agreement check's
+  `tolerance` is its absolute bound; `relative_tolerance` (number, optional) is its relative bound,
+  written only when nonzero. Checks with the same
   `origin`, `law` and `lean_declaration` are merged into one record: `count` (how many were
   merged), `samples` and `violations` (summed), `max_abs_error` and `tolerance` (largest),
   `passed` (all passed), `detail` (the alphabetically first detail of a failing check, else of a

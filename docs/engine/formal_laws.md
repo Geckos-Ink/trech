@@ -159,7 +159,11 @@ neither, so their files keep the same bytes as before.
   `origin` saying who ran it. `engine` checks come from the engine itself (each lattice it builds
   checks its velocity set, opposite-direction table and streaming table). `validation` checks come
   from a companion through `TRECH_FORMAL_LAWS.record`. Identical checks are merged, and `count`
-  says how many were merged.
+  says how many were merged. `tolerance` is the check's bound; for an agreement check
+  (`kind: "agreement"`) it is the absolute part, and `relative_tolerance`, present only when
+  nonzero, is the relative part. A sample passes when `|a − b| ≤ tolerance +
+  relative_tolerance · max(|a|, |b|)`. For example, `attenuation.memoryless` records
+  `tolerance: 0` and `relative_tolerance: 2e-15`.
 - **`formal`** in the `run_end` provenance record: which law sources the binary was built with
   (hashes of `formal/laws.json` and of every Lean file), which Lean theorems the checks cite, how
   many checks failed, and `lean_status`.
@@ -189,8 +193,7 @@ at least two `validation` records and `formal_laws_hold` needs all of them to pa
 the engine takes the attenuation coefficient `μ` it computed from Geant4's cross sections for
 that check, and the check's path `L`, and records the engine check `attenuation.memoryless`: it
 evaluates `exp(−μ(x+y))` against `exp(−μx)·exp(−μy)` for the cuts `x = L·k/10` (k = 1…9,
-`y = L − x`) and for `x = y = L`, within `2e-15` relative (the record's `tolerance` field holds
-only the absolute part, `0`). The `analytic_beer_lambert` scenario (100 keV gamma, 50 mm of
+`y = L − x`) and for `x = y = L`, within `2e-15` relative (`relative_tolerance` in the record). The `analytic_beer_lambert` scenario (100 keV gamma, 50 mm of
 water) gets `μ = 0.01704/mm` and agrees within `5.6e-17`. The check reads nothing from the run
 and changes nothing in it; the scenario's family gate requires it (`engine_laws_recorded`,
 `engine_laws_hold`). The companion itself cannot run it, because `μ` exists only once Geant4

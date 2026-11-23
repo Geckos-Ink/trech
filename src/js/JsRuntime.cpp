@@ -6362,6 +6362,9 @@ static JSValue jsFormalRecord(JSContext* ctx, JSValueConst, int argc, JSValueCon
                           ? j["max_abs_error"].get<double>()
                           : std::numeric_limits<double>::quiet_NaN();
   check.tolerance = j.contains("tolerance") && j["tolerance"].is_number() ? j["tolerance"].get<double>() : 0.0;
+  check.relativeTolerance = j.contains("relative_tolerance") && j["relative_tolerance"].is_number()
+                                ? j["relative_tolerance"].get<double>()
+                                : 0.0;
   check.passed = j.value("passed", false);
   check.detail = j.value("detail", "");
   trech::formal::recordRunCheck(check, "validation");

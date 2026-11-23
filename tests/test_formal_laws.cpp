@@ -1196,6 +1196,23 @@ void runRecordContract() {
     std::fprintf(stderr, "run record did not merge as specified: %s\n", checks.dump().c_str());
     ++failures;
   }
+  // relative_tolerance: written for agreement checks with a relative bound (merged by max), and
+  // absent from every other record so they keep their bytes.
+  {
+    formal::recordRunCheck(formal::checkAgreement("relative.run_record", "", {1.0}, {1.0}, 0.0, 1e-15), "engine");
+    formal::recordRunCheck(formal::checkAgreement("relative.run_record", "", {1.0}, {1.0}, 0.0, 3e-15), "engine");
+    formal::recordRunCheck(formal::checkWithinBounds("relative.bounds_record", "", {0.5}, {0.0}, {1.0}, 0.0), "engine");
+    const auto records = formal::takeRunChecks();
+    bool ok = records.size() == 2;
+    for (const auto& r : records) {
+      if (r.at("law") == "relative.run_record") ok = ok && r.value("relative_tolerance", 0.0) == 3e-15;
+      if (r.at("law") == "relative.bounds_record") ok = ok && !r.contains("relative_tolerance");
+    }
+    if (!ok) {
+      std::fprintf(stderr, "relative_tolerance not recorded as specified: %s\n", records.dump().c_str());
+      ++failures;
+    }
+  }
   // The embedded law-source hash equals the one recomputed from the files (the same algorithm as
   // scripts/check_lean_laws.py sources_sha256), so the build is not stale.
   {
@@ -1261,6 +1278,11 @@ globalThis.TRECH_CONFIG = {formal: {
   const auto jsChecks = formal::takeRunChecks();
   bool js = out.at("recorded") == 2 && out.at("probability") == 1 && out.at("rejected") == true && jsChecks.size() == 3;
   for (const auto& c : jsChecks) js = js && c.at("origin") == "validation" && c.at("passed") == true;
+  // The JS agreement record carries its relative bound into the run record; others do not.
+  for (const auto& c : jsChecks) {
+    if (c.at("law") == "compton.edge_at_backscatter") js = js && c.value("relative_tolerance", 0.0) == 1e-15;
+    else js = js && !c.contains("relative_tolerance");
+  }
   if (!js) {
     std::fprintf(stderr, "JS law-check recording failed: %s %s\n", out.dump().c_str(), jsChecks.dump().c_str());
     ++failures;

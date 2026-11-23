@@ -25,7 +25,6 @@ implementation as the running path, with the Lean definition beside it for valid
 - **P3** · R8 · More runs recording law checks: `analytic_compton_transfer` (validation and engine) and `analytic_beer_lambert` (engine, `attenuation.memoryless` at Geant4's own coefficient) record verdicts. Next: companions of `ctx.react` scenarios checking recorded per-cell probabilities with `checkProbabilityVector`, and an engine `ctx.lift` check of conserved weight per level from the recorded groups. Always observe-only and off the decision path; a companion check runs under the `validation` role. ([detail](#attenuation-at-geant4s-coefficient-2026-11-23))
 - **P3** · R3 · Non-finite steps beyond the per-call count: `nonFiniteSteps` is returned to the calling scenario only. Decide whether a run-level counter belongs in provenance (beside the hook/predict counters) and whether the engine trace should warn on the first such step, conditionally serialized so unaffected configs keep their hashes. ([detail](#non-finite-steps-counted-2026-11-23))
 - **P3** · R8 · Split inequality under the affine fallback: `split_le_parent` and `split_le_parent_ridge` cover full-basis (ridge) minimisers, but `DomainLearner` fits a side with fewer than four rows per quadratic coefficient on the affine part only, a minimiser over a subspace, so that side's error may exceed the parent's full-basis fit. Measure how often it happens on recorded learner calls and decide whether the gate should compare like with like. ([detail](#learner-gate-and-ridge-split-2026-11-23))
-- **P3** · R8 · Relative tolerance in law records: `checkAgreement` (C++ and JS) stores only the absolute tolerance in `LawCheck.tolerance`, so an agreement checked within a relative bound (`attenuation.memoryless`, the decay and band checks) records `0`. Add a `relative_tolerance` field, serialized only when nonzero so existing records keep their bytes, and update the output schema and audit. ([detail](#attenuation-at-geant4s-coefficient-2026-11-23))
 - **P3** · R8 · Reals vs floats: bridge Mathlib's `ℝ` theorems to IEEE-754 kernels with stated error bounds, interval arithmetic or a rounding-model proof; until then label every Lean verdict as covering the real-valued statement only. ([detail](#route-opened--2026-11-22))
 - **P3** · R3 · Leader ranking on shared calls: `decayedMean_needs_common_calls` shows that the leader (decayed mean log error over the calls each method predicted in) can rank a method that abstains on easy calls behind one it beats on every shared call; `decay.needs_common_calls` reproduces it on the engine. Measure how often methods abstain on recorded `ctx.evolveField` and operator runs, and decide whether the leader should rank on calls (or rows) every candidate predicted, as `rmse_common` already does, with a regression on the lamp and furnace either way. ([detail](#decayed-prequential-scores-2026-11-23))
 - **P3** · R8 · Lean CI beyond this machine: the toolchain, cache and `trech_formal_lean_build` are verified on macOS arm64 only; check Linux and decide whether CI runs the Lean check. ([detail](#proofs-compiled-and-audited--2026-11-22))
@@ -33,6 +32,17 @@ implementation as the running path, with the Lean definition beside it for valid
 - **P3** · R5 · Geant4 secondary track: Lean statements of Geant4's basic laws (two-body kinematics, the Compton relation from four-momentum conservation, exponential attenuation, energy conservation in `SampleSecondaries`), attached through derived classes in shadow mode (inheritance preferred; `patches/geant4/` only for non-virtual code). Observation first; any replacement needs byte parity or a validated tolerance, a regression against the unpatched build and the owner's go-ahead. ([detail](AGENTS.md#geant4-secondary-track))
 - **gated** · R8 · Owner decision: whether to add a physics-specific Lean library (for example PhysLean) as a further reference checkout, so physical laws are also checked against it before being declared.
 - **gated** · R8 · Owner decision: when (if ever) Lean stops being optional for a given path.
+
+## Relative tolerance in law records (2026-11-23)
+
+- [x] `LawCheck.relativeTolerance` (C++) and `relative_tolerance` (JS records, read back by
+  `__TRECH_FORMAL_RECORD`): set by `checkAgreement`, merged by maximum, written to `law_checks`
+  only when nonzero so every other record keeps its bytes. Records of agreement checks with a
+  relative bound (the Compton companion's `compton.edge_at_backscatter`,
+  `attenuation.memoryless`) gain the field.
+- [x] `trech_formal_laws` run-record section: two engine agreements merge to the larger bound, a
+  bounds check has no field, and a JS Compton record carries `1e-15` through the runtime.
+- Verification: Debug CTest 80/80.
 
 ## Attenuation at Geant4's coefficient (2026-11-23)
 
@@ -46,8 +56,8 @@ implementation as the running path, with the Lean definition beside it for valid
   real Release run (μ = 0.01704/mm, 50 mm) passes 6/6 with a largest error of 5.6e-17;
   `trech_scenario_contracts` covers pass, a failed record and a missing record.
 - Tests: `trech_formal_laws` (two coefficients, a split-sum negative control), Debug CTest.
-- Known: `LawCheck.tolerance` from `checkAgreement` stores only the absolute tolerance, so the
-  record shows `0` for a relative bound (documented in the output schema; queued).
+- Known at landing: `checkAgreement` stored only the absolute tolerance; fixed the same day
+  (record below).
 
 ## Band order (2026-11-23)
 
