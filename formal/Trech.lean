@@ -13,3 +13,4 @@ public import Trech.Methods.LeastSquares
 public import Trech.Methods.PairInteraction
 public import Trech.Methods.Arbiter
 public import Trech.Methods.Decay
+public import Trech.Methods.Band

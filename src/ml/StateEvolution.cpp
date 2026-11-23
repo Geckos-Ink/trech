@@ -87,6 +87,10 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
   }
 
   // ---- order stages by scale band (registration order breaks ties) --------
+  // Lean pair Trech.Methods.Band (formal/Trech/Methods/Band.lean): inside a band,
+  // rate-only stages commute (their rates add; three or more round in this order),
+  // and so do stages with disjoint writes that read nothing the other writes; an
+  // assignment or intermediate read by a later stage makes the order matter.
   std::vector<const EvolutionStage*> ordered;
   ordered.reserve(stages_.size());
   for (const EvolutionStage& s : stages_) {

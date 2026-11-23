@@ -33,6 +33,7 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <stdexcept>
 #include <string>
@@ -597,6 +598,64 @@ void evolvePairs() {
                        std::to_string(one.nonFiniteSteps);
   }
   expect(nonFinite);
+}
+
+void bandPairs() {
+  // Trech.Methods.Band on StateEvolution::evolve: one scale band, the same stages registered in
+  // two orders. Rates accumulate, assignments overwrite the working vector later stages read.
+  const trech::test::TemporaryDirectory fixture;
+  auto linear = [&](const std::string& name, std::vector<std::string> inputs, std::vector<std::string> outputs,
+                    std::vector<std::vector<double>> weights, std::vector<double> bias) {
+    const nlohmann::json layer = {{"weights", weights}, {"bias", bias}, {"activation", "none"}};
+    const nlohmann::json spec = {{"model", "generic_surrogate_v1"}, {"input_features", inputs},
+                                 {"output_features", outputs}, {"layers", {layer}}};
+    const auto path = (fixture.path() / (name + ".json")).string();
+    std::ofstream(path) << spec;
+    auto model = std::make_unique<trech::ml::GenericSurrogate>();
+    if (!model->load(path)) throw std::runtime_error("Could not load band model: " + name);
+    return model;
+  };
+  const auto r1 = linear("r1", {"a"}, {"d_c_dt"}, {{0.3}}, {0.1});
+  const auto r2 = linear("r2", {"b"}, {"d_c_dt"}, {{0.7}}, {-0.2});
+  const auto r3 = linear("r3", {"a", "b"}, {"d_c_dt"}, {{0.11, 0.13}}, {1e-3});
+  const auto s1 = linear("s1", {"b"}, {"set_a"}, {{2.0}}, {0.0});   // writes a, reads b
+  const auto s2 = linear("s2", {"c"}, {"set_c"}, {{0.5}}, {1.0});   // writes c, reads c
+  trech::ml::EvolutionRequest request;
+  request.fields = {{"a"}, {"b"}, {"c"}};
+  const std::size_t n = 33;
+  request.elementCount = n;
+  for (std::size_t e = 0; e < n; ++e) {
+    const double x = 0.1 + 0.37 * static_cast<double>(e);
+    request.state.insert(request.state.end(), {std::sin(x), 0.3 + std::cos(1.7 * x), x / 3.0});
+  }
+  request.dt = 0.25;
+  auto run = [&](std::vector<const trech::ml::GenericSurrogate*> stages) {
+    trech::ml::StateEvolution evolution;
+    for (std::size_t i = 0; i < stages.size(); ++i)
+      evolution.addStage("stage" + std::to_string(i), trech::ml::DimensionScale::kMicro, stages[i]);
+    const auto result = evolution.evolve(request);
+    if (result.inferenceCount != n * stages.size()) throw std::runtime_error("Band stages must all run");
+    return result.state;
+  };
+  const char* perm = "Trech.Methods.Band.rateOnly_perm";
+  expect(formal::checkAgreement("band.two_rates_commute", "Trech.Methods.Band.rateOnly_comm",
+                                run({r1.get(), r2.get()}), run({r2.get(), r1.get()}), 0.0, 0.0));
+  std::vector<double> forward, others;
+  for (const auto& order : std::vector<std::vector<const trech::ml::GenericSurrogate*>>{
+           {r2.get(), r1.get(), r3.get()}, {r3.get(), r2.get(), r1.get()}, {r1.get(), r3.get(), r2.get()}}) {
+    const auto base = run({r1.get(), r2.get(), r3.get()});
+    const auto other = run(order);
+    forward.insert(forward.end(), base.begin(), base.end());
+    others.insert(others.end(), other.begin(), other.end());
+  }
+  // Three or more rates sum in registration order: equal over the reals, within rounding here.
+  expect(formal::checkAgreement("band.rate_band_reorders", perm, forward, others, 1e-15, 1e-15));
+  expect(formal::checkAgreement("band.disjoint_assigners_commute", "Trech.Methods.Band.apply_comm",
+                                run({s1.get(), s2.get(), r2.get()}), run({s2.get(), s1.get(), r2.get()}), 0.0, 0.0));
+  // Counterexample (order_matters): r1 reads a, which s1 assigns.
+  expect(formal::checkAgreement("band.assignment_read_order_negative_control", "",
+                                run({s1.get(), r1.get()}), run({r1.get(), s1.get()}), 1e-12, 0.0),
+         false);
 }
 
 void setPoolPairs() {
@@ -1209,6 +1268,7 @@ int main() {
     transitionConservation();
     pairConservation();
     evolvePairs();
+    bandPairs();
     setPoolPairs();
     groupPairs();
     leastSquaresPairs();

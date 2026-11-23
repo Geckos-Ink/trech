@@ -193,6 +193,25 @@
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["decay.closed_form", "decay.arbiter_scores", "decay.dominant_leads", "decay.needs_common_calls"]}
     },
     {
+      "id": "evolve.band_order",
+      "role": "method_property",
+      "statement": "Inside one ctx.evolve scale band, stages run in registration order on a working vector: a stage adds its rates and overwrites the slots it assigns. Two stages commute when they write disjoint slots and neither reads a slot the other writes; rate-only stages always commute, and a band of them adds the sum of its rates, so any reordering gives the same outcome (over the reals); an assignment read by a rate stage is order-dependent.",
+      "lean": {
+        "file": "formal/Trech/Methods/Band.lean",
+        "declarations": [
+          "Trech.Methods.Band.apply_comm",
+          "Trech.Methods.Band.rateOnly_comm",
+          "Trech.Methods.Band.foldRateOnly",
+          "Trech.Methods.Band.rateOnly_perm",
+          "Trech.Methods.Band.order_matters"
+        ]
+      },
+      "classic": [
+        {"path": "src/ml/StateEvolution.cpp", "cites": "Trech.Methods.Band"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["band.two_rates_commute", "band.rate_band_reorders", "band.disjoint_assigners_commute"]}
+    },
+    {
       "id": "evolve.bounded_explicit_step",
       "role": "method_property",
       "statement": "Over the reals, the engine's bounded explicit step clamp(x + r dt) to ordered declared bounds lo <= hi always lies in [lo, hi] and equals the unclamped step when that already lies inside; the unclamped increment is linear in dt and additive over consecutive steps at one rate.",
