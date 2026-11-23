@@ -193,6 +193,28 @@
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["decay.closed_form", "decay.arbiter_scores", "decay.dominant_leads", "decay.needs_common_calls"]}
     },
     {
+      "id": "domains.routing_partition",
+      "role": "method_property",
+      "statement": "The domain learner's routing tree sends every row to exactly one current domain: the leaves' regions are disjoint and cover the input, so the per-domain row counts add up to the batch; replacing one leaf by a subtree (a split) or a split node by a leaf (a merge) changes the domain only of rows that were in the replaced domains.",
+      "lean": {
+        "file": "formal/Trech/Methods/Route.lean",
+        "declarations": [
+          "Trech.Methods.Route.Tree.route_mem_ids",
+          "Trech.Methods.Route.Tree.mem_region_iff",
+          "Trech.Methods.Route.Tree.regions_disjoint",
+          "Trech.Methods.Route.Tree.regions_cover",
+          "Trech.Methods.Route.Tree.card_routed",
+          "Trech.Methods.Route.Tree.route_replace",
+          "Trech.Methods.Route.Tree.split_keeps_other_rows",
+          "Trech.Methods.Route.Tree.merge_keeps_other_rows"
+        ]
+      },
+      "classic": [
+        {"path": "src/ml/DomainLearner.cpp", "cites": "Trech.Methods.Route"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["route.row_in_current_domain", "route.counts_add_up", "route.refinement_keeps_other_rows", "route.exported_tree_routes"]}
+    },
+    {
       "id": "evolve.band_order",
       "role": "method_property",
       "statement": "Inside one ctx.evolve scale band, stages run in registration order on a working vector: a stage adds its rates and overwrites the slots it assigns. Two stages commute when they write disjoint slots and neither reads a slot the other writes; rate-only stages always commute, and a band of them adds the sum of its rates, so any reordering gives the same outcome (over the reals); an assignment read by a rate stage is order-dependent.",

@@ -279,6 +279,17 @@ struct Leaf {
   std::size_t rows() const { return calls.size(); }
 };
 
+// The half-space test of an inner node: direction . x <= threshold goes left. Routing and the
+// split's redistribution of buffered rows both call this one function (not inlined, so the
+// compiler emits one evaluation for both), so a buffered row sits in the leaf a fresh copy of it
+// would be routed to. Lean pair Trech.Methods.Route (formal/Trech/Methods/Route.lean): the
+// leaves partition the input and a split or merge reroutes only its own domain's rows.
+[[gnu::noinline]] bool goesLeft(const std::vector<double>& direction, double threshold, const double* x) {
+  double s = 0.0;
+  for (std::size_t f = 0; f < direction.size(); ++f) s += direction[f] * x[f];
+  return s <= threshold;
+}
+
 struct Node {
   bool leaf = true;
   int leafId = -1;
@@ -351,9 +362,7 @@ struct DomainLearner::Impl {
     int n = 0;
     while (!nodes[n].leaf) {
       const auto& node = nodes[n];
-      double s = 0.0;
-      for (std::size_t f = 0; f < d; ++f) s += node.direction[f] * x[f];
-      n = s <= node.threshold ? node.left : node.right;
+      n = goesLeft(node.direction, node.threshold, x) ? node.left : node.right;
     }
     return nodes[n].leafId;
   }
@@ -1052,9 +1061,7 @@ struct DomainLearner::Impl {
     Leaf& left = leaves.at(leftId);
     Leaf& right = leaves.at(rightId);
     for (std::size_t i = 0; i < parent.rows(); ++i) {
-      double s = 0.0;
-      for (std::size_t f = 0; f < d; ++f) s += direction[f] * parent.xs[i * d + f];
-      Leaf& target = s <= threshold ? left : right;
+      Leaf& target = goesLeft(direction, threshold, &parent.xs[i * d]) ? left : right;
       target.xs.insert(target.xs.end(), &parent.xs[i * d], &parent.xs[i * d] + d);
       target.ys.insert(target.ys.end(), &parent.ys[i * t], &parent.ys[i * t] + t);
       target.calls.push_back(parent.calls[i]);

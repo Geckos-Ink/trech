@@ -13,6 +13,7 @@
 #include "trech/ml/BoundedStep.hpp"
 #include "trech/ml/DecayedScore.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
+#include "trech/ml/DomainLearner.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/GroupHierarchy.hpp"
 #include "trech/ml/LeastSquaresStatistics.hpp"
@@ -36,6 +37,7 @@
 #include <limits>
 #include <memory>
 #include <numeric>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -671,6 +673,93 @@ void bandPairs() {
   expect(formal::checkAgreement("band.assignment_read_order_negative_control", "",
                                 run({s1.get(), r1.get()}), run({r1.get(), s1.get()}), 1e-12, 0.0),
          false);
+}
+
+void routePairs() {
+  // Trech.Methods.Route on DomainLearner: three affine regimes (splits), then one shared law
+  // (merges). Per call: every routed row is in a current domain, the domains' element counts add
+  // up to the batch (card_routed), rows whose pre-refinement domain survived keep it
+  // (route_replace), and walking the exported tree as Route.route gives every row's domain.
+  trech::ml::DomainLearnerOptions o;
+  o.features = {"a", "b"};
+  o.targets = {"y"};
+  o.seed = 7;
+  o.capacity.maxDomains = 12;
+  o.capacity.bufferRows = 2048;
+  o.capacity.splitCandidates = 32;
+  o.capacity.basisDegree = 1;
+  o.minElements = 24;
+  o.mergeCooldown = 3;
+  trech::ml::DomainLearner learner(o);
+  std::uint64_t state = 21;
+  auto uniform = [&]() {
+    state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+    return static_cast<double>(state >> 11) * 0x1.0p-53;
+  };
+  std::size_t rows = 0, kept = 0, rerouted = 0, splits = 0, merges = 0;
+  std::size_t memberViolations = 0, countViolations = 0, localityViolations = 0, treeViolations = 0;
+  for (int call = 0; call < 80; ++call) {
+    trech::ml::DomainLearnerBatch batch;
+    batch.time = call;
+    batch.count = 400;
+    for (std::size_t i = 0; i < batch.count; ++i) {
+      const double a = uniform(), b = uniform();
+      const int regime = call >= 25 ? 0 : a < 0.4 ? 0 : b < 0.5 ? 1 : 2;
+      batch.features.insert(batch.features.end(), {a, b});
+      batch.targets.push_back(regime == 0 ? 1.0 + 2.0 * a - b : regime == 1 ? -3.0 + 0.5 * a + 4.0 * b : 2.0 - 1.5 * a + 0.2 * b);
+    }
+    const auto r = learner.update(batch);
+    for (const auto& e : r.events) { splits += e.type == "split"; merges += e.type == "merge"; }
+    std::set<int> current;
+    std::size_t counted = 0;
+    for (const auto& d : r.domains) { current.insert(d.id); counted += d.elements; }
+    if (counted != batch.count) ++countViolations;
+    const auto tree = learner.exportState(false).at("nodes");
+    for (std::size_t i = 0; i < batch.count; ++i) {
+      ++rows;
+      const int before = r.predictionDomains[i], after = r.elementDomains[i];
+      if (!current.count(after)) ++memberViolations;
+      if (current.count(before)) { ++kept; if (after != before) ++localityViolations; }
+      else ++rerouted;
+      std::size_t n = 0;  // Route.route over the exported tree
+      while (!tree[n].contains("leaf")) {
+        double s = 0.0;
+        const auto direction = tree[n].at("direction").get<std::vector<double>>();
+        for (std::size_t f = 0; f < 2; ++f) s += direction[f] * batch.features[i * 2 + f];
+        n = tree[n].at(s <= tree[n].at("threshold").get<double>() ? "left" : "right").get<std::size_t>();
+      }
+      if (tree[n].at("leaf").get<int>() != after) ++treeViolations;
+    }
+  }
+  if (splits < 2 || merges < 1 || rerouted == 0) {
+    throw std::runtime_error("Route conformance needs splits and merges (splits " + std::to_string(splits) +
+                             ", merges " + std::to_string(merges) + ")");
+  }
+  auto verdict = [&](const char* law, const char* lean, const char* kind, std::size_t samples, std::size_t violations) {
+    formal::LawCheck c;
+    c.law = law;
+    c.leanDeclaration = lean;
+    c.kind = kind;
+    c.samples = samples;
+    c.violations = violations;
+    c.passed = violations == 0;
+    if (!c.passed) c.detail = std::to_string(violations) + " violations";
+    expect(c);
+  };
+  verdict("route.row_in_current_domain", "Trech.Methods.Route.Tree.route_mem_ids", "invariant", rows, memberViolations);
+  verdict("route.counts_add_up", "Trech.Methods.Route.Tree.card_routed", "invariant", 80, countViolations);
+  verdict("route.refinement_keeps_other_rows", "Trech.Methods.Route.Tree.route_replace", "invariant", kept, localityViolations);
+  verdict("route.exported_tree_routes", "Trech.Methods.Route.Tree.mem_region_iff", "agreement", rows, treeViolations);
+  // Negative control: the rows of split or merged domains do move, so demanding that every row keep
+  // its pre-refinement domain fails.
+  formal::LawCheck everyRow;
+  everyRow.law = "route.every_row_kept_negative_control";
+  everyRow.kind = "invariant";
+  everyRow.samples = rows;
+  everyRow.violations = rerouted;
+  everyRow.passed = rerouted == 0;
+  expect(everyRow, false);
+  std::printf("%-40s %zu splits, %zu merges, %zu rows kept, %zu rerouted\n", "route.events", splits, merges, kept, rerouted);
 }
 
 void setPoolPairs() {
@@ -1309,6 +1398,7 @@ int main() {
     setPoolPairs();
     groupPairs();
     leastSquaresPairs();
+    routePairs();
     arbiterPairs();
     decayPairs();
     javascriptPairs();
