@@ -535,8 +535,13 @@ load. Changing either after startup requires a restart.
   An intermediate must have been produced for this element/material, or explicitly supplied in
   `context`; another material's registered producer does not supply an implicit zero. Strict mode returns `null` **and leaves the state untouched**. Every model
   evaluation counts: a K-stage operator over N elements adds **N×K** to `hook_predict_count`.
-  The report carries `{ran, stagesRun, elementsEvolved, inferenceCount, outOfDomainInferences,
-  sharedKeys, auxKeys, selection, trace}`. `selection` contains the explicit/contextual mode,
+  The report carries `{ran, stagesRun, elementsEvolved, nonFiniteSteps, inferenceCount, outOfDomainInferences,
+  sharedKeys, auxKeys, selection, trace}`. `nonFiniteSteps` counts the field steps whose increment
+  `rate·dt` was not finite or whose result was NaN. The engine does not reject or repair them: an
+  overflowing increment lands on the bound it points to, and a NaN stays NaN (no comparison with
+  NaN is true, so the bounds cannot catch it). For example, a learned rate of `1e308` with
+  `dt: 10` overflows to infinity and puts a `[0, 1]` field at `1`; the report then shows
+  `nonFiniteSteps: 1`. A finite call reports `0`. `selection` contains the explicit/contextual mode,
   `selected`/`ambiguous`/`no_compatible` status, selected model names, and a per-model trace with
   compatibility reason and missing context keys. Each evolution `trace[i]` adds
   `integratedFields`, `assignedFields`,
@@ -731,10 +736,12 @@ load. Changing either after startup requires a restart.
   gate and add unit/pin checks and transactional proposal acceptance around the raw operator.
 
   The report carries `{ran, pairCount, linkPairs, neighborPairs, neighborPairsSkipped,
-  neighborPairsTruncated, invalidLinks, duplicateLinks, stagesRun, inferenceCount,
+  neighborPairsTruncated, invalidLinks, duplicateLinks, nonFiniteSteps, stagesRun, inferenceCount,
   outOfDomainInferences, sharedKeys, auxKeys, selection, trace}`, plus
   `blockedReason:"no_pairs"` when a well-formed call found no link or neighbour to evaluate
-  (distinct from a malformed block; `ran` stays false); each `trace[i]` names
+  (distinct from a malformed block; `ran` stays false). `nonFiniteSteps` counts link and element
+  steps with a non-finite increment or a NaN result, as in `ctx.evolve` (opposite rates that cancel
+  exactly before `dt` multiplies them leave a finite step); each `trace[i]` names
   `ratedElementFields`, `incrementedElementFields`, `ratedPairFields`, `assignedPairFields`,
   `intermediateOutputs`, `unappliedFieldOutputs` and the per-pair-aggregated trust profile
   (`pairsOutOfDomain`, `pairsStarved`, `maxExtrapolation`, …). The

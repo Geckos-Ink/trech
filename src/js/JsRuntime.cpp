@@ -3008,6 +3008,8 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                     JS_NewInt32(ctx, run.stagesStarved));
   JS_SetPropertyStr(ctx, result, "elementsEvolved",
                     JS_NewInt64(ctx, static_cast<std::int64_t>(run.elementsEvolved)));
+  JS_SetPropertyStr(ctx, result, "nonFiniteSteps",
+                    JS_NewInt64(ctx, static_cast<std::int64_t>(run.nonFiniteSteps)));
   JS_SetPropertyStr(ctx, result, "inferenceCount",
                     JS_NewInt64(ctx, static_cast<std::int64_t>(run.inferenceCount)));
   JS_SetPropertyStr(
@@ -4685,6 +4687,9 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
   JS_SetPropertyStr(
       ctx, result, "duplicateLinks",
       JS_NewInt64(ctx, static_cast<std::int64_t>(run.duplicateLinks)));
+  JS_SetPropertyStr(
+      ctx, result, "nonFiniteSteps",
+      JS_NewInt64(ctx, static_cast<std::int64_t>(run.nonFiniteSteps)));
   JS_SetPropertyStr(ctx, result, "stagesRun", JS_NewInt32(ctx, run.stagesRun));
   JS_SetPropertyStr(ctx, result, "stagesExtrapolating",
                     JS_NewInt32(ctx, run.stagesExtrapolating));

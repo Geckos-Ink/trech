@@ -23,7 +23,7 @@ implementation as the running path, with the Lean definition beside it for valid
 - **P2** · R8 · Conformance harness: a Lean reference evaluator (`@[export]` C symbols linked behind an opt-in `TRECH_ENABLE_LEAN`, default OFF, or a separate `lake exe` fed JSON) that checks the classic kernel on sampled or recorded inputs offline. Measure its cost; it never runs per step in production and never changes physics, RNG or emits. ([detail](#route-opened--2026-11-22))
 - **P2** · R8 · Hardware acceleration contract: Lean compiles to scalar CPU code, so accelerated kernels (C++ SIMD, LibTorch, GPU) stay the compute path. Define how a proof about an algorithm's model transfers to its accelerated implementation (shared algorithm spec, sampled conformance, documented reduction-order and fused-operation differences). ([detail](#route-opened--2026-11-22))
 - **P3** · R8 · More companions recording law checks: only `analytic_compton_transfer` records `TRECH_FORMAL_LAWS` verdicts. Candidates: `analytic_beer_lambert` (memorylessness at its own attenuation coefficients), and companions of `ctx.react` scenarios checking recorded per-cell probabilities with `checkProbabilityVector`. Always from the `.validation.js` companion under the `validation` role, never on the decision path. ([detail](#law-checks-in-run-outputs--2026-11-22))
-- **P3** · R8 · Non-finite rates in `ctx.evolve`/`ctx.interact`: the bounded-step theorems hold over the reals, and the boundary now rejects unordered or NaN bounds, but a NaN rate still yields a NaN state (every IEEE comparison with NaN is false) and an infinite rate lands on a bound. Decide whether the operator rejects, counts or reports such a rate, with a test either way. ([detail](#bounded-explicit-step-2026-11-23))
+- **P3** · R3 · Non-finite steps beyond the per-call count: `nonFiniteSteps` is returned to the calling scenario only. Decide whether a run-level counter belongs in provenance (beside the hook/predict counters) and whether the engine trace should warn on the first such step, conditionally serialized so unaffected configs keep their hashes. ([detail](#non-finite-steps-counted-2026-11-23))
 - **P3** · R8 · Split inequality under the affine fallback: `split_le_parent` and `split_le_parent_ridge` cover full-basis (ridge) minimisers, but `DomainLearner` fits a side with fewer than four rows per quadratic coefficient on the affine part only, a minimiser over a subspace, so that side's error may exceed the parent's full-basis fit. Measure how often it happens on recorded learner calls and decide whether the gate should compare like with like. ([detail](#learner-gate-and-ridge-split-2026-11-23))
 - **P3** · R8 · Reals vs floats: bridge Mathlib's `ℝ` theorems to IEEE-754 kernels with stated error bounds, interval arithmetic or a rounding-model proof; until then label every Lean verdict as covering the real-valued statement only. ([detail](#route-opened--2026-11-22))
 - **P3** · R3 · Leader ranking on shared calls: `decayedMean_needs_common_calls` shows that the leader (decayed mean log error over the calls each method predicted in) can rank a method that abstains on easy calls behind one it beats on every shared call; `decay.needs_common_calls` reproduces it on the engine. Measure how often methods abstain on recorded `ctx.evolveField` and operator runs, and decide whether the leader should rank on calls (or rows) every candidate predicted, as `rmse_common` already does, with a regression on the lamp and furnace either way. ([detail](#decayed-prequential-scores-2026-11-23))
@@ -32,6 +32,22 @@ implementation as the running path, with the Lean definition beside it for valid
 - **P3** · R5 · Geant4 secondary track: Lean statements of Geant4's basic laws (two-body kinematics, the Compton relation from four-momentum conservation, exponential attenuation, energy conservation in `SampleSecondaries`), attached through derived classes in shadow mode (inheritance preferred; `patches/geant4/` only for non-virtual code). Observation first; any replacement needs byte parity or a validated tolerance, a regression against the unpatched build and the owner's go-ahead. ([detail](AGENTS.md#geant4-secondary-track))
 - **gated** · R8 · Owner decision: whether to add a physics-specific Lean library (for example PhysLean) as a further reference checkout, so physical laws are also checked against it before being declared.
 - **gated** · R8 · Owner decision: when (if ever) Lean stops being optional for a given path.
+
+## Non-finite steps counted (2026-11-23)
+
+- [x] Decision for the P3 non-finite-rate item: count and report, never reject or repair. A NaN
+  rate still yields a NaN state and an overflowing increment still lands on its bound (no
+  behaviour change); `nonFiniteStep` (`ml/BoundedStep.hpp`) marks a step whose increment is not
+  finite or whose result is NaN, and `ctx.evolve` and `ctx.interact` return the count as
+  `nonFiniteSteps`. Rejecting would abort runs whose learned operator extrapolates; repairing
+  would hide it.
+- [x] Tests: `evolve.non_finite_steps_counted` (rate `1e308`, `dt` 10: both elements land on the
+  upper bound of `[0, 1]`, the unbounded field goes to `-inf` and to NaN from `+inf`, count 4)
+  and `pair.non_finite_steps_counted` (two links: count 2, the shared element's opposite rates
+  cancel exactly before `dt` and it keeps its value) in `trech_formal_laws`; a finite
+  `ctx.evolve` call reports `nonFiniteSteps: 0` at the JS boundary (`trech_js_runtime`).
+- Verification: Debug CTest 80/80.
+- Queued: a run-level counter and trace warning.
 
 ## Decayed prequential scores (2026-11-23)
 

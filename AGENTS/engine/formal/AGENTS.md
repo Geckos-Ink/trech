@@ -144,7 +144,8 @@ conservation, exponential attenuation from a constant interaction rate, energy c
   seen). Tighten a tolerance only with evidence; never loosen one to make a check pass.
 - **Engine methods route through the proved function.** `ctx.react` draws only through
   `selectTransitionChannel`, `ctx.evolve` and `ctx.interact` step and clamp only through
-  `boundedEulerStep`/`clampToBounds` (`ml/BoundedStep.hpp`), the arbiter grades by squared
+  `boundedEulerStep`/`clampToBounds` (`ml/BoundedStep.hpp`) and count steps outside the
+  theorems (non-finite increment or NaN result) as `nonFiniteSteps` without repairing them, the arbiter grades by squared
   error ranked through `log(error + floor)`, and every decayed arbiter score advances only
   through `decayedUpdate` (`ml/DecayedScore.hpp`). Changing either changes what `Trech.Methods.Transition`,
   `Trech.Methods.Evolve`, `Trech.Methods.Arbiter` or `Trech.Methods.Decay` covers: update the Lean pair and its conformance check in the same change.

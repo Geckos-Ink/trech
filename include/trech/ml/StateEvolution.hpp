@@ -185,6 +185,9 @@ struct EvolutionResult {
   // The evolved state, same layout as the request's (unchanged when !ran).
   std::vector<double> state;
   std::size_t elementsEvolved = 0;
+  // Field steps whose increment rate*dt was not finite or whose result was NaN
+  // (BoundedStep.hpp nonFiniteStep); counted, never repaired.
+  std::size_t nonFiniteSteps = 0;
   int stagesRun = 0;
   int stagesExtrapolating = 0;    // stages with >=1 out-of-domain element
   int stagesScaleMismatched = 0;

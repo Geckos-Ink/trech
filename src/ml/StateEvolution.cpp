@@ -533,9 +533,11 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
     for (std::size_t f = 0; f < fieldCount; ++f) {
       // Lean pair Trech.Methods.Evolve (include/trech/ml/BoundedStep.hpp).
       const EvolutionField& field = request.fields[f];
+      const double rate = pendingRates[stateBase + f];
       result.state[stateBase + f] =
-          boundedEulerStep(pendingFields[stateBase + f], pendingRates[stateBase + f],
+          boundedEulerStep(pendingFields[stateBase + f], rate,
                            request.dt, field.minValue, field.maxValue);
+      if (nonFiniteStep(rate * request.dt, result.state[stateBase + f])) ++result.nonFiniteSteps;
     }
   }
 

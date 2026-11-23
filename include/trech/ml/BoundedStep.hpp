@@ -16,7 +16,12 @@
 // The engine rejects unordered or NaN bounds at the JS boundary
 // (`boundsOrdered`), which is the theorems' hypothesis. A NaN update stays NaN:
 // IEEE comparisons with NaN are false, so the clamp cannot repair it, and the
-// theorems (over the reals) say nothing about it.
+// theorems (over the reals) say nothing about it. An infinite increment lands
+// on the bound it points to. Neither is rejected or repaired: the operators
+// count such steps (`nonFiniteStep`) and return the count as `nonFiniteSteps`,
+// so a scenario or companion can see a rate the theorems do not cover.
+
+#include <cmath>
 
 namespace trech::ml {
 
@@ -32,6 +37,12 @@ inline double clampToBounds(double value, double lo, double hi) {
 inline double boundedEulerStep(double value, double rate, double dt, double lo,
                                double hi) {
   return clampToBounds(value + rate * dt, lo, hi);
+}
+
+// A step outside the theorems: its increment (rate * dt, or the summed pair
+// delta) is not finite, or its result is NaN.
+inline bool nonFiniteStep(double increment, double result) {
+  return !std::isfinite(increment) || std::isnan(result);
 }
 
 // The theorems' hypothesis: lo <= hi (false for NaN on either side).

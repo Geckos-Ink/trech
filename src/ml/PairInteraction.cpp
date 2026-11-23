@@ -927,6 +927,7 @@ PairInteractionResult PairInteraction::interact(
       const PairStateField& field = request.pairFields[p];
       result.pairState[base + p] = boundedEulerStep(
           linkBase[base + p], linkRates[base + p], request.dt, field.minValue, field.maxValue);
+      if (nonFiniteStep(linkRates[base + p] * request.dt, result.pairState[base + p])) ++result.nonFiniteSteps;
     }
   }
 
@@ -942,6 +943,7 @@ PairInteractionResult PairInteraction::interact(
       const PairElementField& field = request.fields[f];
       result.state[base + f] =
           clampToBounds(request.state[base + f] + delta, field.minValue, field.maxValue);
+      if (nonFiniteStep(delta, result.state[base + f])) ++result.nonFiniteSteps;
     }
   }
 

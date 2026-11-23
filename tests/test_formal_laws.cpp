@@ -446,6 +446,33 @@ void pairConservation() {
   const auto clipped = interaction.interact(request);
   expect(formal::checkConservedTotal("pair.clipped_exchange_negative_control", "", request.state, clipped.state, 1e-15),
          false);
+  // A rate whose increment overflows (1e308 x dt 10) is counted where it lands and goes to the
+  // bound it points to. The middle element receives +1e308 and -1e308, which cancel exactly
+  // before dt multiplies them, so its step is finite and it keeps its value. Finite calls count none.
+  trech::ml::GenericSurrogate huge;
+  loadConformanceModel(huge, (fixture.path() / "pair_huge.json").string(), {"d_heat_dt"}, {1e308});
+  trech::ml::PairInteraction overflow;
+  overflow.addStage("exchange", trech::ml::DimensionScale::kMicro, &huge);
+  auto wild = request;
+  wild.fields[0].maxValue = std::numeric_limits<double>::infinity();
+  wild.fields[0].minValue = 0.0;
+  wild.dt = 10.0;
+  const auto counted = overflow.interact(wild);
+  formal::LawCheck nonFinite;
+  nonFinite.law = "pair.non_finite_steps_counted";
+  nonFinite.leanDeclaration = "Trech.Methods.Evolve.boundedStep_mem";
+  nonFinite.kind = "hypothesis";
+  nonFinite.samples = 3;
+  const double inf = std::numeric_limits<double>::infinity();
+  nonFinite.passed = counted.nonFiniteSteps == 2 && run.nonFiniteSteps == 0 && clipped.nonFiniteSteps == 0 &&
+                     counted.state == std::vector<double>{inf, 3.0, 0.0};
+  if (!nonFinite.passed) {
+    nonFinite.violations = 1;
+    nonFinite.detail = "counted " + std::to_string(counted.nonFiniteSteps) + ", state " +
+                       std::to_string(counted.state[0]) + " " + std::to_string(counted.state[1]) + " " +
+                       std::to_string(counted.state[2]);
+  }
+  expect(nonFinite);
 }
 
 void evolvePairs() {
@@ -543,6 +570,33 @@ void evolvePairs() {
   expect(formal::checkWithinBounds("evolve.unordered_bounds_negative_control", "",
                                    {trech::ml::boundedEulerStep(0.5, 0.0, 1.0, 1.0, 0.0)}, {1.0}, {0.0}, 0.0),
          false);
+
+  // Outside the theorems: an increment that overflows (rate 1e308, dt 10) lands on the bound it
+  // points to, an infinite state meeting the opposite infinite increment gives NaN. Neither is
+  // rejected or repaired; every such step is counted (nonFiniteSteps), and finite calls count 0.
+  trech::ml::GenericSurrogate huge;
+  loadConformanceModel(huge, (fixture.path() / "huge.json").string(), {"d_a_dt", "d_b_dt"}, {1e308, -1e308});
+  trech::ml::StateEvolution overflow;
+  overflow.addStage("drive", trech::ml::DimensionScale::kMicro, &huge);
+  trech::ml::EvolutionRequest wild;
+  wild.fields = {{"a", 0.0, 1.0}, {"b"}};
+  wild.elementCount = 2;
+  wild.state = {0.5, 0.5, 0.5, inf};
+  wild.dt = 10.0;
+  const auto counted = overflow.evolve(wild);
+  formal::LawCheck nonFinite;
+  nonFinite.law = "evolve.non_finite_steps_counted";
+  nonFinite.leanDeclaration = "Trech.Methods.Evolve.boundedStep_mem";
+  nonFinite.kind = "hypothesis";
+  nonFinite.samples = 4;
+  nonFinite.passed = counted.nonFiniteSteps == 4 && one.nonFiniteSteps == 0 && counted.state[0] == 1.0 &&
+                     counted.state[2] == 1.0 && counted.state[1] == -inf && std::isnan(counted.state[3]);
+  if (!nonFinite.passed) {
+    nonFinite.violations = 1;
+    nonFinite.detail = "counted " + std::to_string(counted.nonFiniteSteps) + ", finite call " +
+                       std::to_string(one.nonFiniteSteps);
+  }
+  expect(nonFinite);
 }
 
 void setPoolPairs() {

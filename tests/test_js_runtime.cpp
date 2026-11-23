@@ -1492,6 +1492,7 @@ globalThis.TRECH_HOOKS = {onInit() { return {override: {
       out << "    ctx.emit(\"evo\", {\n";
       out << "      ran: r ? r.ran : null,\n";
       out << "      boundsErrors: boundsErrors.join(\",\"),\n";
+      out << "      nonFinite: r ? r.nonFiniteSteps : -1,\n";
       out << "      stages: r ? r.stagesRun : -1,\n";
       out << "      elements: r ? r.elementsEvolved : -1,\n";
       out << "      inferences: r ? r.inferenceCount : -1,\n";
@@ -1541,6 +1542,8 @@ globalThis.TRECH_HOOKS = {onInit() { return {override: {
       const std::string& p = eEmits[0].payloadJson;
       failures += expect(p.find("\"ran\":true") != std::string::npos,
                          "Expected the operator to report it ran.");
+      failures += expect(p.find("\"nonFinite\":0") != std::string::npos,
+                         "Expected a finite ctx.evolve call to report nonFiniteSteps 0.");
       failures += expect(p.find("\"boundsErrors\":\"range,range\"") != std::string::npos,
                          "Expected ctx.evolve to reject unordered and NaN field bounds.");
       failures += expect(p.find("\"stages\":2") != std::string::npos,

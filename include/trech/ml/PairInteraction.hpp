@@ -270,6 +270,9 @@ struct PairInteractionResult {
   int stagesRun = 0;
   int stagesExtrapolating = 0;
   int stagesScaleMismatched = 0;
+  // Link and element steps whose increment was not finite or whose result was
+  // NaN (BoundedStep.hpp nonFiniteStep); counted, never repaired.
+  std::size_t nonFiniteSteps = 0;
   int stagesStarved = 0;
   // Model evaluations performed = stagesRun * pairCount.  The honest inference
   // count the run reports: a batched pair operator does not hide P predictions
