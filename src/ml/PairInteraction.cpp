@@ -1,5 +1,7 @@
 #include "trech/ml/PairInteraction.hpp"
 
+#include "trech/ml/BoundedStep.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -917,15 +919,14 @@ PairInteractionResult PairInteraction::interact(
 
   // Integrate each touched link's own state once, at the bounded step the
   // caller chose, then apply its declared bounds. Only a declared link persists.
+  // Lean pair Trech.Methods.Evolve (include/trech/ml/BoundedStep.hpp).
   for (std::size_t l = 0; l < request.links.size(); ++l) {
     if (!linkTouched[l]) continue;
     const std::size_t base = l * pairFieldCount;
     for (std::size_t p = 0; p < pairFieldCount; ++p) {
-      double value = linkBase[base + p] + linkRates[base + p] * request.dt;
       const PairStateField& field = request.pairFields[p];
-      if (value < field.minValue) value = field.minValue;
-      if (value > field.maxValue) value = field.maxValue;
-      result.pairState[base + p] = value;
+      result.pairState[base + p] = boundedEulerStep(
+          linkBase[base + p], linkRates[base + p], request.dt, field.minValue, field.maxValue);
     }
   }
 
@@ -938,11 +939,9 @@ PairInteractionResult PairInteraction::interact(
       if (delta == 0.0) {
         continue;  // an element no pair touched keeps its value bit-for-bit
       }
-      double value = request.state[base + f] + delta;
       const PairElementField& field = request.fields[f];
-      if (value < field.minValue) value = field.minValue;
-      if (value > field.maxValue) value = field.maxValue;
-      result.state[base + f] = value;
+      result.state[base + f] =
+          clampToBounds(request.state[base + f] + delta, field.minValue, field.maxValue);
     }
   }
 

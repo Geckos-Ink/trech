@@ -74,7 +74,11 @@ layer is linear). An `mpnn` additionally runs `rounds` message-passing steps wit
 across rounds: each element aggregates `message([h_i, h_j, x_j[relative] − x_i[relative]])` over
 the other present elements and updates `h_i = update([h_i, m_i])`. With `mask` = f, an element is
 present iff its raw feature f is > 0.5, so one model serves sets of varying size. Input scalers
-are shared by every element block, so permuting blocks never changes a prediction. Every hidden
+are shared by every element block, so permuting blocks never changes a prediction; the C++
+loader refuses a v3 checkpoint whose slots differ in `input_mean` or `input_std` (since
+2026-11-23), because such a model would not be permutation invariant. The invariance is proved in
+Lean (`Trech.Methods.SetPool`, [formal laws](../engine/formal_laws.md)) and checked on the fixtures
+under every element order; in doubles a sum pool may still differ in the last bits (4.4e-16 seen). Every hidden
 layer uses `activation`; `message` lists hidden widths before the state width (the last `phi`
 width). Checkpoints are `generic_surrogate_v3` (nested `network` with `kind`, `phi`, `rho` and
 for MPNN `message`/`update`; `output_transforms` always present), evaluated by the C++

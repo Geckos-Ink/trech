@@ -1482,8 +1482,16 @@ globalThis.TRECH_HOOKS = {onInit() { return {override: {
       out << "      aux: {catalyst:[0]}, context:{rate_coefficient:0.25},\n";
       out << "      operator_role:\"unavailable_context\", element_kind:\"parcel\"\n";
       out << "    });\n";
+      // Unordered or NaN bounds break the Trech.Methods.Evolve hypothesis lo <= hi.
+      out << "    const boundsErrors = [];\n";
+      out << "    for (const f of [{name:\"conversion\",min:1,max:0}, {name:\"conversion\",min:NaN}]) {\n";
+      out << "      try { ctx.evolve({dt:1, fields:[f], state:{conversion:[0.5]}, aux:{catalyst:[0]},\n";
+      out << "                        context:{rate_coefficient:0.25}}); boundsErrors.push(\"accepted\"); }\n";
+      out << "      catch (e) { boundsErrors.push(e instanceof RangeError ? \"range\" : String(e)); }\n";
+      out << "    }\n";
       out << "    ctx.emit(\"evo\", {\n";
       out << "      ran: r ? r.ran : null,\n";
+      out << "      boundsErrors: boundsErrors.join(\",\"),\n";
       out << "      stages: r ? r.stagesRun : -1,\n";
       out << "      elements: r ? r.elementsEvolved : -1,\n";
       out << "      inferences: r ? r.inferenceCount : -1,\n";
@@ -1533,6 +1541,8 @@ globalThis.TRECH_HOOKS = {onInit() { return {override: {
       const std::string& p = eEmits[0].payloadJson;
       failures += expect(p.find("\"ran\":true") != std::string::npos,
                          "Expected the operator to report it ran.");
+      failures += expect(p.find("\"boundsErrors\":\"range,range\"") != std::string::npos,
+                         "Expected ctx.evolve to reject unordered and NaN field bounds.");
       failures += expect(p.find("\"stages\":2") != std::string::npos,
                          "Expected both operator stages to run.");
       failures += expect(p.find("\"elements\":3") != std::string::npos,

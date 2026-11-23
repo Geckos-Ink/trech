@@ -1,5 +1,7 @@
 #include "trech/ml/StateEvolution.hpp"
 
+#include "trech/ml/BoundedStep.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -529,11 +531,11 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
                 result.rates.begin() + static_cast<long>(stateBase));
     }
     for (std::size_t f = 0; f < fieldCount; ++f) {
-      double value = pendingFields[stateBase + f] + pendingRates[stateBase + f] * request.dt;
+      // Lean pair Trech.Methods.Evolve (include/trech/ml/BoundedStep.hpp).
       const EvolutionField& field = request.fields[f];
-      if (value < field.minValue) value = field.minValue;
-      if (value > field.maxValue) value = field.maxValue;
-      result.state[stateBase + f] = value;
+      result.state[stateBase + f] =
+          boundedEulerStep(pendingFields[stateBase + f], pendingRates[stateBase + f],
+                           request.dt, field.minValue, field.maxValue);
     }
   }
 

@@ -18,11 +18,13 @@ Standing constraint for every item: Lean stays optional. Each law keeps its clas
 implementation as the running path, with the Lean definition beside it for validation
 ([rule](AGENTS.md#rules)).
 
-- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Added declared `ctx.react` count conservation, antisymmetric `ctx.interact` exchange, the energy balance of recorded Geant4 Compton steps and the Compton relation from four-momentum conservation (momentum balance checked on recorded steps). Next: the `ctx.evolve` integrator (an explicit step within declared bounds stays within them, and a rate-only update is linear in `dt`). Search Mathlib first. ([detail](#compton-from-four-momentum-2026-11-22))
+- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Added declared `ctx.react` count conservation, antisymmetric `ctx.interact` exchange, the energy balance of recorded Geant4 Compton steps, the Compton relation from four-momentum conservation (momentum balance checked on recorded steps) and the bounded explicit step of `ctx.evolve`/`ctx.interact` (ordered bounds enforced at the JS boundary). Also added the order independence of set networks (`ctx.lift`, set operators) with its slot-standardisation hypothesis enforced at load. Next: `GroupHierarchy` group assembly (lifting a partition level by level reads each member once, so a group's members are neither dropped nor counted twice) and the `ctx.evolve` stage ordering (rates evaluated against the start-of-step state make the result independent of stage order within a band). Search Mathlib first. ([detail](#set-network-order-independence-2026-11-23))
 - **P2** · R8 · Energy balance on every recorded step: today `energy.step_balance` reads only a primary photon's first Compton scatter. Extend it to every process and generation with the rest-mass term `Q` (gamma conversion `−2 m_e c²`, positron annihilation, nuclear reactions from Geant4's mass table), behind the same observe-only contract and only in runs that ask for it. ([detail](#geant4-step-energy-balance-2026-11-22))
 - **P2** · R8 · Conformance harness: a Lean reference evaluator (`@[export]` C symbols linked behind an opt-in `TRECH_ENABLE_LEAN`, default OFF, or a separate `lake exe` fed JSON) that checks the classic kernel on sampled or recorded inputs offline. Measure its cost; it never runs per step in production and never changes physics, RNG or emits. ([detail](#route-opened--2026-11-22))
 - **P2** · R8 · Hardware acceleration contract: Lean compiles to scalar CPU code, so accelerated kernels (C++ SIMD, LibTorch, GPU) stay the compute path. Define how a proof about an algorithm's model transfers to its accelerated implementation (shared algorithm spec, sampled conformance, documented reduction-order and fused-operation differences). ([detail](#route-opened--2026-11-22))
 - **P3** · R8 · More companions recording law checks: only `analytic_compton_transfer` records `TRECH_FORMAL_LAWS` verdicts. Candidates: `analytic_beer_lambert` (memorylessness at its own attenuation coefficients), and companions of `ctx.react` scenarios checking recorded per-cell probabilities with `checkProbabilityVector`. Always from the `.validation.js` companion under the `validation` role, never on the decision path. ([detail](#law-checks-in-run-outputs--2026-11-22))
+- **P3** · R8 · Non-finite rates in `ctx.evolve`/`ctx.interact`: the bounded-step theorems hold over the reals, and the boundary now rejects unordered or NaN bounds, but a NaN rate still yields a NaN state (every IEEE comparison with NaN is false) and an infinite rate lands on a bound. Decide whether the operator rejects, counts or reports such a rate, with a test either way. ([detail](#bounded-explicit-step-2026-11-23))
+- **P3** · R8 · Advance the Mathlib pin: `scripts/pull_lean.sh` moved `thirds/mathlib4` to `90e6eec` on 2026-11-23, but refreshing the prebuilt cache (`lake update`, `lake exe cache get`) was not approved in that session, so the pointer stays at `6ebcce3733`. Fetch the cache, rerun `check_lean_laws.py`, fix any rename and commit the pointer with `lake-manifest.json`. ([detail](#bounded-explicit-step-2026-11-23))
 - **P3** · R8 · Reals vs floats: bridge Mathlib's `ℝ` theorems to IEEE-754 kernels with stated error bounds, interval arithmetic or a rounding-model proof; until then label every Lean verdict as covering the real-valued statement only. ([detail](#route-opened--2026-11-22))
 - **P3** · R8 · Arbiter ranking across calls: `Trech.Methods.Arbiter` covers one weighted sample; the leader ranks by the decayed mean of log call RMSE (a geometric mean over calls) and the learned policy by a decayed log-ratio score. State and prove what those rankings preserve (for example, that a method better on every call ranks first) or document why they need no such guarantee. ([detail](#more-law-pairs-and-the-first-engine-check--2026-11-22))
 - **P3** · R8 · Lean CI beyond this machine: the toolchain, cache and `trech_formal_lean_build` are verified on macOS arm64 only; check Linux and decide whether CI runs the Lean check. ([detail](#proofs-compiled-and-audited--2026-11-22))
@@ -30,6 +32,49 @@ implementation as the running path, with the Lean definition beside it for valid
 - **P3** · R5 · Geant4 secondary track: Lean statements of Geant4's basic laws (two-body kinematics, the Compton relation from four-momentum conservation, exponential attenuation, energy conservation in `SampleSecondaries`), attached through derived classes in shadow mode (inheritance preferred; `patches/geant4/` only for non-virtual code). Observation first; any replacement needs byte parity or a validated tolerance, a regression against the unpatched build and the owner's go-ahead. ([detail](AGENTS.md#geant4-secondary-track))
 - **gated** · R8 · Owner decision: whether to add a physics-specific Lean library (for example PhysLean) as a further reference checkout, so physical laws are also checked against it before being declared.
 - **gated** · R8 · Owner decision: when (if ever) Lean stops being optional for a given path.
+
+## Set-network order independence (2026-11-23)
+
+- [x] `Trech.Methods.SetPool`: `sumPool_perm`, `presentCount_perm` and `meanPool_perm` (from
+  Mathlib's `Equiv.sum_comp`), `presentImage_perm` (the set of present images, which a max pool
+  reduces), `sumPool_update_absent`, `deepSets_perm` and `mpnnRound_perm` (one message-passing
+  round is permutation equivariant; the state may carry the raw features, covering relative
+  features). Presence is a predicate on each element's own features, as the engine reads it from
+  the raw mask. Audit 40/40.
+- [x] Hypothesis enforced: `GenericSurrogate` now fails closed on a `generic_surrogate_v3` set
+  network whose element slots differ in `input_mean`/`input_std`. All nine committed set models
+  (three furnace conduction models, three group-hierarchy and two set-network fixtures) tie
+  them exactly.
+- [x] Conformance (`trech_formal_laws`): the DeepSets and MPNN fixtures and four pool/aggregate
+  variants, 11 rows under all 24 orders of four element blocks (264 samples each): DeepSets max
+  exact, sums within `1e-12` relative (4.4e-16 seen); moving an absent element's features
+  changes nothing, bit for bit; the untied-slot model is refused with its note.
+- Verification: Debug CTest 80/80; Lean audit 40/40.
+- Not covered by the proof: the float rounding of a sum pool in a different order, which the
+  theorems (over a commutative monoid) leave aside; tracked by the reals-vs-floats queue item.
+
+## Bounded explicit step (2026-11-23)
+
+- [x] `Trech.Methods.Evolve`: `clampBounds_eq_projIcc` (the classic lower-then-upper clamp is
+  Mathlib's `Set.projIcc` for `lo ≤ hi`), `boundedStep_mem` (the step lands in `[lo, hi]` from
+  any start and rate), `boundedStep_of_mem` (an inside step is not clipped, from
+  `Set.projIcc_of_mem`), `eulerStep_smul_dt` (the increment is linear in `dt`) and
+  `eulerStep_add_dt` (two steps at one rate equal one of the summed length). Audit 33/33.
+- [x] Classic side routed through one function: `boundedEulerStep`/`clampToBounds`
+  (`include/trech/ml/BoundedStep.hpp`) now carry the `ctx.evolve` field step and the
+  `ctx.interact` link and element clamps, with the same operations as before.
+- [x] Hypothesis enforced: `ctx.evolve` fields and `ctx.interact` `fields`/`pair_fields` throw a
+  `RangeError` when `min <= max` fails (inverted or NaN), tested in `trech_js_runtime`.
+- [x] Conformance (`trech_formal_laws`): 41 elements driven across a two-sided and a one-sided
+  bound; all in bounds and equal to the clamp, 62 unclipped steps exact, `dt` scaling within
+  `1e-15` absolute plus `1e-14` relative (4.4e-16 seen), two steps of `dt` equal to one of `2dt`
+  bit for bit here; a negative control shows unordered bounds breaking the lower bound.
+- Verification: Debug CTest 80/80; Lean audit 33/33 at landing. `glass_from_sand` (domain and
+  declared grouping) byte-identical before and after with `TRECH_COMPUTE_BUDGET` pinned (unpinned,
+  only its `field_evolution` emits vary, as between two runs of one binary); `polyurethane_foam`
+  and `testscenario_efflux` run without a bounds rejection.
+- Residuals queued: non-finite rates, and the Mathlib pin advance whose cache refresh was not
+  run.
 
 ## Compton from four-momentum (2026-11-22)
 

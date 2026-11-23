@@ -10,10 +10,12 @@
 #include "trech/core/Provenance.hpp"
 #include "trech/core/LatticeKinetic.hpp"
 #include "trech/js/JsRuntime.hpp"
+#include "trech/ml/BoundedStep.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/MethodArbiter.hpp"
 #include "trech/ml/PairInteraction.hpp"
+#include "trech/ml/StateEvolution.hpp"
 #include "trech/sim/EnergyBalance.hpp"
 #include "trech/sim/KleinNishina.hpp"
 
@@ -27,6 +29,7 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <numeric>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -441,6 +444,184 @@ void pairConservation() {
          false);
 }
 
+void evolvePairs() {
+  // Trech.Methods.Evolve on the engine's StateEvolution::evolve: one constant-rate stage drives
+  // bounded fields across both bounds and an unbounded field; the classic step must stay within
+  // ordered bounds, leave an unclipped step exact, and scale its increment with dt.
+  const trech::test::TemporaryDirectory fixture;
+  trech::ml::GenericSurrogate model;
+  const double rateA = 0.75, rateB = -1.5;
+  loadConformanceModel(model, (fixture.path() / "evolve.json").string(), {"d_a_dt", "d_b_dt"}, {rateA, rateB});
+  trech::ml::StateEvolution evolution;
+  evolution.addStage("drive", trech::ml::DimensionScale::kMicro, &model);
+  trech::ml::EvolutionRequest request;
+  request.fields = {{"a", 0.0, 1.0}, {"b"}};
+  request.fields[1].minValue = -2.0;  // one-sided: no upper bound
+  const std::size_t n = 41;
+  request.elementCount = n;
+  for (std::size_t e = 0; e < n; ++e) {
+    const double x = -0.5 + 2.0 * static_cast<double>(e) / static_cast<double>(n - 1);  // [-0.5, 1.5]
+    request.state.push_back(x);
+    request.state.push_back(x);
+  }
+  request.dt = 0.4;
+  const auto run = evolution.evolve(request);
+  if (run.state.size() != request.state.size() || run.inferenceCount != n) {
+    throw std::runtime_error("Evolution conformance stage must run on every element");
+  }
+  std::vector<double> stepped, expected, inside, insideExpected;
+  std::vector<double> a, b;
+  for (std::size_t e = 0; e < n; ++e) {
+    const double x = request.state[2 * e];
+    a.push_back(run.state[2 * e]);
+    b.push_back(run.state[2 * e + 1]);
+    for (int f = 0; f < 2; ++f) {
+      const double rate = f == 0 ? rateA : rateB;
+      const double unclamped = x + rate * request.dt;
+      const auto& field = request.fields[static_cast<std::size_t>(f)];
+      stepped.push_back(run.state[2 * e + static_cast<std::size_t>(f)]);
+      expected.push_back(std::min(field.maxValue, std::max(field.minValue, unclamped)));  // Lean clampBounds
+      if (unclamped >= field.minValue && unclamped <= field.maxValue) {
+        inside.push_back(run.state[2 * e + static_cast<std::size_t>(f)]);
+        insideExpected.push_back(unclamped);
+      }
+    }
+  }
+  const char* mem = "Trech.Methods.Evolve.boundedStep_mem";
+  expect(formal::checkWithinBounds("evolve.bounded_step_within_bounds", mem, a, std::vector<double>(n, 0.0),
+                                   std::vector<double>(n, 1.0), 0.0));
+  expect(formal::checkWithinBounds("evolve.bounded_step_within_bounds", mem, b, std::vector<double>(n, -2.0),
+                                   std::vector<double>(n, std::numeric_limits<double>::infinity()), 0.0));
+  expect(formal::checkAgreement("evolve.bounded_step_within_bounds", "Trech.Methods.Evolve.clampBounds_eq_projIcc",
+                                stepped, expected, 0.0, 1e-15));
+  if (inside.size() < n / 2 || inside.size() == stepped.size()) {
+    throw std::runtime_error("Evolution conformance grid must hold clipped and unclipped steps");
+  }
+  expect(formal::checkAgreement("evolve.unclipped_step_exact", "Trech.Methods.Evolve.boundedStep_of_mem", inside,
+                                insideExpected, 0.0, 1e-15));
+
+  // Linear in dt: with bounds wide enough to stay unclipped, k * dt gives k times the increment,
+  // and two steps of dt equal one of 2 dt (eulerStep_add_dt), within a few ulp.
+  request.fields = {{"a"}, {"b"}};
+  const auto one = evolution.evolve(request);
+  std::vector<double> scaled, scaledExpected;
+  for (double k : {0.25, 2.0, 3.0}) {
+    auto longer = request;
+    longer.dt = k * request.dt;
+    const auto r = evolution.evolve(longer);
+    for (std::size_t i = 0; i < request.state.size(); ++i) {
+      scaled.push_back(r.state[i] - request.state[i]);
+      scaledExpected.push_back(k * (one.state[i] - request.state[i]));
+    }
+  }
+  auto twice = request;
+  twice.state = one.state;
+  const auto second = evolution.evolve(twice);
+  auto doubled = request;
+  doubled.dt = 2.0 * request.dt;
+  const auto once = evolution.evolve(doubled);
+  expect(formal::checkAgreement("evolve.rate_linear_in_dt", "Trech.Methods.Evolve.eulerStep_smul_dt", scaled,
+                                scaledExpected, 1e-15, 1e-14));
+  expect(formal::checkAgreement("evolve.rate_linear_in_dt", "Trech.Methods.Evolve.eulerStep_add_dt", second.state,
+                                once.state, 1e-15, 1e-15));
+
+  // The hypothesis lo <= hi: the JS boundary rejects what boundsOrdered refuses (tests/test_js_runtime.cpp).
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double inf = std::numeric_limits<double>::infinity();
+  std::vector<double> ordered;
+  for (const auto& [lo, hi] : std::vector<std::pair<double, double>>{
+           {0.0, 1.0}, {-inf, inf}, {2.0, 2.0}, {1.0, 0.0}, {nan, 1.0}, {0.0, nan}}) {
+    ordered.push_back(trech::ml::boundsOrdered(lo, hi) ? 1.0 : 0.0);
+  }
+  expect(formal::checkAgreement("evolve.ordered_bounds_rejected", "Trech.Methods.Evolve.boundedStep_mem", ordered,
+                                {1, 1, 1, 0, 0, 0}, 0.0, 0.0));
+  // Negative control: unordered bounds (what the boundary rejects) break the lower bound.
+  expect(formal::checkWithinBounds("evolve.unordered_bounds_negative_control", "",
+                                   {trech::ml::boundedEulerStep(0.5, 0.0, 1.0, 1.0, 0.0)}, {1.0}, {0.0}, 0.0),
+         false);
+}
+
+void setPoolPairs() {
+  // Trech.Methods.SetPool on GenericSurrogate::predictSet: the committed set-network fixtures
+  // (DeepSets with a max pool, message passing with a sum aggregate and a mean pool) and their
+  // sum/mean/max and aggregate variants, evaluated under all 24 orders of their four element
+  // blocks. Max pools are exact; sums round in a different order, so a tolerance is stated.
+  const std::string dir = std::string(TRECH_SOURCE_DIR) + "/tests/fixtures/ml_set_networks/";
+  const auto rows = nlohmann::json::parse(std::ifstream(dir + "expected.json")).at("rows")
+                        .get<std::vector<std::vector<double>>>();
+  const trech::test::TemporaryDirectory fixture;
+  struct Variant { std::string kind, pool, aggregate; };
+  const std::vector<Variant> variants = {{"deepsets", "max", ""}, {"deepsets", "sum", ""}, {"deepsets", "mean", ""},
+                                         {"mpnn", "mean", "sum"}, {"mpnn", "max", "mean"}, {"mpnn", "sum", "sum"}};
+  for (const auto& v : variants) {
+    auto spec = nlohmann::json::parse(std::ifstream(dir + v.kind + ".json"));
+    spec["network"]["pool"] = v.pool;
+    if (!v.aggregate.empty()) spec["network"]["aggregate"] = v.aggregate;
+    const std::string label = v.kind + "/" + v.pool + (v.aggregate.empty() ? "" : "/" + v.aggregate);
+    const auto path = (fixture.path() / (v.kind + "_" + v.pool + "_" + v.aggregate + ".json")).string();
+    std::ofstream(path) << spec;
+    trech::ml::GenericSurrogate model;
+    if (!model.load(path)) throw std::runtime_error("Set-network variant failed to load: " + label);
+    const std::size_t E = spec["network"]["elements"], F = spec["network"]["element_features"];
+    const std::size_t mask = spec["network"]["mask_feature"];
+    trech::ml::GenericSurrogate::Workspace workspace;
+    std::vector<double> original, permuted;
+    std::vector<std::size_t> order(E);
+    for (const auto& row : rows) {
+      double reference = 0.0;
+      if (!model.predictInto(row.data(), row.size(), &reference, 1, workspace)) {
+        throw std::runtime_error("Set-network variant failed to predict: " + label);
+      }
+      std::iota(order.begin(), order.end(), 0);
+      do {
+        auto shuffled = row;
+        for (std::size_t e = 0; e < E; ++e)
+          std::copy(row.begin() + static_cast<long>(order[e] * F), row.begin() + static_cast<long>((order[e] + 1) * F),
+                    shuffled.begin() + static_cast<long>(e * F));
+        double out = 0.0;
+        model.predictInto(shuffled.data(), shuffled.size(), &out, 1, workspace);
+        original.push_back(reference);
+        permuted.push_back(out);
+      } while (std::next_permutation(order.begin(), order.end()));
+    }
+    const bool exact = v.pool == "max" && (v.kind == "deepsets");
+    expect(formal::checkAgreement("set.permutation_invariance",
+                                  v.kind == "mpnn" ? "Trech.Methods.SetPool.mpnnRound_perm"
+                                                   : "Trech.Methods.SetPool.deepSets_perm",
+                                  original, permuted, 0.0, exact ? 0.0 : 1e-12));
+    // An absent element (raw mask <= 0.5) takes no part: its other features may change freely.
+    std::vector<double> kept, changed;
+    for (const auto& row : rows) {
+      for (std::size_t e = 0; e < E; ++e) {
+        if (row[e * F + mask] > 0.5) continue;
+        auto moved = row;
+        for (std::size_t f = 0; f < F; ++f)
+          if (f != mask) moved[e * F + f] = 37.0 * static_cast<double>(f + 1) - 11.0;
+        double a = 0.0, b = 0.0;
+        model.predictInto(row.data(), row.size(), &a, 1, workspace);
+        model.predictInto(moved.data(), moved.size(), &b, 1, workspace);
+        kept.push_back(a);
+        changed.push_back(b);
+      }
+    }
+    if (kept.empty()) throw std::runtime_error("Set-network fixtures need an absent element: " + label);
+    expect(formal::checkAgreement("set.absent_element_ignored", "Trech.Methods.SetPool.sumPool_update_absent", kept,
+                                  changed, 0.0, 0.0));
+  }
+  // The hypothesis: element slots share input standardisation. A model whose slot 2 differs is
+  // refused at load, because permuting its blocks would change the standardised inputs.
+  auto untied = nlohmann::json::parse(std::ifstream(dir + "deepsets.json"));
+  const std::size_t F = untied["network"]["element_features"];
+  untied["input_mean"][2 * F] = untied["input_mean"][2 * F].get<double>() + 0.25;
+  const auto untiedPath = (fixture.path() / "untied.json").string();
+  std::ofstream(untiedPath) << untied;
+  trech::ml::GenericSurrogate refused;
+  const bool loaded = refused.load(untiedPath);
+  const bool noted = refused.note().find("share input_mean/input_std") != std::string::npos;
+  expect(formal::checkAgreement("set.shared_slot_standardisation", "Trech.Methods.SetPool.deepSets_perm",
+                                {loaded ? 1.0 : 0.0, noted ? 1.0 : 0.0}, {0.0, 1.0}, 0.0, 0.0));
+}
+
 void arbiterPairs() {
   // Trech.Methods.Arbiter.squaredScore_mean_lt on the engine's MethodArbiter: with noisy references,
   // the method that predicts the conditional mean scores lowest and leads; biased methods lose.
@@ -670,6 +851,8 @@ int main() {
     transitionPairs();
     transitionConservation();
     pairConservation();
+    evolvePairs();
+    setPoolPairs();
     arbiterPairs();
     javascriptPairs();
     runRecordContract();

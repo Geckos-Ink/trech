@@ -523,9 +523,13 @@ load. Changing either after startup requires a restart.
   `ctx.react` call-sequence index is consumed.
 
   A stage output named `d_<field>_dt` is a **rate** (accumulated across stages, integrated once per
-  call, then held inside the field's declared bounds); `set_<field>` is an **assignment** applied
+  call as `f + rate·dt`, then held inside the field's declared bounds); `set_<field>` is an **assignment** applied
   immediately and visible to higher stages; any other output is an **intermediate** a higher-scale
-  stage can consume. `dt` is a reserved readable input. Input precedence is
+  stage can consume. A field's `min` and `max` must be ordered (`min <= max`, neither NaN):
+  `ctx.evolve` and `ctx.interact` (for `fields` and `pair_fields`) throw a `RangeError` otherwise,
+  because an unordered pair would let the clamp push a value below `min`. With ordered bounds the
+  step provably lands inside them (Lean `Trech.Methods.Evolve`, see
+  [formal laws](formal_laws.md)); a NaN rate still yields NaN. `dt` is a reserved readable input. Input precedence is
   field > aux > intermediate > `dt` > `context`/ambient. Missing inputs skip the
   affected element-stage, report `missingInputs`, and contribute no prediction or state change.
   An intermediate must have been produced for this element/material, or explicitly supplied in

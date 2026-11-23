@@ -170,6 +170,48 @@
         {"path": "src/ml/MethodArbiter.cpp", "cites": "Trech.Methods.Arbiter"}
       ],
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["arbiter.mean_scores_lowest", "arbiter.mean_leads"]}
+    },
+    {
+      "id": "evolve.bounded_explicit_step",
+      "role": "method_property",
+      "statement": "Over the reals, the engine's bounded explicit step clamp(x + r dt) to ordered declared bounds lo <= hi always lies in [lo, hi] and equals the unclamped step when that already lies inside; the unclamped increment is linear in dt and additive over consecutive steps at one rate.",
+      "lean": {
+        "file": "formal/Trech/Methods/Evolve.lean",
+        "declarations": [
+          "Trech.Methods.Evolve.clampBounds_eq_projIcc",
+          "Trech.Methods.Evolve.boundedStep_mem",
+          "Trech.Methods.Evolve.boundedStep_of_mem",
+          "Trech.Methods.Evolve.eulerStep_smul_dt",
+          "Trech.Methods.Evolve.eulerStep_add_dt"
+        ]
+      },
+      "classic": [
+        {"path": "include/trech/ml/BoundedStep.hpp", "cites": "Trech.Methods.Evolve"},
+        {"path": "src/ml/StateEvolution.cpp", "cites": "Trech.Methods.Evolve"},
+        {"path": "src/ml/PairInteraction.cpp", "cites": "Trech.Methods.Evolve"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["evolve.bounded_step_within_bounds", "evolve.unclipped_step_exact", "evolve.rate_linear_in_dt", "evolve.ordered_bounds_rejected"]}
+    },
+    {
+      "id": "set.permutation_invariance",
+      "role": "method_property",
+      "statement": "A set network's sum, mean and max pools over its present elements, its DeepSets readout and (as equivariance) each message-passing round do not depend on the order of the elements, and an absent element that stays absent does not change the pool; given that every element slot shares its feature's input standardisation.",
+      "lean": {
+        "file": "formal/Trech/Methods/SetPool.lean",
+        "declarations": [
+          "Trech.Methods.SetPool.sumPool_perm",
+          "Trech.Methods.SetPool.presentCount_perm",
+          "Trech.Methods.SetPool.meanPool_perm",
+          "Trech.Methods.SetPool.presentImage_perm",
+          "Trech.Methods.SetPool.sumPool_update_absent",
+          "Trech.Methods.SetPool.deepSets_perm",
+          "Trech.Methods.SetPool.mpnnRound_perm"
+        ]
+      },
+      "classic": [
+        {"path": "src/ml/GenericSurrogate.cpp", "cites": "Trech.Methods.SetPool"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["set.permutation_invariance", "set.absent_element_ignored", "set.shared_slot_standardisation"]}
     }
   ]
 }

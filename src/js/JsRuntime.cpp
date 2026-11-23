@@ -8,6 +8,7 @@
 #include "trech/core/ScalarField.hpp"
 #include "trech/core/FormalLaws.hpp"
 #include "trech/core/Trace.hpp"
+#include "trech/ml/BoundedStep.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/DomainDiscovery.hpp"
 #include "trech/ml/DomainLearner.hpp"
@@ -2721,6 +2722,12 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
       JS_FreeValue(ctx, fieldsVal);
       return JS_ThrowTypeError(ctx, "ctx.evolve spec.fields entries need a name");
     }
+    if (!trech::ml::boundsOrdered(field.minValue, field.maxValue)) {
+      JS_FreeValue(ctx, fieldsVal);
+      return JS_ThrowRangeError(ctx,
+                                "ctx.evolve field \"%s\" needs min <= max (got min %g, max %g)",
+                                field.name.c_str(), field.minValue, field.maxValue);
+    }
     request.fields.push_back(std::move(field));
   }
   JS_FreeValue(ctx, fieldsVal);
@@ -4233,6 +4240,12 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
       return JS_ThrowTypeError(ctx,
                                "ctx.interact spec.fields entries need a name");
     }
+    if (!trech::ml::boundsOrdered(field.minValue, field.maxValue)) {
+      JS_FreeValue(ctx, fieldsVal);
+      return JS_ThrowRangeError(ctx,
+                                "ctx.interact field \"%s\" needs min <= max (got min %g, max %g)",
+                                field.name.c_str(), field.minValue, field.maxValue);
+    }
     request.fields.push_back(std::move(field));
   }
   JS_FreeValue(ctx, fieldsVal);
@@ -4438,6 +4451,13 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
       releaseArrays();
       return JS_ThrowTypeError(
           ctx, "ctx.interact spec.pair_fields entries need a name");
+    }
+    if (!trech::ml::boundsOrdered(field.minValue, field.maxValue)) {
+      JS_FreeValue(ctx, pairFieldsVal);
+      releaseArrays();
+      return JS_ThrowRangeError(
+          ctx, "ctx.interact pair field \"%s\" needs min <= max (got min %g, max %g)",
+          field.name.c_str(), field.minValue, field.maxValue);
     }
     request.pairFields.push_back(std::move(field));
   }

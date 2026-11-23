@@ -8,7 +8,7 @@ statement written in Lean (a *theorem*) is accepted only with a proof that Lean'
 [Mathlib](https://github.com/leanprover-community/mathlib4) is the community library of
 mathematics written in Lean, from real analysis to linear algebra and probability.
 
-**Status (2026-11-22): eight law pairs exist and their 22 Lean theorems are verified.** The
+**Status (2026-11-23): twelve law pairs exist and their 40 Lean theorems are verified.** The
 classic code of each pair is checked against its Lean statement by an ordinary test, without
 Lean. The Lean files compile with Lean `v4.37.0-rc1` and the pinned Mathlib, and every theorem
 rests only on Lean's three standard axioms. The transition count proof uses mathematical
@@ -73,6 +73,8 @@ Lean file and theorems, and the classic sources.
 | Reaction step probabilities (`ctx.react`) | `Trech.Methods.Transition`: the engine's two-stage draw fires channel `c` with probability `h·s_c/S`; these are nonnegative and add up to the event hazard `h ≤ 1`, leaving `1 − h` for "no transition" | `selectTransitionChannel` in `src/ml/DiscreteTransition.cpp` | the engine's draw function swept over 2²⁰ evenly spaced draws for four hazard/score cases; each outcome's share matches its probability within 2/2²⁰ |
 | Reaction count conservation (`ctx.react`) | `Trech.Methods.Transition.applyChannel_conserves` and `applyChannel_nonnegative` preserve declared weighted totals and the valid count range when applying or rejecting a channel | `src/ml/DiscreteTransition.cpp` | exact integer counts after accepted, unbalanced, insufficient and overflowing changes, including the signed 64-bit limit |
 | Antisymmetric exchange (`ctx.interact`) | `Trech.Methods.PairInteraction.exchange_preserves_sum` conserves the real-valued total when each member receives opposite rates and increments and the resulting state stays within its bounds | `src/ml/PairInteraction.cpp` | two links sharing a member exchange a field within `1e-15` relative tolerance on the total. Forcing a bound to clip the state demonstrates the conservation check detects the change |
+| Bounded explicit step (`ctx.evolve`, `ctx.interact`) | `Trech.Methods.Evolve`: the engine's step `x + r·dt`, clamped to the field's declared bounds `lo ≤ hi`, always lands in `[lo, hi]` and is left untouched when it already lies inside (the clamp is Mathlib's projection onto the interval); the unclamped increment is linear in `dt` and two steps at one rate equal one step of the summed length | `include/trech/ml/BoundedStep.hpp`, called by `src/ml/StateEvolution.cpp` and `src/ml/PairInteraction.cpp` | a constant-rate stage drives 41 elements across a two-sided and a one-sided bound through `StateEvolution::evolve`: every result is in bounds and equal to the clamp, the 62 unclipped steps are exact, scaling `dt` by 0.25, 2 and 3 scales the increment within `1e-15` absolute plus `1e-14` relative (4.4e-16 seen), and two steps of `dt` equal one of `2dt`. Unordered or NaN bounds (`min: 1, max: 0`, `min: NaN`) are rejected by `ctx.evolve` and `ctx.interact` with a `RangeError`; with them, the clamp breaks the lower bound, which a negative control shows |
+| Set-network order independence (`ctx.lift`, set operators) | `Trech.Methods.SetPool`: the sum, mean and max pools over the present elements, a DeepSets readout and (as *equivariance*: permuting the inputs permutes the outputs) each message-passing round do not depend on element order, and an absent element that stays absent does not change the pool. The hypothesis is that every element slot shares its feature's input standardisation | `src/ml/GenericSurrogate.cpp` (`predictSet`; the loader enforces the hypothesis) | the committed DeepSets and message-passing fixtures and four variants (sum, mean and max pools; sum and mean aggregation), 11 rows under all 24 orders of their four element blocks: max pooling is exact, sums agree within `1e-12` relative (4.4e-16 seen); moving an absent element's features changes nothing, exactly. A model whose slot statistics differ fails to load |
 | Method arbiter scoring | `Trech.Methods.Arbiter`: the squared error is minimised exactly by the mean prediction (a *strictly proper* score), and ranking by `log(error + floor)` keeps the error order | `src/ml/MethodArbiter.cpp` | 40 noisy graded calls with an unbiased method and two biased ones: the unbiased one scores lowest and leads, although the declared fallback is a biased one |
 
 The attenuation row shows why the real-versus-float caveat matters. Over the reals,
@@ -207,7 +209,7 @@ python3 scripts/check_lean_laws.py
 ```
 
 The last command builds the package and prints one line per theorem with the axioms it uses,
-ending with `28/28 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
+ending with `40/40 theorems proved from standard axioms only`. An unfinished proof (`sorry`) or
 an added axiom makes it fail. Add `--report build/lean_audit.json` to also save the audit
 as JSON: the Lean version, toolchain and Mathlib revision, the SHA-256 hash of `laws.json` and
 of every Lean file, one combined hash of all of them, and each theorem's axioms. A run reads it

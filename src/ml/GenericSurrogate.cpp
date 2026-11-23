@@ -384,6 +384,20 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
 
   if (setNetwork) {
     if (!buildSetNetwork(&network, nIn, nOut)) return false;
+    // Hypothesis of Trech.Methods.SetPool (formal/Trech/Methods/SetPool.lean): the network sees
+    // each element only through shared phi/message weights, so permuting element blocks permutes
+    // the standardised inputs only if every slot shares its feature's input_mean and input_std.
+    // A model whose slots differ would not be permutation invariant; fail closed.
+    for (std::size_t e = 1; e < set_.elements; ++e) {
+      for (std::size_t f = 0; f < set_.features; ++f) {
+        const std::size_t i = e * set_.features + f;
+        if (inputMean_[i] != inputMean_[f] || inputStd_[i] != inputStd_[f]) {
+          note_ = "v3 element slots must share input_mean/input_std per element feature "
+                  "(slot " + std::to_string(e) + ", feature " + std::to_string(f) + ")";
+          return false;
+        }
+      }
+    }
     if (!parseGroupLift(&j)) return false;
   } else if (j.contains("group_lift")) {
     note_ = "group_lift requires a generic_surrogate_v3 set network";
