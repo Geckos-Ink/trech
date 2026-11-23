@@ -234,7 +234,7 @@
     {
       "id": "least_squares.split_score",
       "role": "method_property",
-      "statement": "For any coefficients the weighted squared error equals c - 2 beta.b + beta.A beta from the rows' summed statistics; the statistics of disjoint row sets add, so prefix sums score every cut; and separately minimised sides never exceed the parent's error at shared coefficients.",
+      "statement": "For any coefficients the weighted squared error equals c - 2 beta.b + beta.A beta from the rows' summed statistics; the statistics of disjoint row sets add, so prefix sums score every cut; separately minimised sides never exceed the parent's error at shared coefficients (with ridge terms, by at most their penalty on the shared coefficients); and the BIC gate accepts a split exactly when its error is below the parent's times exp(-penalty / n_eff), so never when the error does not fall.",
       "lean": {
         "file": "formal/Trech/Methods/LeastSquares.lean",
         "declarations": [
@@ -242,14 +242,17 @@
           "Trech.Methods.LeastSquares.gram_union",
           "Trech.Methods.LeastSquares.moment_union",
           "Trech.Methods.LeastSquares.yy_union",
-          "Trech.Methods.LeastSquares.split_le_parent"
+          "Trech.Methods.LeastSquares.split_le_parent",
+          "Trech.Methods.LeastSquares.split_le_parent_ridge",
+          "Trech.Methods.LeastSquares.bicGate_iff",
+          "Trech.Methods.LeastSquares.bicGate_rejects"
         ]
       },
       "classic": [
         {"path": "include/trech/ml/LeastSquaresStatistics.hpp", "cites": "Trech.Methods.LeastSquares"},
         {"path": "src/ml/DomainLearner.cpp", "cites": "Trech.Methods.LeastSquares"}
       ],
-      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["least_squares.sse_from_statistics", "least_squares.statistics_add", "least_squares.split_le_parent"]}
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["least_squares.sse_from_statistics", "least_squares.statistics_add", "least_squares.split_le_parent", "least_squares.split_le_parent_ridge", "least_squares.bic_gate_threshold", "least_squares.bic_gate_rejects"]}
     }
   ]
 }

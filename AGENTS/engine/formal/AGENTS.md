@@ -6,13 +6,13 @@ Related owners: [Builds and dependencies](../../tooling/dependencies/AGENTS.md) 
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
-**Maturity (2026-11-23): fourteen law pairs, 49 proofs verified. Lean stays optional.** The pairs
+**Maturity (2026-11-23): fourteen law pairs, 52 proofs verified. Lean stays optional.** The pairs
 ([`formal/laws.json`](../../../formal/laws.json)) are Compton kinematics, the Compton relation
 from four-momentum conservation, the energy balance of a recorded step, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step
 probabilities and declared count conservation, antisymmetric `ctx.interact` exchange, the bounded explicit step of `ctx.evolve` and `ctx.interact`, the order independence of set networks, `ctx.lift` group assembly, the domain learner's split score, and the
 method arbiter's proper squared score. Their classic C++/JS code is
 checked against each Lean statement by `trech_formal_laws`, and the pair links by
-`trech_formal_law_pairs` (both in the normal suite, no Lean needed). The 49 Lean theorems
+`trech_formal_law_pairs` (both in the normal suite, no Lean needed). The 52 Lean theorems
 compile with Lean `v4.37.0-rc1` and Mathlib `90e6eec` and depend only on the standard
 axioms (`propext`, `Classical.choice`, `Quot.sound`), checked by the opt-in
 `trech_formal_lean_build`. The count proof uses mathematical integers. The exchange proof uses
@@ -186,7 +186,7 @@ that release candidate, so a from-source toolchain build must check out the tag 
 | [`DiscreteTransition.hpp`](../../../include/trech/ml/DiscreteTransition.hpp) · [`MethodArbiter.cpp`](../../../src/ml/MethodArbiter.cpp) | `selectTransitionChannel` (the `ctx.react` draw, pair `Trech.Methods.Transition`) and the arbiter's squared-error grading (pair `Trech.Methods.Arbiter`). |
 | [`GenericSurrogate.cpp`](../../../src/ml/GenericSurrogate.cpp) | `predictSet` (DeepSets and message passing behind `ctx.lift` and set operators), pair `Trech.Methods.SetPool`. A `generic_surrogate_v3` set network whose element slots do not share their feature's `input_mean`/`input_std` fails to load (the theorems' hypothesis); every committed set model ties them exactly. |
 | [`GroupHierarchy.cpp`](../../../src/ml/GroupHierarchy.cpp) | `partition` and the per-group weight and weighted centroid of `ctx.lift`, pair `Trech.Methods.Group`. |
-| [`LeastSquaresStatistics.hpp`](../../../include/trech/ml/LeastSquaresStatistics.hpp) | `sseFromStatistics`: the batched `c − 2β·b + β·Aβ` that `DomainLearner`'s `scoreCuts` uses to score candidate splits, pair `Trech.Methods.LeastSquares`. |
+| [`LeastSquaresStatistics.hpp`](../../../include/trech/ml/LeastSquaresStatistics.hpp) | `sseFromStatistics` (the batched `c − 2β·b + β·Aβ` that `DomainLearner`'s `scoreCuts` uses to score candidate splits) and `bicSplitAccepted` (its BIC gate), pair `Trech.Methods.LeastSquares`. |
 | [`BoundedStep.hpp`](../../../include/trech/ml/BoundedStep.hpp) | `boundedEulerStep`, `clampToBounds` and `boundsOrdered`: the explicit step and declared-bounds clamp of `ctx.evolve` (`StateEvolution.cpp`) and `ctx.interact` (`PairInteraction.cpp`), pair `Trech.Methods.Evolve`. `JsRuntime.cpp` throws a `RangeError` for a field whose bounds fail `boundsOrdered` (the theorems' hypothesis). |
 | [`js/trech_formal_laws.js`](../../../js/trech_formal_laws.js) | `TRECH_FORMAL_LAWS` (QuickJS, V8, Node): classic `compton` and `attenuation` references for validation companions, each naming its Lean declaration, the same check contract as C++ (`role: "validation"`), and `checkComptonBounds`/`checkAttenuationMemoryless`. Calls are reported as authored laws in the engine trace. |
 | [`tests/test_formal_laws.cpp`](../../../tests/test_formal_laws.cpp) | CTest `trech_formal_laws`: classic C++ and JS against each statement, hypothesis checks on a periodic D2Q9 lattice driven through `advanceLattice` with a body force, the engine's own `lawChecks()` on a walled scalar lattice (400 advected steps) and a walled D3Q19 flow lattice, `selectTransitionChannel` over 2^20 draws, the arbiter on noisy references with biased rivals, bit-identical C++/JS Compton values (`-ffp-contract=off`), the run record (merging, provenance grading of missing/stale/partial/matching audits, JS recording and rejection), and a negative control per check kind. |

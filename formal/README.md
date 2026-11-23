@@ -24,7 +24,7 @@ Contract: [formal-laws handbook](../AGENTS/engine/formal/AGENTS.md).
 exist and cite each other; `tests/test_formal_laws.cpp` runs the classic code against each
 statement. Neither needs Lean.
 
-**Status (2026-11-23): all 49 theorems compile and use only the standard axioms**
+**Status (2026-11-23): all 52 theorems compile and use only the standard axioms**
 (`propext`, `Classical.choice`, `Quot.sound`), with Lean `v4.37.0-rc1` and Mathlib
 `90e6eec`, on macOS arm64. Transition counts are proved over mathematical integers.
 Checks for real-valued proofs state a tolerance where the classic results round.

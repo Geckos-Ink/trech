@@ -5,6 +5,7 @@ import Mathlib.Algebra.BigOperators.Group.Finset.Sigma
 public import Mathlib.Basic.Real.Basic
 import Mathlib.Tactic.Ring
 import Mathlib.Tactic.Linarith
+public import Mathlib.Analysis.SpecialFunctions.Log.Basic
 
 /-!
 # The split score of the engine's domain learner (`ctx.learnDomains`)
@@ -30,9 +31,17 @@ target, summed over both sides.
   never raises the training error, which is why the learner gates splits by a BIC penalty and
   two-fold cross-validation rather than by the error alone.
 
+* `split_le_parent_ridge`: with the learner's ridge terms `λL, λR ≥ 0` (scaled per side), if
+  each side's `β` minimises its penalised error, the split's error exceeds the parent's at any
+  shared `β` by at most `(λL + λR) · ‖β‖²`. The engine's penalty is about `10⁻⁹` of the mean
+  Gram diagonal, so the excess is negligible next to the BIC penalty.
+* `bicGate_iff`: the learner's gate `n · log(S / S₀) + pen < 0` accepts a split exactly when its
+  error falls below `S₀ · exp(−pen / n)`; `bicGate_rejects` shows that with a nonnegative
+  penalty a split that does not lower the error is never accepted.
+
 The identity holds for any `β`, so it covers the ridge solutions the learner computes. The
-inequality is stated for exact minimisers: with the learner's ridge term (scaled per side) or its
-reduced affine fit for small sides, a side's `β` minimises the penalised error instead. Over the
+learner's reduced affine fit for a small side is a minimiser over a subspace, which the
+inequalities do not cover. Over the
 reals; in doubles the statistic form cancels (`c` and `2β·b` are close for a good fit), which the
 conformance test bounds. Conformance: `tests/test_formal_laws.cpp`.
 -/
@@ -113,6 +122,48 @@ theorem split_le_parent {s t : Finset ι} (h : Disjoint s t) (w y : ι → ℝ) 
     sse s w y φ βL + sse t w y φ βR ≤ sse (s ∪ t) w y φ β := by
   unfold sse at *
   rw [Finset.sum_union h]
+  linarith
+
+/-- Ridge version: separately minimised penalised sides exceed the parent's error at a shared
+`β` by at most the penalty that `β` pays on both sides. -/
+theorem split_le_parent_ridge {s t : Finset ι} (h : Disjoint s t) (w y : ι → ℝ)
+    (φ : ι → P → ℝ) (βL βR β : P → ℝ) (lL lR : ℝ) (hlL : 0 ≤ lL) (hlR : 0 ≤ lR)
+    (hL : sse s w y φ βL + lL * ∑ k, βL k ^ 2 ≤ sse s w y φ β + lL * ∑ k, β k ^ 2)
+    (hR : sse t w y φ βR + lR * ∑ k, βR k ^ 2 ≤ sse t w y φ β + lR * ∑ k, β k ^ 2) :
+    sse s w y φ βL + sse t w y φ βR ≤ sse (s ∪ t) w y φ β + (lL + lR) * ∑ k, β k ^ 2 := by
+  have nL : 0 ≤ lL * ∑ k, βL k ^ 2 := mul_nonneg hlL (Finset.sum_nonneg fun k _ => sq_nonneg _)
+  have nR : 0 ≤ lR * ∑ k, βR k ^ 2 := mul_nonneg hlR (Finset.sum_nonneg fun k _ => sq_nonneg _)
+  have hs : sse (s ∪ t) w y φ β = sse s w y φ β + sse t w y φ β := by
+    unfold sse
+    exact Finset.sum_union h
+  rw [hs]
+  nlinarith
+
+/-- The learner's BIC gate is a threshold on the split's error. -/
+theorem bicGate_iff {n S S₀ pen : ℝ} (hn : 0 < n) (hS : 0 < S) (hS₀ : 0 < S₀) :
+    n * Real.log (S / S₀) + pen < 0 ↔ S < S₀ * Real.exp (-pen / n) := by
+  have hq : 0 < S / S₀ := div_pos hS hS₀
+  constructor
+  · intro hg
+    have hlog : Real.log (S / S₀) < -pen / n := by
+      rw [lt_div_iff₀ hn]
+      linarith
+    have := (Real.log_lt_iff_lt_exp hq).1 hlog
+    rwa [div_lt_iff₀ hS₀, mul_comm] at this
+  · intro hlt
+    have hq' : S / S₀ < Real.exp (-pen / n) := by
+      rw [div_lt_iff₀ hS₀, mul_comm]
+      exact hlt
+    have hlog := (Real.log_lt_iff_lt_exp hq).2 hq'
+    rw [lt_div_iff₀ hn] at hlog
+    linarith
+
+/-- With a nonnegative penalty, a split that does not lower the error is never accepted. -/
+theorem bicGate_rejects {n S S₀ pen : ℝ} (hn : 0 < n) (hS₀ : 0 < S₀) (hpen : 0 ≤ pen)
+    (hle : S₀ ≤ S) : ¬ (n * Real.log (S / S₀) + pen < 0) := by
+  have h1 : 1 ≤ S / S₀ := by rw [le_div_iff₀ hS₀]; linarith
+  have : 0 ≤ Real.log (S / S₀) := Real.log_nonneg h1
+  have : 0 ≤ n * Real.log (S / S₀) := mul_nonneg hn.le this
   linarith
 
 end Trech.Methods.LeastSquares

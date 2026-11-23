@@ -788,6 +788,40 @@ void leastSquaresPairs() {
   expect(formal::checkWithinBounds("least_squares.split_le_parent", "Trech.Methods.LeastSquares.split_le_parent",
                                    margin, std::vector<double>(margin.size(), -1e-12),
                                    std::vector<double>(margin.size(), std::numeric_limits<double>::infinity()), 0.0));
+  // split_le_parent_ridge with the learner's per-side scale (mean Gram diagonal * 1e-9 + 1e-12).
+  std::vector<double> ridgeMargin;
+  auto lambda = [&](const at::Tensor& g) { return g.diagonal().mean().item<double>() * 1e-9 + 1e-12; };
+  for (int64_t cut = 24; cut < n; cut += 24) {
+    const auto left = stats(0, cut), right = stats(cut, n);
+    const double lL = lambda(left[0]), lR = lambda(right[0]), lP = lambda(total[0]);
+    const auto bL = at::linalg_solve(left[0] + lL * at::eye(p, opts), left[1]);
+    const auto bR = at::linalg_solve(right[0] + lR * at::eye(p, opts), right[1]);
+    const auto bP = at::linalg_solve(total[0] + lP * at::eye(p, opts), total[1]);
+    ridgeMargin.push_back(direct(0, n, bP) + (lL + lR) * bP.square().sum().item<double>() -
+                          direct(0, cut, bL) - direct(cut, n, bR));
+  }
+  expect(formal::checkWithinBounds("least_squares.split_le_parent_ridge",
+                                   "Trech.Methods.LeastSquares.split_le_parent_ridge", ridgeMargin,
+                                   std::vector<double>(ridgeMargin.size(), -1e-12),
+                                   std::vector<double>(ridgeMargin.size(), std::numeric_limits<double>::infinity()),
+                                   0.0));
+  // bicGate_iff / bicGate_rejects on the learner's gate over a grid of scores and penalties.
+  std::vector<double> gate, threshold, rejected;
+  for (double neff : {3.0, 40.0, 900.0})
+    for (double pen : {0.0, 1.5, 25.0})
+      for (double ratio : {0.05, 0.5, 0.9, 0.97, 0.999, 1.0, 1.2}) {
+        const double parent = 7.25, score = ratio * parent;
+        const bool accepted = trech::ml::bicSplitAccepted(neff, score, parent, pen);
+        const double cutoff = parent * std::exp(-pen / neff);
+        if (std::abs(score - cutoff) <= 1e-12 * parent) continue;  // rounding at the boundary itself
+        gate.push_back(accepted ? 1.0 : 0.0);
+        threshold.push_back(score < cutoff ? 1.0 : 0.0);
+        if (ratio >= 1.0) rejected.push_back(accepted ? 1.0 : 0.0);
+      }
+  expect(formal::checkAgreement("least_squares.bic_gate_threshold", "Trech.Methods.LeastSquares.bicGate_iff", gate,
+                                threshold, 0.0, 0.0));
+  expect(formal::checkAgreement("least_squares.bic_gate_rejects", "Trech.Methods.LeastSquares.bicGate_rejects",
+                                rejected, std::vector<double>(rejected.size(), 0.0), 0.0, 0.0));
   // Negative control: the score with a wrong sign on the cross term is not the error.
   const auto a = total[0].unsqueeze(0), b = total[1].unsqueeze(0), c = total[2].unsqueeze(0);
   const auto beta = at::linalg_solve(ridge(a), b);

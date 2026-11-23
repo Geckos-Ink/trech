@@ -1008,7 +1008,7 @@ struct DomainLearner::Impl {
     for (const auto& candidate : candidates) {
       if (tried >= 6) break;
       // BIC on the rows' effective count.
-      if (!(neff * std::log(std::max(candidate.score, 1e-300) / sseParent) + penalty < 0.0)) break;
+      if (!bicSplitAccepted(neff, candidate.score, sseParent, penalty)) break;  // Trech.Methods.LeastSquares.bicGate_iff
       ++tried;
       std::vector<int64_t> left, right;
       std::set<long> leftCalls, rightCalls;
