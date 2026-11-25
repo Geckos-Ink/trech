@@ -32,8 +32,8 @@ Read the root principles and the parent handbook first; then open only the subca
   ([leanprover-community/mathlib4](https://github.com/leanprover-community/mathlib4)) are
   shallow submodules tracking `master`. Pull both before every use with
   [`scripts/pull_lean.sh`](../../../scripts/pull_lean.sh) (fast-forward, heads, toolchain check),
-  and commit moved pointers with the work that needed them. Current checkout (2026-11-23): lean4
-  `231ef9a`, mathlib4 `90e6eec`, whose `lean-toolchain` is `v4.37.0-rc1`. CMake and CTest
+  and commit moved pointers with the work that needed them. Current checkout (2026-11-25): lean4
+  `451d44e`, mathlib4 `348837d`, whose `lean-toolchain` is `v4.37.0-rc1`. CMake and CTest
   never use them; building Lean from source or Mathlib without its cache is heavy and gated. Installed
   2026-11-22 on macOS arm64: Homebrew `elan-init` 4.4.0 with toolchain `v4.37.0-rc1` and the Mathlib
   cache (6.9 GB, ignored). The opt-in `TRECH_ENABLE_LEAN_CHECK` uses them. Contract and rules:

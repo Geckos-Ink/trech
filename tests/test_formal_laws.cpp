@@ -19,6 +19,7 @@
 #include "trech/ml/LeastSquaresStatistics.hpp"
 #include "trech/ml/MethodArbiter.hpp"
 #include "trech/ml/PairInteraction.hpp"
+#include "trech/ml/ScaleCascade.hpp"
 #include "trech/ml/StateEvolution.hpp"
 #include "trech/sim/AttenuationLaw.hpp"
 #include "trech/sim/EnergyBalance.hpp"
@@ -36,10 +37,13 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <map>
 #include <numeric>
+#include <random>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace formal = trech::formal;
@@ -672,6 +676,126 @@ void bandPairs() {
   // Counterexample (order_matters): r1 reads a, which s1 assigns.
   expect(formal::checkAgreement("band.assignment_read_order_negative_control", "",
                                 run({s1.get(), r1.get()}), run({r1.get(), s1.get()}), 1e-12, 0.0),
+         false);
+}
+
+void cascadePairs() {
+  // Trech.Methods.Cascade on ScaleCascade::run: nine stages over three bands, with in-band and
+  // cross-band dependencies, registered in many orders. Every stage evaluates the same model on
+  // the same inputs in every order, so the contexts must agree bit for bit.
+  using trech::ml::DimensionScale;
+  const trech::test::TemporaryDirectory fixture;
+  std::vector<std::unique_ptr<trech::ml::GenericSurrogate>> models;
+  struct Declared {
+    std::string name;
+    DimensionScale scale;
+    std::vector<std::string> inputs, outputs;
+    const trech::ml::GenericSurrogate* model;
+  };
+  auto declare = [&](const std::string& name, DimensionScale scale, std::vector<std::string> inputs,
+                     std::string output, double slope) {
+    std::vector<double> row;
+    for (std::size_t i = 0; i < inputs.size(); ++i) row.push_back(slope / (1.0 + static_cast<double>(i)));
+    const nlohmann::json hidden = {{"weights", std::vector<std::vector<double>>{row}}, {"bias", {0.1 * slope}},
+                                   {"activation", "tanh"}};
+    const nlohmann::json out = {{"weights", {{1.7}}}, {"bias", {-0.3}}, {"activation", "none"}};
+    const nlohmann::json spec = {{"model", "generic_surrogate_v1"}, {"input_features", inputs},
+                                 {"output_features", {output}}, {"layers", {hidden, out}}};
+    const auto path = (fixture.path() / (name + ".json")).string();
+    std::ofstream(path) << spec;
+    models.push_back(std::make_unique<trech::ml::GenericSurrogate>());
+    if (!models.back()->load(path)) throw std::runtime_error("Could not load cascade model: " + name);
+    return Declared{name, scale, std::move(inputs), {std::move(output)}, models.back().get()};
+  };
+  const auto nano = DimensionScale::kNano, micro = DimensionScale::kMicro, meso = DimensionScale::kMeso;
+  const std::vector<Declared> stages = {
+      declare("a", nano, {"x0"}, "n1", 0.9),         declare("b", nano, {"n1", "y0"}, "n2", -1.3),
+      declare("c", nano, {"n2"}, "n3", 0.7),         declare("d", nano, {"y0"}, "n4", 1.1),
+      declare("e", micro, {"n3", "n4"}, "m1", 0.5),  declare("f", micro, {"m1"}, "m2", -0.8),
+      declare("g", micro, {"n1"}, "m3", 1.4),        declare("h", meso, {"m2", "m3"}, "o1", 0.6),
+      declare("i", meso, {"o1", "x0"}, "o2", -1.2)};
+  const std::unordered_map<std::string, double> seed = {{"x0", 0.37}, {"y0", -0.61}};
+  std::map<std::string, const Declared*> producer;
+  for (const auto& s : stages) producer[s.outputs[0]] = &s;
+
+  struct Outcome {
+    std::vector<std::string> keys;
+    std::vector<double> values;
+    trech::ml::CascadeResult result;
+  };
+  auto run = [&](const std::vector<const Declared*>& order, const std::unordered_map<std::string, double>& facts) {
+    trech::ml::ScaleCascade cascade;
+    for (const Declared* s : order) cascade.addStage(s->name, s->scale, s->model);
+    Outcome outcome;
+    outcome.result = cascade.run(facts);
+    const std::map<std::string, double> sorted(outcome.result.context.begin(), outcome.result.context.end());
+    for (const auto& [key, value] : sorted) {
+      outcome.keys.push_back(key);
+      outcome.values.push_back(value);
+    }
+    return outcome;
+  };
+
+  std::vector<const Declared*> order;
+  for (const auto& s : stages) order.push_back(&s);
+  const Outcome base = run(order, seed);
+  if (base.result.stagesRun != static_cast<int>(stages.size())) throw std::runtime_error("Cascade stages must all run");
+  std::mt19937 shuffle(20261125u);
+  std::vector<double> expected, observed;
+  std::size_t orders = 0, producerChecks = 0, producerViolations = 0;
+  std::string producerDetail;
+  for (int trial = 0; trial < 240; ++trial) {
+    if (trial == 0) std::reverse(order.begin(), order.end());
+    else std::shuffle(order.begin(), order.end(), shuffle);
+    const Outcome other = run(order, seed);
+    if (other.keys != base.keys) throw std::runtime_error("Cascade orders must produce the same facts");
+    expected.insert(expected.end(), base.values.begin(), base.values.end());
+    observed.insert(observed.end(), other.values.begin(), other.values.end());
+    ++orders;
+    // cascade.producers_first: every stage that ran ran after the stage producing each input.
+    std::map<std::string, std::size_t> position;
+    for (std::size_t k = 0; k < other.result.stages.size(); ++k)
+      if (other.result.stages[k].ran) position[other.result.stages[k].model] = k;
+    for (const auto& s : stages) {
+      for (const auto& input : s.inputs) {
+        const auto p = producer.find(input);
+        if (p == producer.end()) continue;  // a seed
+        ++producerChecks;
+        if (!position.count(s.name) || !position.count(p->second->name) ||
+            position[p->second->name] >= position[s.name]) {
+          ++producerViolations;
+          if (producerDetail.empty()) producerDetail = s.name + " before its producer " + p->second->name;
+        }
+      }
+    }
+  }
+  expect(formal::checkAgreement("cascade.registration_order", "Trech.Methods.Cascade.cascade_perm", expected,
+                                observed, 0.0, 0.0));
+  formal::LawCheck first;
+  first.law = "cascade.producers_first";
+  first.leanDeclaration = "Trech.Methods.Cascade.runAll_perm";
+  first.kind = "hypothesis";
+  first.samples = producerChecks;
+  first.violations = producerViolations;
+  first.passed = producerViolations == 0 && orders == 240;
+  first.detail = producerDetail;
+  expect(first);
+
+  // stale_read_order_matters: n1 already present at band start (a seed). Registered before its
+  // in-band producer a, the ready stage b reads the seed; after a, it reads a's value.
+  auto facts = seed;
+  facts["n1"] = 2.5;
+  const auto stale = run({&stages[1], &stages[0], &stages[2], &stages[3]}, facts);
+  const auto fresh = run({&stages[0], &stages[1], &stages[2], &stages[3]}, facts);
+  if (stale.keys != fresh.keys) throw std::runtime_error("Stale-read control must produce the same facts");
+  expect(formal::checkAgreement("cascade.stale_read_negative_control", "", fresh.values, stale.values, 1e-12, 0.0),
+         false);
+  // rivals_order_matters: two nano stages writing n1; with no arbiter the last writer's value stays.
+  const Declared rival = declare("a_rival", nano, {"x0"}, "n1", -0.4);
+  const auto first_rival = run({&stages[0], &rival, &stages[1]}, seed);
+  const auto last_rival = run({&rival, &stages[0], &stages[1]}, seed);
+  expect(formal::checkAgreement("cascade.rivals_negative_control", "", first_rival.values, last_rival.values, 1e-12,
+                                0.0),
          false);
 }
 
@@ -1395,6 +1519,7 @@ int main() {
     pairConservation();
     evolvePairs();
     bandPairs();
+    cascadePairs();
     setPoolPairs();
     groupPairs();
     leastSquaresPairs();

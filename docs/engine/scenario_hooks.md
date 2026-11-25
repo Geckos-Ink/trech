@@ -334,7 +334,11 @@ load. Changing either after startup requires a restart.
 ### `ctx.cascade`
 
 - `ctx.cascade(seed?, modelNames?, options?)`: run declared scale-tagged models in ascending scale order.
-  Within a band, dependency-ready models run first, with registration order breaking ties. There
+  Within a band, dependency-ready models run first, with registration order breaking ties. When
+  every fact has one writer per band and no fact a band's model writes is already present when the
+  band starts, the result does not depend on the order the models were registered in (the
+  [`ctx.cascade` registration-order law](formal_laws.md)); a seeded fact that a model in its band
+  replaces is read as seeded by models registered before that producer. There
   is no fixed stage-depth limit. Optional `maxStages` (0 = all) and `targetOutputs` bound work
   deterministically; metadata reports omitted stages and stop reasons. See
   [adaptive precision](adaptive_precision.md#prediction-depth).

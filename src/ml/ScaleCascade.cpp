@@ -134,6 +134,15 @@ CascadeResult ScaleCascade::run(
 
   // Ascending scale order; dependency-ready stages within each band run in
   // registration order. Ordering depends only on declared IO and supplied facts.
+  // Trech.Methods.Cascade (formal/Trech/Methods/Cascade.lean): stages that write
+  // disjoint facts and do not read each other's commute (run_comm), so every
+  // producer-first order of a band gives the same context (runAll_perm) and the
+  // chained result does not depend on registration order (cascade_perm). The
+  // ready-stage choice below is producer-first when no fact an in-band stage
+  // writes is already present at band start; a seeded or lower-band fact an
+  // in-band stage replaces is read stale by a consumer registered first
+  // (stale_read_order_matters), and rivals keep the last writer's value unless
+  // arbitrated (rivals_order_matters).
   std::vector<const Stage*> ordered;
   ordered.reserve(stages_.size());
   for (const Stage& s : stages_) {

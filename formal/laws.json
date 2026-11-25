@@ -215,6 +215,28 @@
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["route.row_in_current_domain", "route.counts_add_up", "route.refinement_keeps_other_rows", "route.exported_tree_routes"]}
     },
     {
+      "id": "cascade.registration_order",
+      "role": "method_property",
+      "statement": "ScaleCascade runs its bands in scale order on one context of named facts; a stage reads only its declared inputs and writes only its declared outputs. Two stages writing disjoint facts, neither reading the other's, commute, so two orders of a band in which every stage comes after every producer of its inputs (and no fact has two writers) give the same context, and permuting the registration of the whole cascade, which permutes each band's stages only, does not change the chained result. Rivals (two writers of one fact) and a stale read (a consumer running on a fact already present before an in-band producer replaces it) are order-dependent.",
+      "lean": {
+        "file": "formal/Trech/Methods/Cascade.lean",
+        "declarations": [
+          "Trech.Methods.Cascade.run_of_notMem",
+          "Trech.Methods.Cascade.run_of_mem",
+          "Trech.Methods.Cascade.run_comm",
+          "Trech.Methods.Cascade.runAll_move_front",
+          "Trech.Methods.Cascade.runAll_perm",
+          "Trech.Methods.Cascade.cascade_perm",
+          "Trech.Methods.Cascade.rivals_order_matters",
+          "Trech.Methods.Cascade.stale_read_order_matters"
+        ]
+      },
+      "classic": [
+        {"path": "src/ml/ScaleCascade.cpp", "cites": "Trech.Methods.Cascade"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["cascade.registration_order", "cascade.producers_first", "cascade.stale_read_negative_control", "cascade.rivals_negative_control"]}
+    },
+    {
       "id": "evolve.band_order",
       "role": "method_property",
       "statement": "Inside one ctx.evolve scale band, stages run in registration order on a working vector: a stage adds its rates and overwrites the slots it assigns. Two stages commute when they write disjoint slots and neither reads a slot the other writes; rate-only stages always commute, and a band of them adds the sum of its rates, so any reordering gives the same outcome (over the reals); an assignment read by a rate stage is order-dependent.",

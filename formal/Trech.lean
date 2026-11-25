@@ -15,3 +15,4 @@ public import Trech.Methods.Arbiter
 public import Trech.Methods.Decay
 public import Trech.Methods.Band
 public import Trech.Methods.Route
+public import Trech.Methods.Cascade

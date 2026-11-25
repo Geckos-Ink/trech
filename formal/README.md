@@ -21,15 +21,16 @@ Contract: [formal-laws handbook](../AGENTS/engine/formal/AGENTS.md).
 | [`Trech/Methods/Arbiter.lean`](Trech/Methods/Arbiter.lean) | `Trech.Methods.Arbiter` | [`MethodArbiter.cpp`](../src/ml/MethodArbiter.cpp) |
 | [`Trech/Methods/Band.lean`](Trech/Methods/Band.lean) | `Trech.Methods.Band` | [`StateEvolution.cpp`](../src/ml/StateEvolution.cpp) (stage order inside a `ctx.evolve` scale band) |
 | [`Trech/Methods/Route.lean`](Trech/Methods/Route.lean) | `Trech.Methods.Route` | [`DomainLearner.cpp`](../src/ml/DomainLearner.cpp) (domain routing, splits and merges of `ctx.learnDomains`) |
+| [`Trech/Methods/Cascade.lean`](Trech/Methods/Cascade.lean) | `Trech.Methods.Cascade` | [`ScaleCascade.cpp`](../src/ml/ScaleCascade.cpp) (registration order of `ctx.cascade` stages) |
 | [`Trech/Methods/Decay.lean`](Trech/Methods/Decay.lean) | `Trech.Methods.Decay` | [`DecayedScore.hpp`](../include/trech/ml/DecayedScore.hpp), called by [`MethodArbiter.cpp`](../src/ml/MethodArbiter.cpp) (decayed prequential scores and the leader ranking) |
 
 [`laws.json`](laws.json) lists the pairs. `tests/test_formal_law_pairs.py` checks that both sides
 exist and cite each other; `tests/test_formal_laws.cpp` runs the classic code against each
 statement. Neither needs Lean.
 
-**Status (2026-11-23): all 71 theorems compile and use only the standard axioms**
+**Status (2026-11-25): all 79 theorems compile and use only the standard axioms**
 (`propext`, `Classical.choice`, `Quot.sound`), with Lean `v4.37.0-rc1` and Mathlib
-`90e6eec`, on macOS arm64. Transition counts are proved over mathematical integers.
+`348837d`, on macOS arm64. Transition counts are proved over mathematical integers.
 Checks for real-valued proofs state a tolerance where the classic results round.
 
 Set up once (the Mathlib cache is about 7 GB, kept in ignored `thirds/mathlib4/.lake`):
