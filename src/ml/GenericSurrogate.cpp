@@ -1455,6 +1455,11 @@ GenericSurrogate::Coverage GenericSurrogate::coverageVector(
   // sit in a hole between the clusters training actually covered.  Skipped
   // entirely (and reported unmeasured) for a model with no joint reference, so
   // it costs nothing for models that do not carry one.
+  // Trech.Methods.Coverage (formal/Trech/Methods/Coverage.lean): the partial-sum
+  // break and the stop at the first covering centre give the full scan's verdict,
+  // and a starved distance is the true minimum (scan_spec); a covered distance is
+  // the first covering centre's, not necessarily the nearest
+  // (covered_distance_not_min).
   if (checkJoint) {
     const std::size_t nIn = inputNames_.size();
     // Tolerance so a training point sitting exactly on the covering radius is

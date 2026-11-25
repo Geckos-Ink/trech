@@ -237,6 +237,25 @@
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["cascade.registration_order", "cascade.producers_first", "cascade.stale_read_negative_control", "cascade.rivals_negative_control"]}
     },
     {
+      "id": "coverage.joint_scan",
+      "role": "method_property",
+      "statement": "GenericSurrogate's joint coverage check stops summing a centre's squared standardized differences once the partial sum reaches the best distance so far, and stops scanning once a centre lies within the acceptance radius. With non-negative terms the pruned sum is the full sum or lies between the best and the full sum, so the scan is covered exactly when some centre's full distance is within the radius, and when it is not covered its best value is the minimum over all centres; a covered scan's distance need not be the minimum.",
+      "lean": {
+        "file": "formal/Trech/Methods/Coverage.lean",
+        "declarations": [
+          "Trech.Methods.Coverage.partialBreak_spec",
+          "Trech.Methods.Coverage.pruned_lt_iff",
+          "Trech.Methods.Coverage.foldl_step_covered",
+          "Trech.Methods.Coverage.scan_spec",
+          "Trech.Methods.Coverage.covered_distance_not_min"
+        ]
+      },
+      "classic": [
+        {"path": "src/ml/GenericSurrogate.cpp", "cites": "Trech.Methods.Coverage"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["coverage.joint_verdict", "coverage.starved_distance_exact", "coverage.covered_distance_negative_control"]}
+    },
+    {
       "id": "evolve.band_order",
       "role": "method_property",
       "statement": "Inside one ctx.evolve scale band, stages run in registration order on a working vector: a stage adds its rates and overwrites the slots it assigns. Two stages commute when they write disjoint slots and neither reads a slot the other writes; rate-only stages always commute, and a band of them adds the sum of its rates, so any reordering gives the same outcome (over the reals); an assignment read by a rate stage is order-dependent.",

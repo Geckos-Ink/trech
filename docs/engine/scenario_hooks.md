@@ -936,7 +936,8 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
   nearest covered region and flags a point beyond it. `jointMeasured:false` means the model carries
   no joint reference and **the check was not performed** — unknown, not a pass; the other fields are
   then `null`. `jointDistance` is exact when starved (the case worth measuring) and the distance to
-  a covering center otherwise. Joint starvation counts into the run-level `stagesStarved`, and the
+  a covering center otherwise; the shortcuts behind this never change the verdict (the
+  [joint-coverage law](formal_laws.md)). Joint starvation counts into the run-level `stagesStarved`, and the
   batched operators report `elementsJointStarved` / `pairsJointStarved` + `maxJointDistance`.
   `python -m trech_torch.plan_experiments --models <model.json>` turns the same evidence into the
   operating points to simulate next, in the model's own raw input units.

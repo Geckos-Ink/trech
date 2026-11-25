@@ -6,13 +6,13 @@ Related owners: [Builds and dependencies](../../tooling/dependencies/AGENTS.md) 
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
-**Maturity (2026-11-25): eighteen law pairs, 79 proofs verified. Lean stays optional.** The pairs
+**Maturity (2026-11-25): nineteen law pairs, 84 proofs verified. Lean stays optional.** The pairs
 ([`formal/laws.json`](../../../formal/laws.json)) are Compton kinematics, the Compton relation
 from four-momentum conservation, the energy balance of a recorded step, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step
 probabilities and declared count conservation, antisymmetric `ctx.interact` exchange, the bounded explicit step of `ctx.evolve` and `ctx.interact`, the order independence of set networks, `ctx.lift` group assembly, the domain learner's split score, the
-method arbiter's proper squared score and its decayed prequential scores, stage order inside a `ctx.evolve` band, `ctx.learnDomains` routing and the registration order of `ctx.cascade`. Their classic C++/JS code is
+method arbiter's proper squared score and its decayed prequential scores, stage order inside a `ctx.evolve` band, `ctx.learnDomains` routing the registration order of `ctx.cascade` and the pruned joint-coverage scan of learned models. Their classic C++/JS code is
 checked against each Lean statement by `trech_formal_laws`, and the pair links by
-`trech_formal_law_pairs` (both in the normal suite, no Lean needed). The 79 Lean theorems
+`trech_formal_law_pairs` (both in the normal suite, no Lean needed). The 84 Lean theorems
 compile with Lean `v4.37.0-rc1` and Mathlib `348837d` and depend only on the standard
 axioms (`propext`, `Classical.choice`, `Quot.sound`), checked by the opt-in
 `trech_formal_lean_build`. The count proof uses mathematical integers. The exchange proof uses

@@ -799,6 +799,80 @@ void cascadePairs() {
          false);
 }
 
+void coveragePairs() {
+  // Trech.Methods.Coverage on GenericSurrogate::coverageVector: the joint check prunes each
+  // centre's distance sum and stops at the first covering centre. Against a full scan of every
+  // centre: same verdict, and the starved distance is the exact minimum.
+  const trech::test::TemporaryDirectory fixture;
+  const std::size_t dims = 3, count = 48;
+  std::vector<std::vector<double>> centers;
+  for (std::size_t c = 0; c < count; ++c) {
+    const double u = static_cast<double>(c);
+    centers.push_back({1.6 * std::sin(0.7 * u), 1.3 * std::cos(1.1 * u), 0.9 * std::sin(0.37 * u + 0.5)});
+  }
+  const double radius = 0.35;
+  const nlohmann::json spec = {
+      {"model", "generic_surrogate_v1"},
+      {"input_features", {"x", "y", "z"}},
+      {"output_features", {"o"}},
+      {"input_mean", {0.0, 0.0, 0.0}},
+      {"input_std", {1.0, 1.0, 1.0}},
+      {"input_domain", {{"standardized_radius", {9.0, 9.0, 9.0}}, {"joint", {{"centers", centers}, {"radius", radius}}}}},
+      {"layers", {{{"weights", {{1.0, 1.0, 1.0}}}, {"bias", {0.0}}, {"activation", "none"}}}}};
+  const auto path = (fixture.path() / "coverage.json").string();
+  std::ofstream(path) << spec;
+  trech::ml::GenericSurrogate model;
+  if (!model.load(path)) throw std::runtime_error("Could not load coverage model");
+  const double accept = radius * (1.0 + 1e-9) + 1e-12;
+  std::size_t samples = 0, verdictErrors = 0, covered = 0, starved = 0;
+  std::vector<double> starvedEngine, starvedFull, coveredEngine, coveredFull;
+  std::string detail;
+  for (int i = -6; i <= 6; ++i)
+    for (int j = -6; j <= 6; ++j)
+      for (int k = -3; k <= 3; ++k) {
+        const std::vector<double> x = {0.29 * i, 0.23 * j, 0.31 * k};
+        const auto cov = model.coverageVector(x);
+        double best = std::numeric_limits<double>::infinity();
+        for (const auto& center : centers) {
+          double sum = 0.0;
+          for (std::size_t d = 0; d < dims; ++d) sum += (x[d] - center[d]) * (x[d] - center[d]);
+          best = std::min(best, sum);
+        }
+        const bool fullCovered = best <= accept * accept;
+        ++samples;
+        if (!cov.jointMeasured || cov.jointStarved == fullCovered) {
+          ++verdictErrors;
+          if (detail.empty()) detail = "verdict differs at sample " + std::to_string(samples);
+        }
+        if (fullCovered) {
+          ++covered;
+          coveredEngine.push_back(cov.jointDistance);
+          coveredFull.push_back(std::sqrt(best));
+        } else {
+          ++starved;
+          starvedEngine.push_back(cov.jointDistance);
+          starvedFull.push_back(std::sqrt(best));
+        }
+      }
+  formal::LawCheck verdict;
+  verdict.law = "coverage.joint_verdict";
+  verdict.leanDeclaration = "Trech.Methods.Coverage.scan_spec";
+  verdict.kind = "invariant";
+  verdict.samples = samples;
+  verdict.violations = verdictErrors;
+  verdict.passed = verdictErrors == 0 && covered > 50 && starved > 50;
+  verdict.detail = detail.empty() ? std::to_string(covered) + " covered, " + std::to_string(starved) + " starved"
+                                  : detail;
+  expect(verdict);
+  std::printf("coverage.events                          %zu covered, %zu starved\n", covered, starved);
+  expect(formal::checkAgreement("coverage.starved_distance_exact", "Trech.Methods.Coverage.scan_spec", starvedFull,
+                                starvedEngine, 0.0, 0.0));
+  // covered_distance_not_min: a covered scan stops at its first covering centre.
+  expect(formal::checkAgreement("coverage.covered_distance_negative_control", "", coveredFull, coveredEngine, 1e-12,
+                                0.0),
+         false);
+}
+
 void routePairs() {
   // Trech.Methods.Route on DomainLearner: three affine regimes (splits), then one shared law
   // (merges). Per call: every routed row is in a current domain, the domains' element counts add
@@ -1520,6 +1594,7 @@ int main() {
     evolvePairs();
     bandPairs();
     cascadePairs();
+    coveragePairs();
     setPoolPairs();
     groupPairs();
     leastSquaresPairs();

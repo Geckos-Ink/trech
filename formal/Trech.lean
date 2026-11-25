@@ -16,3 +16,4 @@ public import Trech.Methods.Decay
 public import Trech.Methods.Band
 public import Trech.Methods.Route
 public import Trech.Methods.Cascade
+public import Trech.Methods.Coverage
