@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / "tools" / "validation"))
 from trech_validation.pubchem_inputs import (  # noqa: E402
     COMPOUNDS, cache_errors, main, snapshot, snapshot_errors)
 from trech_validation.cases import CaseResult  # noqa: E402
-from trech_validation.report import write_report  # noqa: E402
+from trech_validation.report import portable_path, write_report  # noqa: E402
 
 
 def write_cache(root: Path) -> None:
@@ -135,6 +135,15 @@ class ReportSnapshotTests(unittest.TestCase):
         result = CaseResult(name="c", description="d", category="x", status="pass")
         write_report([result], runs / "r.md", runs / "r.json", runs_dir=runs)
         return (runs / "r.md").read_text(), json.loads((runs / "r.json").read_text())
+
+    def test_runs_dir_never_records_the_home_directory(self):
+        # Committed reports once recorded /Users/<author>/... as runs_dir (fixed 2026-11-26).
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            runs = Path(directory)
+            markdown, payload = self.report(runs)
+            self.assertEqual(payload["runs_dir"], runs.resolve().relative_to(Path.cwd().resolve()).as_posix())
+            self.assertIn(f"- runs_dir: `{payload['runs_dir']}`", markdown)
+        self.assertEqual(portable_path(Path.home() / "outside" / "runs"), "~/outside/runs")
 
     def test_recorded_invalid_and_absent_snapshots(self):
         with tempfile.TemporaryDirectory() as directory:

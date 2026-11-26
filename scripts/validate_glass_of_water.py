@@ -111,6 +111,18 @@ class BoxVolume:
         return dx >= -tol_mm and dy >= -tol_mm and dz >= -tol_mm
 
 
+
+def portable_path(path) -> str:
+    """A report path that leaks no home directory: relative to the working directory when it
+    lies inside it, ``~/…`` under the home directory, absolute otherwise."""
+    resolved = Path(path).expanduser().resolve()
+    for base, prefix in ((Path.cwd().resolve(), ""), (Path.home().resolve(), "~/")):
+        try:
+            return prefix + resolved.relative_to(base).as_posix()
+        except ValueError:
+            continue
+    return resolved.as_posix()
+
 def _resolve_box_world_position(volumes_by_name: Dict[str, dict], name: str) -> Tuple[float, float, float]:
     """Walk the parent chain to convert local positions to world coords."""
     cx = cy = cz = 0.0
@@ -599,7 +611,7 @@ def run(args: argparse.Namespace) -> int:
         })
 
     summary = {
-        "run_dir": str(run_dir),
+        "run_dir": portable_path(run_dir),
         "beam_energy_ev": (scene.get("beams") or [{}])[0].get("energy_ev"),
         "n_trajectories": len(trajectories),
         "snell": rows_snell,

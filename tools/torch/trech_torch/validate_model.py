@@ -10,6 +10,9 @@ Static gates (pure Python; no NumPy/torch, so they run in every CTest environmen
                      by the C++ GenericSurrogate (same rules, re-implemented here);
 - `finite_on_domain` a float64 forward pass is finite at the training mean, at each
                      feature's trained edge and at the joint covering centres;
+- `portable_metadata` no metadata string is an absolute path (a home directory or another
+                     host's layout); `fail` in the committed audit, `warn` for an ad-hoc model
+                     trained on runs outside the working directory;
 - `trust_profile`    the model carries what the engine needs to grade a prediction:
                      measured hull, occupancy, joint reference, held-out R2 and per-output
                      RMSE (a missing block is a `warn`: the engine falls back to heuristics);
@@ -450,12 +453,47 @@ def check_torchscript(model: dict, pt_path: Optional[Path], rows: List[List[floa
                 "(float32 twin vs float64 JSON; tolerance 1e-4)", max_relative_difference=_round(worst))
 
 
-def static_gates(model: dict, pt_path: Optional[Path] = None) -> Tuple[List[dict], List[List[float]]]:
+def _absolute_path(text: str) -> bool:
+    """A POSIX, home-relative or Windows absolute path (``/…``, ``~/…``, ``C:\\…``, ``\\\\host``)."""
+    return (text.startswith(("/", "~/", "\\\\"))
+            or (len(text) > 2 and text[0].isalpha() and text[1] == ":" and text[2] in "/\\"))
+
+
+def _metadata_strings(value, where: str):
+    if isinstance(value, str):
+        yield where, value
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            yield from _metadata_strings(item, f"{where}.{key}" if where else str(key))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            if isinstance(item, (str, dict, list)):
+                yield from _metadata_strings(item, f"{where}[{index}]")
+
+
+def check_portable_metadata(model: dict, *, committed: bool = False) -> dict:
+    """Committed metadata must not carry absolute paths: they leak the author's home directory
+    and do not resolve on another host. Training records use repository-relative run paths
+    (``build/…``), as the trainer writes them. A model trained on runs outside the working
+    directory legitimately records absolute paths, so outside the committed audit this is a
+    ``warn``; the audit (``committed=True``) fails it."""
+    found = [f"{where}={text!r}" for where, text in _metadata_strings(model, "") if _absolute_path(text)]
+    if found:
+        shown = ", ".join(found[:3]) + (f" (+{len(found) - 3} more)" if len(found) > 3 else "")
+        return gate("portable_metadata", "fail" if committed else "warn",
+                    f"{len(found)} absolute path(s) in model metadata: {shown}; "
+                    "record repository-relative paths before committing", absolute_paths=len(found))
+    return gate("portable_metadata", "pass", "no absolute paths in model metadata")
+
+
+def static_gates(model: dict, pt_path: Optional[Path] = None, *,
+                 committed: bool = False) -> Tuple[List[dict], List[List[float]]]:
     structure = check_structure(model)
+    portable = check_portable_metadata(model, committed=committed)
     if structure["status"] == "fail":
-        return [structure], []
+        return [structure, portable], []
     finite, rows = check_finite(model)
-    gates = [structure, finite, check_trust(model), check_carried_accuracy(model)]
+    gates = [structure, finite, check_trust(model), check_carried_accuracy(model), portable]
     return gates, rows
 
 
@@ -800,7 +838,7 @@ def audit(dirs: Sequence[Path], root: Path) -> dict:
     models = []
     for path in find_models(dirs):
         model = load_model(path)
-        gates, _rows = static_gates(model)
+        gates, _rows = static_gates(model, committed=True)
         profile = trust_profile(model) if gates[0]["status"] == "pass" else None
         holdout = model.get("holdout") or {}
         plan = layer_plan(model)

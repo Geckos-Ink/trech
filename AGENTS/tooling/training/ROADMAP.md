@@ -21,7 +21,6 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R3 · Migrate scenarios that hand-write `models[]` paths onto definitions + `modelEntry` with committed fallbacks. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
 - **P2** · R3 · Next set-network users: efflux/foam parcel operators, an MPNN where neighbour-of-neighbour structure matters, a conservative set operator through `ctx.interact`. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
 - **P2** · R2 · Engine-side checkpoint usage recording (outside Studio) and an automatic age/size budget after searches. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
-- **P2** · R1 · Five committed glass-furnace models (`data/glass_furnace_operators_trained/{thermal,chemistry}_*.json`) record their training `runs` as absolute `/Users/<author>/…/build/glass_train/…` paths, which leak a home directory and do not resolve on another host. `trech-measure-routing-domain` already writes repository-relative paths; rewrite the existing training records the same way (re-hashing any digest that covers them) and add a validator gate that rejects absolute paths in committed model metadata. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
 - **P2** · R2 · Particle-observer coverage holes and physical uncertainty calibration. (owned by the [engine/inference queue](../../engine/inference/ROADMAP.md#priority-queue))
 - **P2** · R2 · Make the synthetic hierarchy demo beat its additive baseline before trusting the trainer on Geant4 data: more systems, minibatching, block-level capacity/latent sweeps, and a structure search over levels. Today the system level loses 0.09 R² to adding up its own block predictions. ([detail](#recursive-group-hierarchies-2026-11-17))
 - **P2** · R2 · Hierarchy tooling parity with single models: TorchScript twins per level, `trech-ml` store registration and a JS `defineModel` hierarchy family, validator gates for chained-holdout reproduction and capacity coverage, and integrate the particle-hierarchy replay recipe into the recheck registry. ([detail](#recursive-group-hierarchies-2026-11-17))
@@ -207,6 +206,18 @@ dated record below, and queue its residuals in the same change.
     grades them on fresh 1640 K / 1790 K runs of the current 3D scenario.
   - Polyurethane originals used sampler variants (`boundary`, `fullpop_raw`) no longer in the
     scenario; fresh 290 K / 303 K runs grade the committed operator (needs the PubChem cache).
+- [x] (2026-11-26) Portable model metadata. The five glass-furnace operators recorded
+  `trained_from.runs`/`validation_runs` as `/Users/<author>/…/build/glass_train/…`; they now
+  read `build/glass_train/…` (weights unchanged). New static gate `portable_metadata`: an
+  absolute metadata path (`/…`, `~/…`, drive letters, UNC) fails the committed audit and warns
+  for ad-hoc validation (models trained on temporary runs). Audit 53 models, 0 failing. The
+  changed digests were re-checked on fresh engine runs (`recheck_models --only`, which now
+  merges into the committed report instead of dropping the other entries): every gate keeps its
+  verdict and fresh R² stays 1.0; the fresh runs differ slightly from 2026-11-18 (the scenario
+  changed since), moving σ ratios within the ×1.5 gate (thermal_glass test/carried RMSE 0.80 →
+  1.17, 1σ coverage 0.66 → 0.34). Validation report writers also record run directories
+  repository-relative (`portable_path`), and the committed validation reports lost their
+  `/Users/<author>` prefixes.
 - [ ] Recipes for the particle observer (`build_particle_observer_models.py`: strict serial
   Geant4 harvests with frozen final cases) and the spectrum models (`projects/spectrum_prediction`).
 - [ ] C++-side evaluator parity inside the validator (today: Python pure/NumPy/TorchScript; C++

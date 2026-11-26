@@ -301,7 +301,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--recipes", default="data/ml_recheck_recipes.json")
     ap.add_argument("--root", default=".")
     ap.add_argument("--work", default="build/ml_recheck", help="where fresh runs are written")
-    ap.add_argument("--only", action="append", default=None, help="re-check only models whose path contains this")
+    ap.add_argument("--only", action="append", default=None,
+                    help="re-check only models whose path contains this; with --json, other entries are kept")
     ap.add_argument("--json", default=None, help="write the report JSON here")
     ap.add_argument("--md", default=None, help="write the Markdown report here")
     ap.add_argument("--check", action="store_true",
@@ -339,6 +340,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         entry = recheck(recipe, root=root, work=(root / args.work))
         print(f"  -> {entry['status']}: " + ", ".join(f"{k}={v}" for k, v in entry["gates"].items()))
         models.append(entry)
+    if args.only and args.json and (root / args.json).is_file():
+        # A partial re-check updates its models in the committed report and keeps every other
+        # entry as it was, in recipe order (before 2026-11-26 it dropped them).
+        fresh = {m["model"]: m for m in models}
+        kept = {m["model"]: m for m in json.loads((root / args.json).read_text(encoding="utf-8")).get("models", [])}
+        models = [fresh.get(r["model"]) or kept.get(r["model"]) for r in recipes]
+        models = [m for m in models if m is not None]
     data = {"schema": SCHEMA, "recipes": args.recipes, "models": models, "not_rechecked": NOT_RECHECKED}
     if args.json:
         Path(root / args.json).write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")

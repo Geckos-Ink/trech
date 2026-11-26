@@ -5,6 +5,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -37,6 +38,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -69,6 +71,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -101,6 +104,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -133,6 +137,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -165,6 +170,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -197,6 +203,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -229,6 +236,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -261,6 +269,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -293,6 +302,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -325,6 +335,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -357,6 +368,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -389,6 +401,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -421,6 +434,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -453,6 +467,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -485,6 +500,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -517,6 +533,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -549,6 +566,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -581,6 +599,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -613,6 +632,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -645,6 +665,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -677,6 +698,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -709,6 +731,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -741,6 +764,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -773,6 +797,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -805,6 +830,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -837,6 +863,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -869,6 +896,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -901,6 +929,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -933,6 +962,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -965,6 +995,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -987,7 +1018,7 @@
         "prediction_interval": false,
         "scale_bands": true
       },
-      "sha256": "5fd3cfd41996a39f8ca9d36a2a6d8d9ad93f71bc16fdf26e9638493bf63f1c03",
+      "sha256": "ed017d1c2fa14dc5e6ad2fc8f1340570fb2f33d9d80d04cf88b245548586228f",
       "status": "warn",
       "structure": "linear",
       "trust": "partial"
@@ -997,6 +1028,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -1019,7 +1051,7 @@
         "prediction_interval": false,
         "scale_bands": true
       },
-      "sha256": "15ddf546716c3cc7aeebea6491ffe54a906af45072e98fc0c90242927ceb7609",
+      "sha256": "aa46eeae5b5d09f1a121f0ba06760e6cf46acac0c554d14510ca0154be46e6cf",
       "status": "warn",
       "structure": "linear",
       "trust": "partial"
@@ -1029,6 +1061,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -1051,7 +1084,7 @@
         "prediction_interval": false,
         "scale_bands": true
       },
-      "sha256": "f1ce1561eb6963a9ffd76bcea36a57decea6d04229db35b8bb3a4722c88caafa",
+      "sha256": "9295b691fa33afb695f40201ea920e8d0f1058b3ed065e81134a1a2ee4c485df",
       "status": "warn",
       "structure": "linear",
       "trust": "partial"
@@ -1061,6 +1094,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -1083,7 +1117,7 @@
         "prediction_interval": false,
         "scale_bands": true
       },
-      "sha256": "681989ec05e6b01888e48eb813f4c6d1bc605fca918c4fd5497bcf19a34af722",
+      "sha256": "830e0ec6caaf77e646fc24819f59d7ec4668e757d7ccfd2c1530034b19754676",
       "status": "warn",
       "structure": "linear",
       "trust": "partial"
@@ -1093,6 +1127,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -1115,7 +1150,7 @@
         "prediction_interval": false,
         "scale_bands": true
       },
-      "sha256": "33be17b1348646137fc8265f2631089a357061eda2bd4b0f07fe0164e5321495",
+      "sha256": "19cf30c991f5735ccfe0109f947edde859243e6e2a9bf6e5df650b248b5f8d03",
       "status": "warn",
       "structure": "linear",
       "trust": "partial"
@@ -1125,6 +1160,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -1157,6 +1193,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -1189,6 +1226,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1221,6 +1259,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1253,6 +1292,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1285,6 +1325,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1317,6 +1358,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1349,6 +1391,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1381,6 +1424,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1413,6 +1457,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1445,6 +1490,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1477,6 +1523,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1509,6 +1556,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -1541,6 +1589,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1573,6 +1622,7 @@
       "gates": {
         "carried_accuracy": "pass",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -1605,6 +1655,7 @@
       "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "warn"
       },
@@ -1639,6 +1690,7 @@
       "gates": {
         "carried_accuracy": "warn",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },
@@ -1673,6 +1725,7 @@
       "gates": {
         "carried_accuracy": "warn",
         "finite_on_domain": "pass",
+        "portable_metadata": "pass",
         "structure": "pass",
         "trust_profile": "pass"
       },

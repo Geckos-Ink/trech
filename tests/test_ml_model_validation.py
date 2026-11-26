@@ -57,6 +57,32 @@ def statuses(model: dict) -> dict:
     return {g["name"]: g["status"] for g in gates}
 
 
+def check_portable_metadata() -> None:
+    # A training record that names the author's home directory leaks it and does not resolve
+    # elsewhere (the five legacy furnace models carried /Users/<author>/... until 2026-11-26).
+    assert statuses(base_model(trained_from={"runs": ["build/glass_train/train_1750"]}))["portable_metadata"] == "pass"
+    for path in ("/Users/someone/trech/build/run", "~/runs/a", "C:\\runs\\a", "D:/runs/a", "\\\\host\\share"):
+        model = base_model(trained_from={"runs": ["build/ok", path]})
+        assert statuses(model)["portable_metadata"] == "warn", path  # ad-hoc: trained outside the repo
+        committed = vm.static_gates(model, committed=True)[0]
+        assert {g["name"]: g["status"] for g in committed}["portable_metadata"] == "fail", path
+        assert vm.overall(committed) == "fail"
+    nested = base_model(holdout={"runs": [{"dir": "/tmp/holdout"}]})
+    gate = next(g for g in vm.static_gates(nested, committed=True)[0] if g["name"] == "portable_metadata")
+    assert "holdout.runs[0].dir" in gate["detail"]
+    # Feature names, units and notes are not paths.
+    assert statuses(base_model(note={"units": "K/s", "teacher": "a/b"}))["portable_metadata"] == "pass"
+    # A structurally broken model still reports the metadata gate.
+    assert "portable_metadata" in statuses(base_model(layers=[], trained_from={"runs": ["/abs"]}))
+    # The committed audit fails a model that leaks a path (the scanned tree must not contain one).
+    with tempfile.TemporaryDirectory() as tmp:
+        leak = Path(tmp) / "data"
+        leak.mkdir()
+        (leak / "leaky.json").write_text(json.dumps(base_model(trained_from={"runs": ["/home/a/run"]})))
+        entry = vm.audit([leak], Path(tmp))["models"][0]
+        assert entry["status"] == "fail" and entry["problems"][0].startswith("portable_metadata:")
+
+
 def check_static_gates() -> None:
     ok = statuses(base_model())
     assert ok["structure"] == "pass" and ok["finite_on_domain"] == "pass", ok
@@ -442,6 +468,7 @@ def check_domain_specialist_routing() -> None:
 def main() -> int:
     check_audit_fresh()
     check_static_gates()
+    check_portable_metadata()
     check_torchscript_sidecar()
     check_domain_specialist_routing()
     check_run_gates()

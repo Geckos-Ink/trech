@@ -47,6 +47,18 @@ import numpy as np
 _ANCHORS_PATH = Path(__file__).resolve().parent.parent / "data" / "optics_handbook_anchors.json"
 
 
+
+def portable_path(path) -> str:
+    """A report path that leaks no home directory: relative to the working directory when it
+    lies inside it, ``~/…`` under the home directory, absolute otherwise."""
+    resolved = Path(path).expanduser().resolve()
+    for base, prefix in ((Path.cwd().resolve(), ""), (Path.home().resolve(), "~/")):
+        try:
+            return prefix + resolved.relative_to(base).as_posix()
+        except ValueError:
+            continue
+    return resolved.as_posix()
+
 def _load_handbook() -> Dict[str, float]:
     try:
         doc = json.loads(_ANCHORS_PATH.read_text())
@@ -198,7 +210,7 @@ def run(args: argparse.Namespace) -> int:
     improved = mae_sur < mae_ext
 
     summary = {
-        "run_dir": str(run_dir),
+        "run_dir": portable_path(run_dir),
         "materials": len(rows),
         "ridge_lambda": args.ridge_lambda,
         "mae_extractor": mae_ext,

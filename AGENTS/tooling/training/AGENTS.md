@@ -58,6 +58,7 @@ Read the root principles and the parent handbook first; then open only the subca
   may regenerate recorded training runs (`training.seeds`). Regenerate
   [`docs/validation/ml_model_recheck.md`](../../../docs/validation/ml_model_recheck.md) (+ `.json`) whenever a recipe or a
   re-checked model changes; CTest `trech_ml_model_recheck` guards staleness without NumPy.
+  `--only` with `--json` merges the re-checked models into the committed report.
 
 - **Occupancy bins are numpy's.** `train_surrogate.input_domain` counts with
   `numpy.histogram`; the engine (`GenericSurrogate::occupancyBin`), the C++ trainer and
@@ -72,7 +73,10 @@ Read the root principles and the parent handbook first; then open only the subca
   training/test runs; TorchScript parity needs torch. `--scan` writes the committed audit
   [`docs/validation/ml_model_audit.md`](../../../docs/validation/ml_model_audit.md) (+ `.json`), guarded by CTest
   `trech_ml_model_audit`: regenerate it whenever a committed model under `data/`/`projects/`
-  changes. A verdict never upgrades a trust label.
+  changes. A verdict never upgrades a trust label. The `portable_metadata` gate fails a committed
+  model whose metadata holds an absolute path (warn for ad-hoc validation); report writers
+  (`trech_validation.report`, `scripts/validate_{glass_of_water,optics_surrogate}.py`) record run
+  directories through `portable_path` (repository-relative, else `~/…`).
 
 - **Evolvo is optional offline tooling:** pinned submodule `thirds/evolvo`; adapter/trainer
   `tools/torch/trech_torch/evolve_structure.py` evolves bounded MLP definitions, selects on

@@ -41,15 +41,15 @@
   ],
   "trained_from": {
     "runs": [
-      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1750",
-      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1600",
-      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1880",
-      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1500",
-      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1700_fine"
+      "build/glass_train/train_1750",
+      "build/glass_train/train_1600",
+      "build/glass_train/train_1880",
+      "build/glass_train/train_1500",
+      "build/glass_train/train_1700_fine"
     ],
     "validation_runs": [
-      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/holdout_1820",
-      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/holdout_1560"
+      "build/glass_train/holdout_1820",
+      "build/glass_train/holdout_1560"
     ],
     "source": "hook_emits",
     "tag": "thermal_sample_glass",

@@ -11,6 +11,18 @@ from typing import Iterable, List, Optional
 from .cases import CaseResult
 from .pubchem_inputs import snapshot_summary
 
+
+def portable_path(path) -> str:
+    """A report path that leaks no home directory: relative to the working directory when it
+    lies inside it, ``~/…`` under the home directory, absolute otherwise."""
+    resolved = Path(path).expanduser().resolve()
+    for base, prefix in ((Path.cwd().resolve(), ""), (Path.home().resolve(), "~/")):
+        try:
+            return prefix + resolved.relative_to(base).as_posix()
+        except ValueError:
+            continue
+    return resolved.as_posix()
+
 # Written by cache-only suite runs (scripts/run_validation_suite.sh).
 PUBCHEM_SNAPSHOT_FILE = "pubchem_input_snapshot.json"
 
@@ -82,7 +94,7 @@ def write_report(
     if git_sha:
         lines.append(f"- git_sha: `{git_sha}`")
     if runs_dir is not None:
-        lines.append(f"- runs_dir: `{runs_dir}`")
+        lines.append(f"- runs_dir: `{portable_path(runs_dir)}`")
     if pubchem is not None:
         if pubchem["status"] == "recorded":
             lines.append(f"- pubchem_inputs: `{pubchem['snapshot_sha256']}` "
@@ -143,7 +155,7 @@ def write_report(
             "schema": "trech_validation_report_v1",
             "generated_at_utc": timestamp,
             "git_sha": git_sha,
-            "runs_dir": str(runs_dir) if runs_dir is not None else "",
+            "runs_dir": portable_path(runs_dir) if runs_dir is not None else "",
             "pubchem_inputs": pubchem if pubchem is not None else {"status": "absent"},
             "counts": counts,
             "results": [r.to_dict() for r in results],

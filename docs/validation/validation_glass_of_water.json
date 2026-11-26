@@ -1,5 +1,5 @@
 {
-  "run_dir": "/Users/richard/Sources/GitHub/trech/build/dev/out_validation_gow",
+  "run_dir": "build/dev/out_validation_gow",
   "beam_energy_ev": 2.25,
   "n_trajectories": 4000,
   "snell": [

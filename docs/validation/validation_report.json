@@ -3172,6 +3172,6 @@
       "tolerance": null
     }
   ],
-  "runs_dir": "/Users/richard/Sources/GitHub/trech/build/dev",
+  "runs_dir": "build/dev",
   "schema": "trech_validation_report_v1"
 }

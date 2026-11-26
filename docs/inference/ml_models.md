@@ -216,6 +216,7 @@ Each gate is `pass`, `warn`, `fail` or `skip` with its reason:
 | `finite_on_domain` | — | an output is non-finite at the training mean, a feature's trained edge or a joint centre |
 | `trust_profile` | — | warn: no measured hull / occupancy / joint reference / holdout R² / per-output RMSE (the engine falls back to heuristics) |
 | `carried_accuracy` | — | warn: the model's own holdout R²min is below 0 |
+| `portable_metadata` | — | a metadata string is an absolute path (`/…`, `~/…`, `C:\…`, `\\host`): it leaks the author's home directory and does not resolve on another host. `fail` in the committed audit; `warn` for an ad-hoc model trained on runs outside the working directory (the trainer records runs inside it repository-relative, such as `build/glass_train/train_1750`) |
 | `torchscript_parity` | torch + `.pt` twin | float32 twin differs from the float64 JSON by more than 1e-4 (relative) |
 | `evaluator_parity` | NumPy, test runs | an independent pure-Python forward pass disagrees with the trainer's NumPy path |
 | `run_leakage` | training runs | a run is used for training and testing, or a test run replays a training configuration (same provenance `config_hash`, incl. seed) |
@@ -246,7 +247,9 @@ produces fresh runs under `build/ml_recheck/`, regenerates the original holdout 
 must reproduce the carried ones, proving the producer has not drifted) and the training run, and
 grades the committed model on the fresh runs with the validator. [`ml_model_recheck.md`](../validation/ml_model_recheck.md)
 is generated; CTest `trech_ml_model_recheck` fails when a re-checked model or its recipe changed
-since (no NumPy needed).
+since (no NumPy needed). `--only <path part>` re-checks just the matching models and, with
+`--json`, keeps every other entry of the committed report (since 2026-11-26; before, it dropped
+them), so changing one model needs only its own fresh runs.
 
 ## Checkpoint store
 
