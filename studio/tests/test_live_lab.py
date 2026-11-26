@@ -18,13 +18,16 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from PySide6.QtCore import QCoreApplication, QObject, Signal  # noqa: E402
+from PySide6.QtCore import QObject, Signal  # noqa: E402
+from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from trech_studio.engine.lab import LabSession  # noqa: E402
 from trech_studio.engine.live_lab import LiveScenarioLab, describe_batch  # noqa: E402
 from trech_studio.engine.locator import EngineLocation  # noqa: E402
 
-_APP = QCoreApplication.instance() or QCoreApplication([])
+# A GUI application (conftest.py creates it first): a bare QCoreApplication here would make
+# later modules' widgets abort the process when the files run together.
+_APP = QApplication.instance() or QApplication([])
 REPO = Path(__file__).resolve().parents[2]
 EXAMPLE = REPO / "examples" / "lab" / "live_hook_tuning.js"
 
@@ -166,7 +169,7 @@ def _wait(condition, timeout=180.0):
     while not condition():
         if time.monotonic() > deadline:
             raise AssertionError("timed out waiting for the live lab")
-        QCoreApplication.processEvents()
+        QApplication.processEvents()
         time.sleep(0.01)
 
 

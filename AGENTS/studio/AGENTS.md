@@ -171,6 +171,9 @@ python -m trech_studio --open ../build/dev/out_viz_refraction   # view an existi
   If `TRECH_BIN` is unset, the locator tries newest executable builds, then PATH, with a bounded
   inspection-protocol check before selection.
 
+- **One Qt application per test process:** `studio/tests/conftest.py` creates the `QApplication`
+  before any module imports; a test module must never create a bare `QCoreApplication` (later
+  widgets then abort the whole run).
 - **Tests** (pytest, headless): [`studio/tests/test_appearance.py`](../../studio/tests/test_appearance.py) (physics
   look), [`studio/tests/test_mesh.py`](../../studio/tests/test_mesh.py) + [`studio/tests/test_metaballs.py`](../../studio/tests/test_metaballs.py)
   (meshing), [`studio/tests/test_playback.py`](../../studio/tests/test_playback.py) (timeline/remap),

@@ -125,10 +125,6 @@ needs.
   crossing/rejection and
   `membraneTargetRadius`/`integrateMembrane` spring/turgor response with particle and membrane-node
   operators; pores/species selectivity and inside/outside accounting remain declared topology.
-  Extend
-  replace `applyLangevinThermostat`, selective `stepParticle` crossing/rejection and
-  `membraneTargetRadius`/`integrateMembrane` spring/turgor response with particle and membrane-node
-  operators; pores/species selectivity and inside/outside accounting remain declared topology.
   Extend `efflux_first_order_kinetics` and `osmotic_shift_observed` with independent compound,
   concentration, temperature and pore-width runs; grade selectivity, clearance rate/half-life,
   flux direction, pressure delta, turgor/crenation and solute retention.
