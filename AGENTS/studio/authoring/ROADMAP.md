@@ -15,10 +15,11 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R6 · Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab`, and live batches redraw the viewport instead of only logging to the console (engine reinitialization is a runtime P1). Options-panel `params`, saved-edit reloads (`--watch`) and generation/refusal logging landed 2026-11-21 in **Run ▸ Start live lab**; a status widget for the active generation and a timed batch loop at `lab.targetHz` are still missing. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · All-scenario render parity: moving apparatus meshes, scalar colour bars, chart/text overlays, simultaneous streams and an all-family capture matrix. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P2** · R6 · Transform gizmos (translate/rotate/scale) on the selected volume. ([detail](#milestone-2--real-time-scenario-editing))
-- **P2** · R6 · Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics. Undo/redo landed 2026-11-22; nested creation and reparenting landed 2026-11-23 (parent control, parent-composed viewport placement). Custom material definitions and per-field engine diagnostics remain. ([detail](#milestone-2--real-time-scenario-editing))
+- **P2** · R6 · Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics. Undo/redo landed 2026-11-22; nested creation and reparenting landed 2026-11-23 (parent control, parent-composed viewport placement); custom material definitions landed 2026-11-26. Per-field engine diagnostics remain. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Callback-bearing scene round-trip: reconstruct typed declarations (`TRECH_VALUE`), companions and callback source so a run that registered hooks can be exported; `scene_to_config` still refuses `hooks.registered`. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Code editor: inline error markers, dynamic aliases/computed properties, template interpolation and complete config-schema completion (from Milestone 0). ([detail](../ROADMAP.md#milestone-0--the-basis-this-scaffold-landed-2026-07-11))
 - **P3** · R6 · Dependency packaging refuses model files the recorded run never opened (strict mode or a disabled optics/stratifier loader records no SHA-256), so such transport runs cannot be exported with their declared model; files a model names internally are not followed. ([detail](#milestone-2--real-time-scenario-editing))
+- **P3** · R6 · Custom material residuals (2026-11-26): Studio cannot check a `G4_*` component or world/volume material name offline (the engine drops an unknown component with a warning and reports `material_fallback` only after the exported scenario runs); ship Geant4's NIST material list with Studio or ask `trech inspect` to resolve names. A material cannot be renamed in the Inspector (references would need rewriting). ([detail](#milestone-2--real-time-scenario-editing))
 - **P3** · R6 · JavaScript engine selector in Run settings: pass `--js-engine quickjs|v8` to runs and the live lab when the engine binary has V8 (today only an inherited `TRECH_JS_ENGINE` selects it). ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P3** · R6 · Live authoring extensions: asynchronous inspection, draft persistence, crash recovery, atomic multi-file saves, source-content provenance, widget layout, workflow jobs, validated model/kernel hot swap. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 
@@ -128,7 +129,19 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   both anchors; the old `tools/viz` assertion (+Z to −Y for `[90, 0, 0]`) was the active sense and
   is now +Y. No bundled scenario rotates a shape that is not symmetric under the change, so no
   reference media changed.
-- [ ] Inspector extensions: custom material definitions, per-field engine diagnostics and crash
+- [x] **Custom material definitions (2026-11-26):** **Add custom material…** in World and an
+  editable Inspector for authored materials (density, SMILES label, one-per-line components by
+  element or material, fraction or atoms, optional isotope `A`), plus **Remove material from
+  draft**. `scene/materials.py` applies the engine's `buildCustomMaterials` rules before Apply;
+  the writer validates new and changed entries and refuses removing a material still in use.
+  `RunAction` now emits `element`/`atoms`/`massNumber` per viz-scene component (older scenes lost
+  them; the Inspector falls back to the recorded config). Evidence: a Geant4 run of an exported
+  draft with `brine` (G4_WATER + Na + Cl) nested in `salted_heavy` (with the recorded deuterated
+  `heavy_water`) built every material with no `geometry_resolution` record, while the same export
+  with an undeclared volume material reported one `material_fallback` to G4_AIR; the run's viz
+  scene loads back with components equal to the recorded config. Studio pytest 391/391,
+  `tools/viz` 20/20, Release CTest 81/81.
+- [ ] Inspector extensions: per-field engine diagnostics and crash
   recovery. Current
   Inspector drafts require a matching, exportable transport run; callback/model-bearing scenarios
   continue through the source editor and typed Options.

@@ -70,6 +70,20 @@ matrices and `bounds_mm` use it. Rotations are `(Rz·Ry·Rx)ᵀ` (`euler_matrix`
 `js/trech_geometry.js` (overlap bounds) on the same rule. The volume inspector removes a leaf volume from the draft.
 The writer rejects case-insensitive name collisions, new names reserved for built-in parents,
 and removal of a parent still referenced by a child.
+**Custom materials:** `scene/materials.py` holds the Inspector's one-per-line component text
+(`format_components`/`parse_components`: `element|material <name>` + `fraction <x>` or
+`atoms <n>`, optional `A <massNumber>`), `validate_material` (the engine's
+`buildCustomMaterials` rules: positive density, at least one component, element symbols Z 1–118
+with A ≥ Z, all-or-none stoichiometric elements, material components `G4_*` or an earlier custom
+material, no `G4_` prefix for new names) and `material_references`. `MaterialDef.authored` is
+false for derived-optics aliases, which stay read-only. The writer validates each new or changed
+material on the written entry (unchanged fields keep the recorded config), keeps new entries
+minimal (no empty `smiles`) and refuses removing a recorded material still used by the world,
+medium, a volume or another material. The Inspector seeds component text from the recorded config
+when its `{material, fraction}` projection matches the scene, because viz scenes before
+2026-11-26 dropped `element`/`atoms`/`massNumber` (`RunAction` now emits them); untouched text
+keeps the model's components so a no-op Apply stays a no-op. Tests: `studio/tests/test_scene_materials.py`
+(includes a strict `trech inspect` round-trip of nested custom materials).
 Apply builds a detached candidate, validates it through the same lossless writer, and only then
 updates the scene/Outliner/viewport. Each applied draft is recorded in `scene/history.SceneHistory`
 (pure data, deep-copied before/after snapshots with their selections, 100-edit limit); **Edit ▸

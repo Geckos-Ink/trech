@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
     QLineEdit,
+    QPlainTextEdit,
     QPushButton,
     QLabel,
     QScrollArea,
@@ -23,7 +24,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..scene.model import SceneModel, Shape, VolumeNode
+from ..scene.materials import format_components, material_references, parse_components, project_components
+from ..scene.model import MaterialDef, SceneModel, Shape, VolumeNode
 from ..precision import PrecisionReport
 
 
@@ -193,6 +195,20 @@ class Inspector(QScrollArea):
                     vol.shape = Shape(type=shape_type, outer_radius_mm=number("outer_radius"),
                                       inner_radius_mm=number("inner_radius"),
                                       length_mm=number("length") if shape_type != "sphere" else 0.)
+            elif kind in ("material", "new_material"):
+                if kind == "new_material":
+                    name = self._fields["name"].text().strip()
+                    mat = MaterialDef(name=name)
+                    candidate.materials.append(mat)
+                    kind, seeded = "material", []
+                else:
+                    mat = candidate.material_by_name(name)
+                    seeded = self._material_components(mat)
+                mat.density_gcm3 = number("density")
+                mat.smiles = self._fields["smiles"].text().strip()
+                components = parse_components(self._fields["components"].toPlainText())
+                if components != seeded:  # untouched text keeps the recorded composition exactly
+                    mat.components = components
             elif kind == "beam":
                 beam = next(b for b in candidate.beams if (b.name or b.particle) == name)
                 beam.particle = self._fields["particle"].text().strip()
@@ -225,6 +241,10 @@ class Inspector(QScrollArea):
             add.setObjectName("add_scene_volume")
             add.clicked.connect(self._show_new_volume)
             self._layout.addWidget(add)
+            add_material = QPushButton("Add custom material…", self._body)
+            add_material.setObjectName("add_scene_material")
+            add_material.clicked.connect(self._show_new_material)
+            self._layout.addWidget(add_material)
         else:
             world.addRow("material", QLabel(s.world_material))
             world.addRow("size (mm)", QLabel(f"{s.world_size_mm:.3g}"))
@@ -449,16 +469,85 @@ class Inspector(QScrollArea):
         form.addRow("active", QLabel("yes" if beam.active else "no"))
         self._layout.addStretch(1)
 
+    def _material_components(self, mat: MaterialDef) -> list:
+        """The material's components in config form. A viz scene older than 2026-11-26
+        records only ``{material, fraction}``, so when the recorded config's entry projects
+        onto the scene's components the recorded (lossless) composition is used instead."""
+        recorded = next((m for m in self._source_config.get("materials", [])
+                         if str(m.get("name", "")).lower() == mat.name.lower()), None)
+        if recorded is not None:
+            components = recorded.get("components", [])
+            if project_components(components) == project_components(mat.components):
+                return deepcopy(components)
+        return deepcopy(mat.components)
+
+    def _material_fields(self, form, mat: MaterialDef) -> None:
+        self._number_field(form, "density (g/cm³)", "density", mat.density_gcm3)
+        self._text_field(form, "SMILES (label)", "smiles", mat.smiles)
+        field = QPlainTextEdit(format_components(self._material_components(mat)), self._body)
+        field.setObjectName("scene_components")
+        field.setPlaceholderText("element H atoms 2\nelement O atoms 1\n"
+                                 "— or — material G4_WATER fraction 0.9")
+        field.setMinimumHeight(90)
+        self._fields["components"] = field
+        form.addRow("components", field)
+        note = QLabel("One component per line: 'element <symbol>' or 'material <G4_* or an earlier "
+                      "custom material>', then 'fraction <x>' (renormalised by the engine) or "
+                      "'atoms <n>' (then on every line), optionally 'A <mass number>' for an isotope. "
+                      "Geant4 builds the material when the exported scenario runs.", self._body)
+        note.setWordWrap(True)
+        note.setProperty("role", "warn")
+        self._layout.addWidget(note)
+
+    def _show_new_material(self) -> None:
+        self._clear()
+        form = self._section("New custom material")
+        self._text_field(form, "name", "name", "")
+        self._material_fields(form, MaterialDef(name="", density_gcm3=1.0))
+        self._apply_button("new_material", "", label="Add to scene draft")
+        cancel = QPushButton("Cancel", self._body)
+        cancel.clicked.connect(self._show_world)
+        self._layout.addWidget(cancel)
+        self._layout.addStretch(1)
+        self._fields["name"].setFocus()
+
+    def _remove_material(self, name: str) -> None:
+        s = self._scene
+        uses = material_references(name, world=s.world_material,
+                                   medium=s.medium_material if s.medium_size_mm else None,
+                                   volumes=s.volumes, materials=s.materials)
+        if uses:
+            self.show_edit_error(f"{name} is still used by {', '.join(uses)}")
+            return
+        candidate = deepcopy(s)
+        candidate.materials.remove(candidate.material_by_name(name))
+        self.edit_requested.emit(candidate, "world", "")
+
     def _show_material(self, name: str) -> None:
         self._clear()
         mat = self._scene.material_by_name(name)
         if mat is None:
             self._show_placeholder(f"material '{name}' not found")
             return
+        editable = self._editable and mat.authored
+        if editable:
+            self._edit_note()
         form = self._section(f"Material · {mat.name}")
-        form.addRow("density (g/cm³)", QLabel(f"{mat.density_gcm3:.4g}"))
-        if mat.smiles:
-            form.addRow("SMILES", QLabel(mat.smiles))
+        if editable:
+            self._material_fields(form, mat)
+            self._apply_button("material", mat.name)
+            remove = QPushButton("Remove material from draft", self._body)
+            remove.setObjectName("remove_scene_material")
+            remove.clicked.connect(lambda: self._remove_material(mat.name))
+            self._layout.addWidget(remove)
+        else:
+            form.addRow("density (g/cm³)", QLabel(f"{mat.density_gcm3:.4g}"))
+            if mat.smiles:
+                form.addRow("SMILES", QLabel(mat.smiles))
+            if mat.authored and mat.components:
+                form.addRow("components", QLabel(format_components(self._material_components(mat))))
+            elif not mat.authored:
+                form.addRow("source", QLabel("Geant4 material seen by derived optics (not authored)"))
         if mat.optics_available:
             # Derive the look at a nominal 20 mm body (opacity is thickness-dependent; the rest
             # — reflectance, tint, refractive index — is not). Volumes show their own thickness.

@@ -48,6 +48,27 @@ def _parse_volume(raw: Dict) -> VolumeNode:
     )
 
 
+def _component(raw: Dict) -> Dict:
+    """A viz-scene component in config form (``material``/``element`` + amount).
+
+    Scenes since 2026-11-26 carry ``element``/``atoms``/``massNumber``; older ones record only
+    ``material`` and ``fraction``, so an element component reads as an empty entry and the
+    Inspector takes the composition from the recorded config instead.
+    """
+    out: Dict = {}
+    if raw.get("material"):
+        out["material"] = str(raw["material"])
+    if raw.get("element"):
+        out["element"] = str(raw["element"])
+    if int(raw.get("atoms") or 0) > 0:
+        out["atoms"] = int(raw["atoms"])
+    else:
+        out["fraction"] = float(raw.get("fraction") or 0.0)
+    if int(raw.get("massNumber") or 0) > 0:
+        out["massNumber"] = int(raw["massNumber"])
+    return out
+
+
 def _parse_materials(raw: Dict) -> List[MaterialDef]:
     """Merge config-level ``materials`` with per-material ``derived_optics``."""
     materials: Dict[str, MaterialDef] = {}
@@ -59,7 +80,7 @@ def _parse_materials(raw: Dict) -> List[MaterialDef]:
             name=name,
             density_gcm3=float(m.get("density_gcm3") or 0.0),
             smiles=str(m.get("smiles") or ""),
-            components=list(m.get("components") or []),
+            components=[_component(c) for c in m.get("components") or []],
         )
 
     for d in raw.get("derived_optics") or []:
@@ -70,7 +91,8 @@ def _parse_materials(raw: Dict) -> List[MaterialDef]:
                 continue
             mat = materials.get(str(key).lower())
             if mat is None:
-                mat = MaterialDef(name=str(key), density_gcm3=float(d.get("density_gcm3") or 0.0))
+                mat = MaterialDef(name=str(key), density_gcm3=float(d.get("density_gcm3") or 0.0),
+                                  authored=False)
                 materials[str(key).lower()] = mat
             mat.display_rgb = _triplet(rgb, default=1.0)
             mat.mean_refractive_index = float(d.get("mean_refractive_index") or 1.0)

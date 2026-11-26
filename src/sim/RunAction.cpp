@@ -306,9 +306,21 @@ void writeVizSceneManifest(const TrechConfig& cfg, const RunOptions& options,
     }
     auto components = nlohmann::json::array();
     for (const auto& component : material.components) {
+      // Lossless: element, stoichiometric atoms and isotope mass number are
+      // emitted when the config declares them, so Studio's Inspector can show
+      // and edit the authored composition (viz output only; no config hash).
       nlohmann::json comp;
       comp["material"] = component.material;
       comp["fraction"] = component.fraction;
+      if (!component.element.empty()) {
+        comp["element"] = component.element;
+      }
+      if (component.atoms > 0) {
+        comp["atoms"] = component.atoms;
+      }
+      if (component.massNumber > 0) {
+        comp["massNumber"] = component.massNumber;
+      }
       components.push_back(comp);
     }
     entry["components"] = components;

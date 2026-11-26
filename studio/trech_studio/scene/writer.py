@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Sequence
 
 from .dependencies import DEFAULT_DEPENDENCY_DIR, SceneBundle, package_dependencies
 from .loader import scene_from_viz_data
+from .materials import material_references, validate_material
 from .model import Beam, SceneModel, Shape, VolumeNode
 
 _BUILTIN_PARENTS = {"world", "medium", "mediumbox", "medium_box"}
@@ -243,6 +244,7 @@ def scene_to_config(scene: SceneModel, base_config: Optional[Dict] = None, *,
     old_materials = {m.name.lower(): m for m in baseline.materials} if baseline else {}
     materials = []
     names = set()
+    declared: List[str] = []  # authored materials before this one (engine build order)
     for material in scene.materials:
         key = material.name.lower()
         if not key or key in names:
@@ -255,19 +257,32 @@ def scene_to_config(scene: SceneModel, base_config: Optional[Dict] = None, *,
             if material != old:
                 raise ValueError(f"{material.name} is derived appearance, not an authored material")
             continue
+        if not material.authored:
+            raise ValueError(f"{material.name} is derived appearance, not an authored material")
         entry = deepcopy(original) if original is not None else {"name": material.name}
+        changed = old is None or any(getattr(material, attr) != getattr(old, attr)
+                                     for attr in ("density_gcm3", "smiles", "components"))
         for attr, field in (("density_gcm3", "densityGcm3"), ("smiles", "smiles"),
                             ("components", "components")):
             value = getattr(material, attr)
             if old is None or value != getattr(old, attr):
-                if attr == "density_gcm3":
-                    _number(value, "material density")
-                    if value < 0:
-                        raise ValueError("material density must be nonnegative")
-                if attr == "components" and any(not (c.get("material") or c.get("element")) for c in value):
-                    raise ValueError("Material components need an explicit material or element")
+                if attr == "smiles" and not value and field not in entry:
+                    continue  # an empty SMILES is the engine default; keep new entries minimal
                 entry[field] = deepcopy(value)
+        if changed:
+            # A new or edited custom material must be one the engine builds as declared. Check
+            # the written entry: unchanged fields keep the recorded (lossless) config values.
+            validate_material(material.name, entry.get("densityGcm3", 0.0), entry.get("components", []),
+                              earlier=declared, new=original is None)
+        declared.append(material.name)
         materials.append(entry)
+    for key, old in old_materials.items():
+        if key not in names and key in originals:
+            uses = material_references(old.name, world=scene.world_material,
+                                       medium=scene.medium_material if scene.medium_size_mm else None,
+                                       volumes=scene.volumes, materials=scene.materials)
+            if uses:
+                raise ValueError(f"Material {old.name} is still used by {', '.join(uses)}")
     # A partial/older viz snapshot may omit unused canonical materials. Their
     # absence from the editable model is not an authored deletion.
     materials.extend(deepcopy(value) for key, value in originals.items()

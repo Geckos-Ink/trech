@@ -41,6 +41,10 @@ class MaterialDef:
     density_gcm3: float = 0.0
     smiles: str = ""
     components: List[Dict] = field(default_factory=list)
+    # True for a config-level (authored) material; False for a lookup alias that only the
+    # run's derived optics introduced (a NIST material such as G4_AIR). Only authored
+    # materials are edited in the Inspector or written back to config.
+    authored: bool = True
     # Derived (never authored) — filled from derived_optics when present.
     display_rgb: Optional[Vec3] = None
     mean_refractive_index: Optional[float] = None

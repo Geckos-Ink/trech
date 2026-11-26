@@ -55,7 +55,10 @@ shape/pose/material and single/named beam particle/energy, direction/origin, dis
 divergence cone half-angle and fractional energy sigma through **Apply scene draft**. Use
 **Add primitive volume…** in World and **Remove volume from draft** on a leaf volume; the
 **parent** control nests a new volume or reparents an existing one (position and rotation are
-relative to the parent, and the viewport composes parents). Source
+relative to the parent, and the viewport composes parents). **Add custom material…** in World
+defines a `materials[]` entry (density plus element/material components by fraction or atoms,
+optional isotope mass number), and an authored material's Inspector edits or removes it
+([guide](../docs/studio/studio_authoring.md)). Source
 controls start from the recorded config and preserve untouched spectrum/polarization settings. The
 viewport updates after validation; recorded playback is hidden because it belongs to the original
 geometry. Run summary and Emits retain the original recorded results. Export and open the new JS

@@ -1338,7 +1338,7 @@ Top-level fields:
 - `world` (object): `{size_mm, material, temperature_k, pressure_atm}`.
 - `medium` (object, optional): `{size_mm, material}` when `detector.mediumBoxMm > 0`.
 - `volumes` (array[object]): each entry includes `name`, `material`, `parent`, `position_mm`, `rotation_deg`, `shape{type, size_mm, outer_radius_mm, inner_radius_mm, length_mm}`, `tags`, `score_edep`. The `tags` list is the visualization channel: `viz_emitter` / `viz_forced_white` make a volume render with a forced look in `tools/viz/`; everything else takes its color and opacity from `derived_optics`.
-- `materials` (array[object]): config-level composition `{name, smiles?, density_gcm3, components[]}`.
+- `materials` (array[object]): config-level composition `{name, smiles?, density_gcm3, components[]}`. Each component carries `material` and `fraction` (empty and `0` for an element component), plus `element`, `atoms` and `massNumber` when the config declares them (since 2026-11-26; older scenes omit them, so a viewer that needs the exact composition reads the recorded `config_json`).
 - `derived_optics` (array[object], present when `optics.derive.enable`): per-material derived optical constants. Each entry:
   - `material_name` (string), `config_material_key` (string), `density_gcm3` (number), `mean_molar_mass_g_per_mol` (number), `number_density_per_cm3` (number).
   - `mean_refractive_index`, `mean_absorption_length_mm`, `mean_scatter_length_mm` (numbers): scalar reporting fields across the visible band.

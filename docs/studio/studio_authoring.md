@@ -109,6 +109,42 @@ keeps it open. Failed/cancelled exports also keep the draft. Reload the run to r
 after Discard. Opening an output directory without `trech_viz_scene.json` leaves the current run
 and scene together. Live lab patches, gizmos and arbitrary source reconstruction remain open.
 
+**Custom materials (since 2026-11-26).** A custom material is a `materials[]` entry in the
+engine config: a name, a density and components that Geant4 mixes when the scenario runs. Select
+World and choose **Add custom material…**, or select an authored material under **materials** in
+Outliner to edit it. Write one component per line:
+
+```text
+element H atoms 2 A 2        # deuterium (A is the mass number of a pure isotope)
+element O atoms 1
+```
+
+or, by mass fraction,
+
+```text
+material G4_WATER fraction 0.96
+element Na fraction 0.016
+element Cl fraction 0.024
+```
+
+A component is an element symbol or a material: a Geant4 NIST `G4_*` name, or a custom material
+listed *before* this one (the engine builds them in order). The engine renormalises fractions over
+the components it resolves, so they need not sum to one. A material that uses `atoms` must use it
+on every line, and every line must then be an element. Before Apply builds the draft, Studio refuses
+what the engine would skip or reject: no density, no components, an unknown element symbol, a mass
+number below the element's Z, a material that contains itself or a later material, mixed `atoms`
+and fractions, and a new name in Geant4's `G4_` namespace. A new material then appears in every
+**material** list, so a volume or the world can use it. **Remove material from draft** is refused
+while the world, the medium box, a volume or another material still uses it. Materials that only
+the run's derived optics listed (such as `G4_AIR`) are Geant4's own and stay read-only. SMILES is
+a label; it does not change the composition. Studio cannot check a `G4_*` name offline: when the
+exported scenario runs, an unknown one is dropped with a Geant4 warning, and a volume whose
+material could not be built is reported as `material_fallback` in `geometry_resolution`. A new
+material has no derived optics until a run derives them, so the viewport draws it with the neutral
+placeholder colour. Untouched component text keeps the recorded composition exactly, isotopes
+included; viz scenes written before 2026-11-26 recorded only `material` and `fraction` per
+component, so the Inspector reads the composition from the run's recorded config.
+
 **Undo and redo.** **Edit ▸ Undo scene edit** (Ctrl+Z / Cmd+Z) restores the scene as it was
 before the last applied draft, and **Edit ▸ Redo scene edit** (Shift+Ctrl+Z / Shift+Cmd+Z)
 re-applies it. The menu names the edit (for example *Undo scene edit (beam proton)*). Undo also
