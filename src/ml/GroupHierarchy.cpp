@@ -140,6 +140,18 @@ GroupHierarchyResult GroupHierarchy::run(const GroupLiftInput& input,
   pop.weights = input.weights.size() == input.count
                     ? input.weights
                     : std::vector<double>(input.count, 1.0);
+  // A weight is how many base elements a member stands for: it must be finite and positive.
+  // Trech.Methods.Group's moment and centroid theorems need non-negative weights, and only
+  // positive ones rule out a zero-weight group (NaN centroid) or cancelling weights at any depth
+  // (liftWeight_pos), so the run refuses anything else rather than lifting it.
+  for (double w : pop.weights) {
+    if (!(std::isfinite(w) && w > 0.0)) {
+      result.stopReason = "invalid_weight";
+      skipRemaining(&result, levels, 0);
+      for (auto& lr : result.levels) lr.skipReason = "invalid_weight";
+      return result;
+    }
+  }
   pop.valid.assign(input.count, 1);
   pop.inDomain.assign(input.count, 1);
   pop.starved.assign(input.count, 0);
@@ -283,6 +295,11 @@ GroupHierarchyResult GroupHierarchy::run(const GroupLiftInput& input,
           lr.positions[g * 3 + a] = centroid[a];
         }
       }
+      // Lineage flags pass to a blocked group too (Trech.Methods.Group.flag_of_descendant): a
+      // group whose evaluation is blocked still descends from its members' out-of-domain or
+      // starved elements, so its effective flags never read cleaner than its members'.
+      lr.inDomain[g] = memberOutOfDomain ? 0 : 1;
+      lr.groupStarved[g] = memberStarved ? 1 : 0;
       if (list.size() > layout.elements) {
         ++lr.overflow;
         ++lr.blocked;

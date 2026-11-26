@@ -79,6 +79,15 @@ def main() -> int:
     check(w == 3.0 and c == (2.0, 4.0, 0.0), "the centroid is weight-averaged")
 
     expected = json.loads((FIXTURE / "expected.json").read_text())
+    for bad_weight in (0.0, -1.0, float("nan")):
+        case = json.loads(json.dumps(expected["cases"][0]))
+        case["weight"] = [1.0] * len(case["features"]["q"])
+        case["weight"][3] = bad_weight
+        try:
+            hierarchy.build_structure(case, plan)
+            check(False, f"a weight of {bad_weight} is refused, as ctx.lift refuses it")
+        except ValueError as exc:
+            check("finite and positive" in str(exc), f"weight refusal names the rule (got: {exc})")
     for case in expected["cases"]:
         structure = hierarchy.build_structure(case, plan)
         for k, level_struct in enumerate(structure):

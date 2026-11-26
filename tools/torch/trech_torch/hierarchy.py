@@ -189,6 +189,8 @@ def build_structure(sample: dict, plan: dict) -> List[dict]:
     count = sample_count(sample)
     positions = _sample_positions(sample, count)
     weights = [float(w) for w in sample.get("weight") or [1.0] * count]
+    if not all(math.isfinite(w) and w > 0.0 for w in weights):
+        raise ValueError("sample weight must be finite and positive (as ctx.lift requires)")
     levels = []
     for level in plan["levels"]:
         ids = (sample.get("groups") or {}).get(level["name"])

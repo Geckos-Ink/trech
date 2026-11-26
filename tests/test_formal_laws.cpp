@@ -1375,19 +1375,134 @@ void groupPairs() {
                                 finitePos, std::vector<double>(finitePos.size(), 1.0), 0.0, 0.0));
   expect(formal::checkAgreement("group.lift_unweighted_negative_control", "", unweightedPos, directPos, 1e-13, 1e-13),
          false);
-  // Negative control: a group whose members weigh zero has no centroid (NaN), the excluded case.
-  trech::ml::GroupLiftInput zero;
-  zero.count = 2;
-  zero.featureNames = {"q"};
-  zero.features = {1.0, 2.0};
-  zero.hasPositions = true;
-  zero.positions = {0.2, 0.2, 0.2, 0.4, 0.4, 0.4};
-  zero.weights = {0.0, 0.0};
-  zero.context["g"] = 0.0;
-  const auto run = trech::ml::GroupHierarchy::run(zero, {levels[0]});
-  expect(formal::checkAgreement("group.zero_weight_negative_control", "", {run.levels.at(0).positions.at(0)}, {0.3},
-                                1e-12, 0.0),
+}
+
+void liftLineagePairs() {
+  // Trech.Methods.Group lineage (liftFlag) on GroupHierarchy::run: the three-level fixtures with
+  // an out-of-domain outlier, a cell over capacity (blocked) and both, so flags are raised by the
+  // levels themselves. A flagged element (blocked, out of domain or starved) flags its ancestor at
+  // every higher level (flag_of_descendant); when the levels above the first raise nothing of
+  // their own, a top group is flagged exactly when a first-level group under it is
+  // (liftFlag_no_local).
+  const std::string dir = std::string(TRECH_SOURCE_DIR) + "/tests/fixtures/ml_group_hierarchy/";
+  trech::ml::GenericSurrogate cell, block, system;
+  if (!cell.load(dir + "cell.json") || !block.load(dir + "block.json") || !system.load(dir + "system.json")) {
+    throw std::runtime_error("Group-lift fixtures failed to load");
+  }
+  using Spec = trech::ml::GroupLevelSpec;
+  std::vector<Spec> levels(3);
+  levels[0] = {"cell", trech::ml::DimensionScale::kNano, &cell, Spec::Grouping::kCell, cell.groupLift().cellSize, {}, 0.0};
+  levels[1] = {"block", trech::ml::DimensionScale::kMicro, &block, Spec::Grouping::kCell, block.groupLift().cellSize, {}, 0.0};
+  levels[2] = {"system", trech::ml::DimensionScale::kMeso, &system, Spec::Grouping::kAll, 0.0, {}, 4.0};
+  const std::size_t capacity = cell.setLayout().elements;
+  const auto expected = nlohmann::json::parse(std::ifstream(dir + "expected.json"));
+  std::size_t pairsChecked = 0, flaggedPairs = 0, missed = 0, exactChecked = 0, exactMismatch = 0;
+  std::size_t blockedWithOodMember = 0, oldRuleMissed = 0;
+  for (const auto& c : expected.at("cases")) {
+    trech::ml::GroupLiftInput base;
+    base.featureNames = {"q"};
+    base.features = c.at("features").at("q").get<std::vector<double>>();
+    base.count = base.features.size();
+    base.hasPositions = true;
+    const auto x = c.at("positions").at("x").get<std::vector<double>>();
+    const auto y = c.at("positions").at("y").get<std::vector<double>>();
+    const auto z = c.at("positions").at("z").get<std::vector<double>>();
+    for (std::size_t i = 0; i < base.count; ++i) base.positions.insert(base.positions.end(), {x[i], y[i], z[i]});
+    base.context["g"] = c.at("context").at("g").get<double>();
+    if (base.count < capacity + 2) throw std::runtime_error("Group-lift lineage case too small");
+    std::vector<trech::ml::GroupLiftInput> variants;
+    for (std::size_t j : {std::size_t{0}, base.count / 2, base.count - 1}) {  // one outlier each
+      auto v = base;
+      v.features[j] = 1e3;
+      variants.push_back(v);
+    }
+    auto over = base;  // capacity + 1 elements in the cell of element 0
+    for (std::size_t i = 1; i <= capacity; ++i)
+      for (int a = 0; a < 3; ++a) over.positions[i * 3 + a] = over.positions[a];
+    variants.push_back(over);
+    // Both: an outlier in a different cell of the same block as the overflowing cell.
+    auto both = over;
+    for (int a = 0; a < 3; ++a) both.positions[(capacity + 1) * 3 + a] = std::floor(both.positions[a] / 2.0) * 2.0 +
+        (std::floor(both.positions[a]) - std::floor(both.positions[a] / 2.0) * 2.0 < 0.5 ? 1.5 : 0.5);
+    both.features[capacity + 1] = 1e3;
+    variants.push_back(both);
+    for (const auto& input : variants) {
+      const auto run = trech::ml::GroupHierarchy::run(input, levels);
+      std::vector<const trech::ml::GroupLevelResult*> ran;
+      for (const auto& lr : run.levels) if (lr.ran) ran.push_back(&lr);
+      auto flags = [](const trech::ml::GroupLevelResult& lr, std::size_t g, int which) {
+        return which == 0 ? !lr.valid[g] : which == 1 ? !lr.inDomain[g] : lr.groupStarved[g] != 0;
+      };
+      for (std::size_t lo = 0; lo + 1 < ran.size(); ++lo) {
+        for (std::size_t m = 0; m < ran[lo]->groups; ++m) {
+          std::size_t anc = m;
+          for (std::size_t hi = lo + 1; hi < ran.size(); ++hi) {
+            anc = static_cast<std::size_t>(ran[hi]->parent[anc]);
+            for (int which = 0; which < 3; ++which) {
+              ++pairsChecked;
+              if (!flags(*ran[lo], m, which)) continue;
+              ++flaggedPairs;
+              if (!flags(*ran[hi], anc, which)) ++missed;
+            }
+          }
+        }
+      }
+      // A blocked level-2 group with an out-of-domain member: before 2026-11-26 the engine
+      // reported it in domain (the rule this check rejects).
+      if (ran.size() >= 2) {
+        const auto& lo = *ran[0];
+        const auto& hi = *ran[1];
+        for (std::size_t m = 0; m < lo.groups; ++m) {
+          const auto g = static_cast<std::size_t>(hi.parent[m]);
+          if (!lo.inDomain[m] && !hi.valid[g]) {
+            ++blockedWithOodMember;
+            if (hi.inDomain[g]) ++oldRuleMissed;
+          }
+        }
+      }
+      bool quiet = ran.size() == 3;  // levels above the first raise no flag of their own
+      for (std::size_t k = 1; quiet && k < ran.size(); ++k)
+        quiet = ran[k]->localOutOfDomain == 0 && ran[k]->localStarved == 0 && ran[k]->overflow == 0 &&
+                ran[k]->blocked == ran[k]->blockedByMembers;
+      if (!quiet) continue;
+      for (int which = 0; which < 3; ++which) {
+        bool any = false;
+        for (std::size_t m = 0; m < ran[0]->groups; ++m) any = any || flags(*ran[0], m, which);
+        ++exactChecked;
+        if (any != flags(*ran[2], 0, which)) ++exactMismatch;
+      }
+    }
+  }
+  if (flaggedPairs < 10 || exactChecked < 6 || blockedWithOodMember == 0)
+    throw std::runtime_error("Group-lift lineage conformance raised too few flags");
+  expect(formal::checkAgreement("group.lineage_reaches_ancestor", "Trech.Methods.Group.flag_of_descendant",
+                                {static_cast<double>(missed)}, {0.0}, 0.0, 0.0));
+  expect(formal::checkAgreement("group.lineage_exact_without_local", "Trech.Methods.Group.liftFlag_no_local",
+                                {static_cast<double>(exactMismatch)}, {0.0}, 0.0, 0.0));
+  expect(formal::checkAgreement("group.lineage_blocked_inherits", "Trech.Methods.Group.flag_of_descendant",
+                                {static_cast<double>(oldRuleMissed)}, {0.0}, 0.0, 0.0));
+  std::printf("  lineage: %zu ancestor pairs (%zu flagged), %zu exact top checks, %zu blocked groups with an "
+              "out-of-domain member\n", pairsChecked, flaggedPairs, exactChecked, blockedWithOodMember);
+  // Negative control: the pre-fix rule (a blocked group reads in domain) misses those groups.
+  expect(formal::checkAgreement("group.lineage_old_rule_negative_control", "",
+                                {static_cast<double>(blockedWithOodMember)}, {0.0}, 0.0, 0.0),
          false);
+  // Weights: a non-positive or non-finite weight is refused, never lifted.
+  for (double bad : {0.0, -1.0, std::nan("")}) {
+    trech::ml::GroupLiftInput input;
+    input.count = 2;
+    input.featureNames = {"q"};
+    input.features = {1.0, 2.0};
+    input.hasPositions = true;
+    input.positions = {0.2, 0.2, 0.2, 0.4, 0.4, 0.4};
+    input.weights = {1.0, bad};
+    input.context["g"] = 0.0;
+    const auto refused = trech::ml::GroupHierarchy::run(input, levels);
+    const bool ok = refused.stopReason == "invalid_weight" && refused.levelsRun == 0 &&
+                    refused.levels.size() == levels.size() && refused.levels[0].skipReason == "invalid_weight";
+    expect(formal::checkAgreement("group.invalid_weight_refused", "Trech.Methods.Group.liftWeight_pos",
+                                  {ok ? 1.0 : 0.0}, {1.0}, 0.0, 0.0));
+  }
 }
 
 void leastSquaresPairs() {
@@ -1859,6 +1974,7 @@ int main(int argc, char** argv) {
     domainPairs();
     setPoolPairs();
     groupPairs();
+    liftLineagePairs();
     leastSquaresPairs();
     routePairs();
     arbiterPairs();

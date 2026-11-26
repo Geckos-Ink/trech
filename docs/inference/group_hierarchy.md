@@ -74,8 +74,16 @@ id, or `"all"`) mean the same thing in labels and at run time.
   blocked (`overflow`). A group containing a blocked member is blocked (`blockedByMembers`).
   Blocked groups publish NaN and `valid:false`. A missing member feature, context input,
   position or length skips the level and every level above it with a named `skipReason`.
+- **Weights are positive.** A weight is the number of base elements a member stands for, so it
+  must be finite and greater than zero. `ctx.lift` throws a `RangeError` naming the first bad
+  element (for example `spec.weight[2]` = 0); a direct `GroupHierarchy::run` call skips every
+  level with `skipReason: "invalid_weight"` and `stopReason: "invalid_weight"`. A zero weight used
+  to give a NaN group position, and negative weights could cancel a group's weight.
 - **Trust propagates up.** A group is out of domain (or starved) when its own inputs are or when
-  any member's lineage is. `localOutOfDomain`/`localStarved` keep the model's own checks. A level
+  any member's lineage is. This holds for blocked groups too (since 2026-11-26): a group blocked
+  by a sibling's overflow still reports `inDomain: false` when one of its members is out of
+  domain, where it used to read as in domain. The rule is proved for any depth in
+  [`Trech.Methods.Group`](../engine/formal_laws.md): a flagged element always flags its ancestors. `localOutOfDomain`/`localStarved` keep the model's own checks. A level
   run at a band its model was not trained on, or above such a level, reports `scaleMismatch`.
 - **Absent slots never trip coverage.** They are filled with the model's input means
   (`present = 0`), so they standardize to zero and take no part in the set arithmetic.
@@ -90,7 +98,7 @@ id, or `"all"`) mean the same thing in labels and at run time.
 const r = ctx.lift({
   features:  { q: charges },                  // per base element (sorted by name)
   positions: { x, y, z },                     // lattice grouping and rel_*
-  weight:    weights,                         // optional, default 1
+  weight:    weights,                         // optional, default 1; finite and > 0
   context:   { g: 1.2 },                      // over the ambient Geant4 seed
   levels: [                                   // optional; omit to let the engine plan
     { model: "cell_lift", cell_size: 1.0 },
@@ -190,7 +198,7 @@ physics.
 
 ## Limits
 
-- Trained on synthetic data only; no Geant4-harvested hierarchy and no scenario user yet.
+- Trained on synthetic data only; no Geant4-harvested hierarchy yet; one scenario user (`particle_observer_cascade`).
 - No TorchScript twins, store registration (`trech-ml`), JS `defineModel` family or validator
   gates specific to hierarchies. Each level passes the ordinary v3 static gates.
 - One cubic lattice per level (no adaptive/octree or neighbour-overlapping groups). Groups do not

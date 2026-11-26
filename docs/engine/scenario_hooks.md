@@ -899,7 +899,8 @@ load. Changing either after startup requires a restart.
   those of the base elements it stands for ([law](formal_laws.md), `Trech.Methods.Group`).
   Without `levels` the engine plans the hierarchy from declared `operator_role: "group_lift"`
   models by scale. Over-capacity groups are blocked, never truncated; blocked members block their
-  ancestors. Out-of-domain/starved lineage propagates to the observer. Each group evaluation is
+  ancestors. Out-of-domain/starved lineage propagates to the observer, through blocked groups too.
+  `spec.weight` must be finite and positive (a `RangeError` otherwise). Each group evaluation is
   one inference, and strict mode returns `null`. `r.top` is the observer when the last level has
   exactly one valid group. Contract and report fields: [group lifting](../inference/group_hierarchy.md).
 

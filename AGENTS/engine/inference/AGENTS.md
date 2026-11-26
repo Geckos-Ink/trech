@@ -111,7 +111,7 @@ lattice from `origin`, explicit ids, or one group of everything) and evaluates a
 a `group_lift` block on every group's members. The groups become the next level's elements:
 features are the model outputs, position is the members' weight-centroid and weight is the sum.
 Contract: [`docs/inference/group_hierarchy.md`](../../../docs/inference/group_hierarchy.md). Status: mechanism +
-trainer tested on synthetic data only; no scenario uses it.
+trainer tested on synthetic data only; one scenario (`particle_observer_cascade`) calls it.
 
 - **Member inputs:** level-below features by name, or engine-synthesized `present`, `weight` and
   `rel_x/y/z` = (member − centroid) / length. The length is the call's `length`, else the lattice
@@ -124,7 +124,10 @@ trainer tested on synthetic data only; no scenario uses it.
   (`blockedByMembers`) and failed predictions publish NaN / `valid:false`. Missing member features,
   context, positions or length skip the level and all above it (`skipReason`,
   `lower_level_unavailable`). `top` is non-null only for one valid final group.
-- **Trust lineage:** a group's effective `inDomain`/`starved` include any member's lineage;
+- **Weights:** finite and positive, or the call is refused (`RangeError` at the JS boundary,
+  `invalid_weight` on every level in C++).
+- **Trust lineage:** a group's effective `inDomain`/`starved` include any member's lineage, blocked
+  groups included (lineage law `group.lift_lineage`);
   `localOutOfDomain`/`localStarved` are the model's own checks. Level `scaleMismatch` is local or
   inherited from a lower level. Effective counts feed `hook_predict_out_of_domain_count`; each
   evaluated group is one `hook_predict_count` inference. Strict mode returns `null`.

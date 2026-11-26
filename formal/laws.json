@@ -380,7 +380,26 @@
       "classic": [
         {"path": "src/ml/GroupHierarchy.cpp", "cites": "Trech.Methods.Group"}
       ],
-      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["group.lift_weight_direct", "group.lift_centroid_direct", "group.lift_positive_weight_finite"]}
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["group.lift_weight_direct", "group.lift_centroid_direct", "group.lift_positive_weight_finite", "group.invalid_weight_refused"]}
+    },
+    {
+      "id": "group.lift_lineage",
+      "role": "method_property",
+      "statement": "A level flags a group (blocked, out of domain or starved) when its own check raises the flag or any member is flagged. At any depth the flag is then the flags of the base elements it descends from or of the levels' own checks under it: a flagged element always flags its ancestor, an unflagged group has no flagged element under it, and when no level raises a flag of its own a group is flagged exactly when a base element under it is.",
+      "lean": {
+        "file": "formal/Trech/Methods/Group.lean",
+        "declarations": [
+          "Trech.Methods.Group.liftFlag_iff",
+          "Trech.Methods.Group.flag_of_descendant",
+          "Trech.Methods.Group.not_flag_no_descendant",
+          "Trech.Methods.Group.liftFlag_false",
+          "Trech.Methods.Group.liftFlag_no_local"
+        ]
+      },
+      "classic": [
+        {"path": "src/ml/GroupHierarchy.cpp", "cites": "Trech.Methods.Group"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["group.lineage_reaches_ancestor", "group.lineage_exact_without_local", "group.lineage_blocked_inherits"]}
     },
     {
       "id": "least_squares.split_score",

@@ -3234,6 +3234,13 @@ static JSValue jsHookLift(JSContext* ctx, JSValueConst /*this_val*/, int argc,
       JS_FreeValue(ctx, weightVal);
       return JS_ThrowTypeError(ctx, "ctx.lift spec.weight must be a numeric array");
     }
+    for (std::size_t i = 0; i < input.count; ++i) {
+      if (!(std::isfinite(input.weights[i]) && input.weights[i] > 0.0)) {
+        JS_FreeValue(ctx, weightVal);
+        return JS_ThrowRangeError(ctx, "ctx.lift spec.weight[%zu] must be finite and positive "
+                                       "(the number of base elements it stands for)", i);
+      }
+    }
   }
   JS_FreeValue(ctx, weightVal);
   JSValue originVal = JS_GetPropertyStr(ctx, spec, "origin");

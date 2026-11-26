@@ -127,7 +127,7 @@ struct GroupHierarchyResult {
   std::size_t outOfDomainInferences = 0;  // effective
   std::size_t starvedInferences = 0;      // effective
   std::size_t scaleMismatchedInferences = 0;
-  std::string stopReason = "complete";  // complete | level_skipped
+  std::string stopReason = "complete";  // complete | level_skipped | invalid_weight
 };
 
 class GroupHierarchy {

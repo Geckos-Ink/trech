@@ -2549,10 +2549,13 @@ globalThis.TRECH_HOOKS = {onInit() { return {override: {
       out << " const r=ctx.lift({features:CASE.features,positions:CASE.positions,context:CASE.context});\n";
       out << " if(r===null){ctx.emit(\"lift_strict\",{nullResult:true});return;}\n";
       out << " const none=ctx.lift({features:CASE.features,positions:CASE.positions});\n";
+      out << " let badWeight=null;try{const w=CASE.features.q.map(()=>1);w[2]=0;\n";
+      out << "  ctx.lift({features:CASE.features,positions:CASE.positions,context:CASE.context,weight:w});\n";
+      out << " }catch(e){badWeight=(e instanceof RangeError?\"range:\":\"other:\")+e.message;}\n";
       out << " ctx.emit(\"lift\",{planned:r.planned,levels:r.levels.map(l=>l.model+\":\"+l.grouping+\":\"+l.groups),\n";
       out << "  top:r.top?r.top.energy:null,inferences:r.inferenceCount,\n";
       out << "  latent:r.levels.map(l=>l.latentOutputs),parentLen:r.levels[0].parent.length,\n";
-      out << "  missing:none.levels[2].skipReason,missingTop:none.top});\n";
+      out << "  missing:none.levels[2].skipReason,missingTop:none.top,badWeight});\n";
       out << "}};\n";
     }
     trech::JsRuntime js;
@@ -2582,6 +2585,9 @@ globalThis.TRECH_HOOKS = {onInit() { return {override: {
                          "Expected one parent index per base element.");
       failures += expect(p.at("missing") == "missing_context" && p.at("missingTop").is_null(),
                          "Expected a missing context input to leave the observer null.");
+      failures += expect(p.at("badWeight").is_string() &&
+                             p.at("badWeight").get<std::string>().rfind("range:ctx.lift spec.weight[2]", 0) == 0,
+                         "Expected a zero ctx.lift weight to throw a RangeError naming the element.");
       const long long inferences = p.at("inferences").get<long long>();
       // Both calls count their group evaluations (the second stops below the top).
       failures += expect(report.predictCount == static_cast<std::size_t>(2 * inferences - 1),

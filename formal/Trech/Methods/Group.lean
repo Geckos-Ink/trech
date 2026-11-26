@@ -232,6 +232,79 @@ theorem liftWeight_pos (ks : List (ι → ι)) (w : ι → ℝ) (hw : ∀ i, 0 <
   obtain ⟨i, -, hi⟩ := Finset.mem_image.1 hg
   exact Finset.sum_pos (fun j _ => hw j) ⟨i, by simp [members, hi]⟩
 
+/-! ### Lineage flags
+
+A level flags a group when the group's own check raises it (`loc`) or any member is flagged.
+The classic code applies this rule to blocking (`valid`: overflow or a failed prediction, or a
+blocked member), to `inDomain` and to `starved`. `liftFlag_iff` splits the flag at any depth into
+the base elements it descends from and the flags raised by the levels themselves; so a flagged
+base element always flags its ancestor (`flag_of_descendant`), and when no level raises a flag
+a group is flagged exactly when some base element under it is (`liftFlag_no_local`). -/
+
+/-- One level's flag rule. -/
+def raise (k : ι → ι) (loc f : ι → Prop) : ι → Prop := fun g => loc g ∨ ∃ i, k i = g ∧ f i
+
+/-- The flags after the levels `ls` (key and the level's own check), from base flags `f`. -/
+def liftFlag : List ((ι → ι) × (ι → Prop)) → (ι → Prop) → ι → Prop
+  | [], f => f
+  | (k, loc) :: ls, f => liftFlag ls (raise k loc f)
+
+omit [Fintype ι] [DecidableEq ι] in
+theorem liftFlag_iff (ls : List ((ι → ι) × (ι → Prop))) (f : ι → Prop) (g : ι) :
+    liftFlag ls f g ↔
+      (∃ i, ancestor (ls.map Prod.fst) i = g ∧ f i) ∨ liftFlag ls (fun _ => False) g := by
+  induction ls generalizing f with
+  | nil => simp [liftFlag, ancestor]
+  | cons l ls ih =>
+    obtain ⟨k, loc⟩ := l
+    simp only [liftFlag, List.map_cons, ancestor]
+    rw [ih, ih (raise k loc fun _ => False)]
+    simp only [raise, and_false, exists_false, or_false]
+    constructor
+    · rintro (⟨j, hj, hl | ⟨i, rfl, hi⟩⟩ | h)
+      · exact Or.inr (Or.inl ⟨j, hj, hl⟩)
+      · exact Or.inl ⟨i, hj, hi⟩
+      · exact Or.inr (Or.inr h)
+    · rintro (⟨i, hi, hf⟩ | ⟨j, hj, hl⟩ | h)
+      · exact Or.inl ⟨k i, hi, Or.inr ⟨i, rfl, hf⟩⟩
+      · exact Or.inl ⟨j, hj, Or.inl hl⟩
+      · exact Or.inr h
+
+omit [Fintype ι] [DecidableEq ι] in
+/-- A flagged base element flags its ancestor at every depth: lineage is never lost. -/
+theorem flag_of_descendant (ls : List ((ι → ι) × (ι → Prop))) (f : ι → Prop) (i : ι)
+    (h : f i) : liftFlag ls f (ancestor (ls.map Prod.fst) i) :=
+  (liftFlag_iff ls f _).2 (Or.inl ⟨i, rfl, h⟩)
+
+omit [Fintype ι] [DecidableEq ι] in
+/-- An unflagged group has no flagged base element under it. -/
+theorem not_flag_no_descendant (ls : List ((ι → ι) × (ι → Prop))) (f : ι → Prop) (g : ι)
+    (h : ¬ liftFlag ls f g) : ∀ i, ancestor (ls.map Prod.fst) i = g → ¬ f i :=
+  fun i hi hf => h (hi ▸ flag_of_descendant ls f i hf)
+
+omit [Fintype ι] [DecidableEq ι] in
+theorem liftFlag_false (ls : List ((ι → ι) × (ι → Prop))) (hl : ∀ p ∈ ls, ∀ g, ¬ p.2 g)
+    (g : ι) : ¬ liftFlag ls (fun _ => False) g := by
+  induction ls generalizing g with
+  | nil => simp [liftFlag]
+  | cons l ls ih =>
+    obtain ⟨k, loc⟩ := l
+    have hloc : ∀ g, ¬ loc g := hl (k, loc) (List.mem_cons_self ..)
+    have hrest : ∀ p ∈ ls, ∀ g, ¬ p.2 g := fun p hp => hl p (List.mem_cons_of_mem _ hp)
+    have hr : raise k loc (fun _ => False) = fun _ => False := by
+      funext g; simp [raise, hloc g]
+    simp only [liftFlag, hr]
+    exact ih hrest g
+
+omit [Fintype ι] [DecidableEq ι] in
+/-- When no level raises a flag of its own, a group is flagged exactly when a base element
+under it is. -/
+theorem liftFlag_no_local (ls : List ((ι → ι) × (ι → Prop))) (hl : ∀ p ∈ ls, ∀ g, ¬ p.2 g)
+    (f : ι → Prop) (g : ι) :
+    liftFlag ls f g ↔ ∃ i, ancestor (ls.map Prod.fst) i = g ∧ f i := by
+  rw [liftFlag_iff]
+  exact or_iff_left (liftFlag_false ls hl g)
+
 end Depth
 
 end Trech.Methods.Group
