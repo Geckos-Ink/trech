@@ -359,6 +359,30 @@
       "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["group.member_unique", "group.weight_conserved", "group.moment_conserved"]}
     },
     {
+      "id": "group.lift_recursion",
+      "role": "method_property",
+      "statement": "Grouping the groups of one level equals grouping the base elements once by the composed key (each element's ancestor). So at any depth of a lift a group's weight is the summed weight of the base elements it descends from and, with non-negative weights, its position is their weighted centroid and total weight and centre of weight are kept; with positive base weights no group weighs zero at any depth.",
+      "lean": {
+        "file": "formal/Trech/Methods/Group.lean",
+        "declarations": [
+          "Trech.Methods.Group.groupWeight_comp",
+          "Trech.Methods.Group.groupMoment_comp",
+          "Trech.Methods.Group.centroid_comp",
+          "Trech.Methods.Group.ancestor_unique",
+          "Trech.Methods.Group.liftWeight_eq",
+          "Trech.Methods.Group.sum_liftWeight",
+          "Trech.Methods.Group.liftMoment_eq",
+          "Trech.Methods.Group.liftPos_eq_centroid",
+          "Trech.Methods.Group.sum_liftMoment",
+          "Trech.Methods.Group.liftWeight_pos"
+        ]
+      },
+      "classic": [
+        {"path": "src/ml/GroupHierarchy.cpp", "cites": "Trech.Methods.Group"}
+      ],
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["group.lift_weight_direct", "group.lift_centroid_direct", "group.lift_positive_weight_finite"]}
+    },
+    {
       "id": "least_squares.split_score",
       "role": "method_property",
       "statement": "For any coefficients the weighted squared error equals c - 2 beta.b + beta.A beta from the rows' summed statistics; the statistics of disjoint row sets add, so prefix sums score every cut; separately minimised sides never exceed the parent's error at shared coefficients (with ridge terms, by at most their penalty on the shared coefficients); and the BIC gate accepts a split exactly when its error is below the parent's times exp(-penalty / n_eff), so never when the error does not fall.",

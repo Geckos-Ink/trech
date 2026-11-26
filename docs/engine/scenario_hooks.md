@@ -894,7 +894,9 @@ load. Changing either after startup requires a restart.
   observer). Each level partitions the current elements (`cell_size` lattice, explicit `groups`
   ids, or `all`) and evaluates a trained v3 set model carrying `group_lift` on every group's
   members. Members read the level-below outputs plus the synthesized `present`, `weight` and
-  `rel_x/y/z`. Groups become the next level's elements (centroid position, summed weight).
+  `rel_x/y/z`. Groups become the next level's elements (centroid position, summed weight). Any depth
+  equals grouping the base elements once by their ancestor, so a group's weight and centroid are
+  those of the base elements it stands for ([law](formal_laws.md), `Trech.Methods.Group`).
   Without `levels` the engine plans the hierarchy from declared `operator_role: "group_lift"`
   models by scale. Over-capacity groups are blocked, never truncated; blocked members block their
   ancestors. Out-of-domain/starved lineage propagates to the observer. Each group evaluation is

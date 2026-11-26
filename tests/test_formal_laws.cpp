@@ -1270,13 +1270,52 @@ void groupPairs() {
   levels[2] = {"system", trech::ml::DimensionScale::kMeso, &system, Spec::Grouping::kAll, 0.0, {}, 4.0};
   const auto expected = nlohmann::json::parse(std::ifstream(dir + "expected.json"));
   std::vector<double> parentsOk, lowerWeight, groupWeight, lowerMoment, groupMoment;
-  std::size_t levelsChecked = 0;
+  // Recursion (liftWeight_eq, liftPos_eq_centroid): at every depth a group's weight and centroid
+  // equal those of the base elements whose composed ancestor it is, grouped once.
+  std::vector<double> deepWeight, directWeight, deepPos, directPos, finitePos, unweightedPos;
+  std::size_t levelsChecked = 0, deepLevels = 0;
   auto checkRun = [&](const trech::ml::GroupLiftInput& input, const std::vector<Spec>& specs, bool requireAll) {
     const auto run = trech::ml::GroupHierarchy::run(input, specs);
     if (requireAll && run.levelsRun != specs.size()) throw std::runtime_error("Group lift stopped: " + run.stopReason);
     std::vector<double> w = input.weights, p = input.positions;
+    std::vector<long long> ancestor(input.count);
+    for (std::size_t i = 0; i < input.count; ++i) ancestor[i] = static_cast<long long>(i);
+    std::size_t depth = 0;
     for (const auto& lr : run.levels) {
       if (!lr.ran) break;
+      ++depth;
+      if (lr.parent.size() != w.size()) throw std::runtime_error("Group lift parent size mismatch");
+      for (auto& a : ancestor) a = lr.parent[static_cast<std::size_t>(a)];
+      std::vector<double> bw(lr.groups, 0.0), bm(lr.groups * 3, 0.0);
+      for (std::size_t i = 0; i < input.count; ++i) {
+        const auto g = static_cast<std::size_t>(ancestor[i]);
+        bw[g] += input.weights[i];
+        for (std::size_t a = 0; a < 3; ++a) bm[g * 3 + a] += input.weights[i] * input.positions[i * 3 + a];
+      }
+      for (std::size_t g = 0; g < lr.groups; ++g) {
+        deepWeight.push_back(lr.weights[g]);
+        directWeight.push_back(bw[g]);
+        for (std::size_t a = 0; a < 3; ++a) {
+          const double pos = lr.positions[g * 3 + a];
+          finitePos.push_back(std::isfinite(pos) ? 1.0 : 0.0);
+          if (depth < 2) continue;
+          deepPos.push_back(pos);
+          directPos.push_back(bm[g * 3 + a] / bw[g]);
+        }
+      }
+      if (depth >= 2) {
+        // Negative control: the unweighted mean of the lower level's centroids, the rule the
+        // recursion would break if a level dropped the member weights.
+        std::vector<double> sum(lr.groups * 3, 0.0), n(lr.groups, 0.0);
+        for (std::size_t m = 0; m < lr.parent.size(); ++m) {
+          const auto g = static_cast<std::size_t>(lr.parent[m]);
+          n[g] += 1.0;
+          for (std::size_t a = 0; a < 3; ++a) sum[g * 3 + a] += p[m * 3 + a];
+        }
+        for (std::size_t g = 0; g < lr.groups; ++g)
+          for (std::size_t a = 0; a < 3; ++a) unweightedPos.push_back(sum[g * 3 + a] / n[g]);
+        ++deepLevels;
+      }
       std::vector<long long> seen(lr.groups, 0);
       bool ok = lr.parent.size() == w.size();
       for (long long g : lr.parent) {
@@ -1327,6 +1366,15 @@ void groupPairs() {
                                 groupWeight, 0.0, 1e-14));
   expect(formal::checkAgreement("group.moment_conserved", "Trech.Methods.Group.sum_weight_centroid", lowerMoment,
                                 groupMoment, 1e-13, 1e-13));
+  if (deepLevels < 4) throw std::runtime_error("Group-lift recursion checked too few levels");
+  expect(formal::checkAgreement("group.lift_weight_direct", "Trech.Methods.Group.liftWeight_eq", deepWeight,
+                                directWeight, 0.0, 1e-14));
+  expect(formal::checkAgreement("group.lift_centroid_direct", "Trech.Methods.Group.liftPos_eq_centroid", deepPos,
+                                directPos, 1e-13, 1e-13));
+  expect(formal::checkAgreement("group.lift_positive_weight_finite", "Trech.Methods.Group.liftWeight_pos",
+                                finitePos, std::vector<double>(finitePos.size(), 1.0), 0.0, 0.0));
+  expect(formal::checkAgreement("group.lift_unweighted_negative_control", "", unweightedPos, directPos, 1e-13, 1e-13),
+         false);
   // Negative control: a group whose members weigh zero has no centroid (NaN), the excluded case.
   trech::ml::GroupLiftInput zero;
   zero.count = 2;

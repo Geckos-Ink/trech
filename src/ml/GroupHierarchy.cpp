@@ -53,7 +53,10 @@ const char* groupingName(GroupLevelSpec::Grouping grouping) {
 
 // Lean pair Trech.Methods.Group (formal/Trech/Methods/Group.lean): every element gets one
 // parent, and the summed group weights and weighted centroids below keep the level's total
-// weight and weighted first moment (for groups of nonzero weight).
+// weight and weighted first moment (for groups of nonzero weight). The run loop below feeds
+// each level's groups to the next; liftWeight_eq and liftPos_eq_centroid show that any depth
+// equals grouping the base elements once by their composed ancestor, and liftWeight_pos that
+// positive base weights never leave a zero-weight (NaN-centroid) group at any depth.
 // Partition `pop` into ordered groups. Returns false (with a reason) when the
 // grouping cannot be formed from what the population carries.
 bool partition(const Population& pop, const GroupLevelSpec& spec,
