@@ -17,3 +17,4 @@ public import Trech.Methods.Band
 public import Trech.Methods.Route
 public import Trech.Methods.Cascade
 public import Trech.Methods.Coverage
+public import Trech.Methods.Domain

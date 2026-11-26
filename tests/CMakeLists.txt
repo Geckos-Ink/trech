@@ -288,6 +288,11 @@ if (Python3_Interpreter_FOUND)
     NAME trech_routing_domain
     COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_routing_domain.py
   )
+  # Occupancy bins: the engine's bin rule against numpy.histogram (Trech.Methods.Domain).
+  add_test(
+    NAME trech_occupancy_bins_numpy
+    COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_occupancy_bins.py $<TARGET_FILE:test_formal_laws>
+  )
   # Online domain learner: NumPy twin of frozen routing and prediction.
   add_test(
     NAME trech_domain_learner_numpy

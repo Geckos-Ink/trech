@@ -32,6 +32,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -873,6 +874,193 @@ void coveragePairs() {
          false);
 }
 
+void domainPairs() {
+  // Trech.Methods.Domain on GenericSurrogate: the per-feature out-of-domain verdict and the
+  // occupancy bin. Edges are numpy's linspace edges k * ((hi - lo) / n) + lo, last edge hi;
+  // tests/test_occupancy_bins.py checks the engine's bins against numpy.histogram itself.
+  const trech::test::TemporaryDirectory fixture;
+  std::uint64_t state = 20261126;
+  auto uniform = [&]() {
+    state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+    return static_cast<double>(state >> 11) * 0x1.0p-53;
+  };
+
+  // Out-of-domain verdict: four inputs, measured radii, inputs spread across the edges.
+  const std::vector<std::string> names = {"a", "b", "c", "d"};
+  const std::vector<double> radii = {0.5, 1.0, 2.0, 3.5};
+  const nlohmann::json verdictSpec = {
+      {"model", "generic_surrogate_v1"},
+      {"input_features", names},
+      {"output_features", {"o"}},
+      {"input_mean", {0.0, 0.0, 0.0, 0.0}},
+      {"input_std", {1.0, 1.0, 1.0, 1.0}},
+      {"input_domain", {{"standardized_radius", radii}}},
+      {"layers", {{{"weights", {{1.0, 1.0, 1.0, 1.0}}}, {"bias", {0.0}}, {"activation", "none"}}}}};
+  const auto verdictPath = (fixture.path() / "verdict.json").string();
+  std::ofstream(verdictPath) << verdictSpec;
+  trech::ml::GenericSurrogate verdictModel;
+  if (!verdictModel.load(verdictPath)) throw std::runtime_error("Could not load domain verdict model");
+  const double tol = 1e-9;
+  std::size_t samples = 0, verdictErrors = 0, inside = 0, outside = 0, monoErrors = 0;
+  std::vector<double> engineExtrap, fullExtrap;
+  for (int trial = 0; trial < 4000; ++trial) {
+    std::vector<double> x(names.size());
+    for (std::size_t i = 0; i < x.size(); ++i) x[i] = (uniform() * 2.0 - 1.0) * radii[i] * 1.3;
+    if (trial % 7 == 0) x[trial % 4] = (trial % 2 ? 1.0 : -1.0) * radii[trial % 4];  // on the edge
+    const auto cov = verdictModel.coverageVector(x);
+    double best = 0.0;
+    std::vector<std::string> named;
+    for (std::size_t i = 0; i < x.size(); ++i) {
+      const double over = std::abs(x[i]) - radii[i];
+      if (over > tol) {
+        named.push_back(names[i]);
+        best = std::max(best, over);
+      }
+    }
+    ++samples;
+    if (cov.inDomain != named.empty() || cov.outOfDomainInputs != named || (cov.extrapolation == 0.0) != cov.inDomain)
+      ++verdictErrors;
+    (cov.inDomain ? inside : outside) += 1;
+    engineExtrap.push_back(cov.extrapolation);
+    fullExtrap.push_back(best);
+    // extrap_mono: scaling every input farther out never lowers extrapolation.
+    std::vector<double> farther = x;
+    for (double& v : farther) v *= 1.25;
+    if (verdictModel.coverageVector(farther).extrapolation < cov.extrapolation) ++monoErrors;
+  }
+  formal::LawCheck verdict;
+  verdict.law = "domain.verdict";
+  verdict.leanDeclaration = "Trech.Methods.Domain.extrap_eq_zero_iff";
+  verdict.kind = "invariant";
+  verdict.samples = samples;
+  verdict.violations = verdictErrors + monoErrors;
+  verdict.passed = verdict.violations == 0 && inside > 200 && outside > 200;
+  verdict.detail = std::to_string(inside) + " in domain, " + std::to_string(outside) + " out, " +
+                   std::to_string(verdictErrors) + " verdict and " + std::to_string(monoErrors) +
+                   " monotonicity violations";
+  expect(verdict);
+  expect(formal::checkAgreement("domain.extrapolation_exact", "Trech.Methods.Domain.le_extrap", fullExtrap,
+                                engineExtrap, 0.0, 0.0));
+
+  // Occupancy bin: the engine's bin contains x for values at, just below and just above every
+  // edge, and for interior values; the uncorrected scaled index does not.
+  auto edge = [](int k, double lo, double hi, int n) {
+    return k >= n ? hi : static_cast<double>(k) * ((hi - lo) / n) + lo;
+  };
+  auto contains = [&](int b, double x, double lo, double hi, int n) {
+    return b >= 0 && b < n && edge(b, lo, hi, n) <= x && (b + 1 == n || x < edge(b + 1, lo, hi, n));
+  };
+  std::size_t binSamples = 0, binErrors = 0, guessFar = 0, rawErrors = 0;
+  std::string binDetail;
+  for (int trial = 0; trial < 3000; ++trial) {
+    const double lo = (uniform() * 2.0 - 1.0) * std::pow(10.0, 3.0 * uniform() - 1.0);
+    const double hi = lo + std::pow(10.0, 4.0 * uniform() - 2.0);
+    const int n = 2 + static_cast<int>(uniform() * 20.0);
+    std::vector<double> xs;
+    for (int k = 0; k <= n; ++k) {
+      const double e = edge(k, lo, hi, n);
+      xs.insert(xs.end(), {e, std::nextafter(e, -INFINITY), std::nextafter(e, INFINITY)});
+    }
+    for (int k = 0; k < 8; ++k) xs.push_back(lo + (hi - lo) * uniform());
+    for (double x : xs) {
+      if (x < lo || x > hi) continue;
+      ++binSamples;
+      const int b = trech::ml::GenericSurrogate::occupancyBin(x, lo, hi, n);
+      if (!contains(b, x, lo, hi, n)) {
+        ++binErrors;
+        if (binDetail.empty()) binDetail = "bin does not contain x at sample " + std::to_string(binSamples);
+      }
+      const int raw = std::clamp(static_cast<int>((x - lo) / (hi - lo) * n), 0, n - 1);
+      if (std::abs(raw - b) > 1) ++guessFar;  // correct_spec's hypothesis: guess at most one off
+      if (!contains(raw, x, lo, hi, n)) ++rawErrors;
+    }
+  }
+  formal::LawCheck bins;
+  bins.law = "domain.bin_contains";
+  bins.leanDeclaration = "Trech.Methods.Domain.correct_spec";
+  bins.kind = "invariant";
+  bins.samples = binSamples;
+  bins.violations = binErrors + guessFar;
+  bins.passed = bins.violations == 0;
+  bins.detail = binDetail.empty() ? std::to_string(rawErrors) + " uncorrected indices off by one" : binDetail;
+  expect(bins);
+  std::printf("domain.raw_index_events                  %zu of %zu uncorrected indices off by one\n", rawErrors,
+              binSamples);
+  formal::LawCheck raw;
+  raw.law = "domain.raw_index_negative_control";
+  raw.kind = "invariant";
+  raw.samples = binSamples;
+  raw.violations = rawErrors;
+  raw.passed = rawErrors == 0;
+  raw.detail = std::to_string(rawErrors) + " uncorrected indices outside their bin";
+  expect(raw, false);
+
+  // training_value_not_starved, through the engine's starved flag: training values sit on and
+  // around the edges of a few bins; counts are built by containment alone (no index formula).
+  const double lo = 0.1, hi = 0.7;
+  const int n = 8;
+  std::vector<double> train;
+  for (int k : {2, 5}) {  // bins 3 and 6 stay empty
+    const double e = edge(k, lo, hi, n);
+    train.insert(train.end(), {e, std::nextafter(e, -INFINITY), std::nextafter(e, INFINITY)});
+  }
+  train.insert(train.end(), {lo, hi});
+  std::vector<int> counts(n, 0);
+  for (double t : train)
+    for (int b = 0; b < n; ++b)
+      if (contains(b, t, lo, hi, n)) ++counts[b];
+  const nlohmann::json binSpec = {
+      {"model", "generic_surrogate_v1"},
+      {"input_features", {"x"}},
+      {"output_features", {"o"}},
+      {"input_mean", {0.4}},
+      {"input_std", {0.2}},
+      {"input_domain",
+       {{"standardized_radius", {1.5}},
+        {"input_min", {lo}},
+        {"input_max", {hi}},
+        {"occupancy", {{"bins", n}, {"counts", nlohmann::json::array({counts})}}}}},
+      {"layers", {{{"weights", {{1.0}}}, {"bias", {0.0}}, {"activation", "none"}}}}};
+  const auto binPath = (fixture.path() / "bins.json").string();
+  std::ofstream(binPath) << binSpec;
+  trech::ml::GenericSurrogate binModel;
+  if (!binModel.load(binPath) || !binModel.hasOccupancy()) throw std::runtime_error("Could not load bin model");
+  std::size_t starvedTrain = 0, emptyBins = 0, starvedProbes = 0;
+  for (double t : train) starvedTrain += !binModel.coverageVector({t}).starvedInputs.empty();
+  for (int b = 0; b < n; ++b) {
+    if (counts[b] != 0) continue;
+    ++emptyBins;
+    const double mid = 0.5 * (edge(b, lo, hi, n) + edge(b + 1, lo, hi, n));
+    starvedProbes += !binModel.coverageVector({mid}).starvedInputs.empty();
+  }
+  formal::LawCheck notStarved;
+  notStarved.law = "domain.training_not_starved";
+  notStarved.leanDeclaration = "Trech.Methods.Domain.training_value_not_starved";
+  notStarved.kind = "invariant";
+  notStarved.samples = train.size();
+  notStarved.violations = starvedTrain + (emptyBins - starvedProbes);
+  notStarved.passed = notStarved.violations == 0 && emptyBins > 0;
+  notStarved.detail = std::to_string(starvedTrain) + " training values starved; " + std::to_string(starvedProbes) +
+                      " of " + std::to_string(emptyBins) + " empty bins flagged";
+  expect(notStarved);
+}
+
+int occupancyBinsMode(const char* path) {
+  // For tests/test_occupancy_bins.py: each line "x lo hi n" -> the engine's bin.
+  std::ifstream in(path);
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.empty()) continue;
+    char* end = nullptr;
+    const double x = std::strtod(line.c_str(), &end);
+    const double lo = std::strtod(end, &end);
+    const double hi = std::strtod(end, &end);
+    const int n = static_cast<int>(std::strtol(end, &end, 10));
+    std::printf("%d\n", trech::ml::GenericSurrogate::occupancyBin(x, lo, hi, n));
+  }
+  return 0;
+}
+
 void routePairs() {
   // Trech.Methods.Route on DomainLearner: three affine regimes (splits), then one shared law
   // (merges). Per call: every routed row is in a current domain, the domains' element counts add
@@ -1580,7 +1768,8 @@ globalThis.TRECH_CONFIG = {formal: {
 
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  if (argc == 3 && std::string(argv[1]) == "--occupancy-bins") return occupancyBinsMode(argv[2]);
   try {
     comptonPairs();
     energyBalancePairs();
@@ -1595,6 +1784,7 @@ int main() {
     bandPairs();
     cascadePairs();
     coveragePairs();
+    domainPairs();
     setPoolPairs();
     groupPairs();
     leastSquaresPairs();

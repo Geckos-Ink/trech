@@ -925,7 +925,12 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
 - **Starved region (density inside the hull):** `starvedInputs` — inputs that are within the trained
   range but land in a bin the training set never populated (a hole the model interpolated through,
   distinct from the beyond-the-edge extrapolation). Only reported when the model carries an
-  `input_domain.occupancy` histogram (exported by `trech-train-surrogate`).
+  `input_domain.occupancy` histogram (exported by `trech-train-surrogate`). The engine finds a
+  value's bin exactly as `numpy.histogram` counted it in training, including numpy's one-bin
+  correction near an edge, so a training value never reads as starved. Before 2026-11-26 the
+  engine skipped that correction: a value within about one ulp below an edge read as the next bin
+  up, and was flagged starved when that bin was empty. Models need no re-export; the counts were
+  always numpy's ([law](formal_laws.md), `Trech.Methods.Domain`).
 - **Joint starved region (the multivariate hole):** `jointMeasured` / `jointStarved` /
   `jointDistance` / `jointRadius`. Both checks above are **per feature**, so neither can see a point
   that is in range on every axis yet nowhere near any training point — train on (cold, slow) and

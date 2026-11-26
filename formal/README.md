@@ -23,13 +23,14 @@ Contract: [formal-laws handbook](../AGENTS/engine/formal/AGENTS.md).
 | [`Trech/Methods/Route.lean`](Trech/Methods/Route.lean) | `Trech.Methods.Route` | [`DomainLearner.cpp`](../src/ml/DomainLearner.cpp) (domain routing, splits and merges of `ctx.learnDomains`) |
 | [`Trech/Methods/Cascade.lean`](Trech/Methods/Cascade.lean) | `Trech.Methods.Cascade` | [`ScaleCascade.cpp`](../src/ml/ScaleCascade.cpp) (registration order of `ctx.cascade` stages) |
 | [`Trech/Methods/Coverage.lean`](Trech/Methods/Coverage.lean) | `Trech.Methods.Coverage` | [`GenericSurrogate.cpp`](../src/ml/GenericSurrogate.cpp) (the pruned joint-coverage scan) |
+| [`Trech/Methods/Domain.lean`](Trech/Methods/Domain.lean) | `Trech.Methods.Domain` | [`GenericSurrogate.cpp`](../src/ml/GenericSurrogate.cpp) (the per-feature domain verdict and the occupancy bin) |
 | [`Trech/Methods/Decay.lean`](Trech/Methods/Decay.lean) | `Trech.Methods.Decay` | [`DecayedScore.hpp`](../include/trech/ml/DecayedScore.hpp), called by [`MethodArbiter.cpp`](../src/ml/MethodArbiter.cpp) (decayed prequential scores and the leader ranking) |
 
 [`laws.json`](laws.json) lists the pairs. `tests/test_formal_law_pairs.py` checks that both sides
 exist and cite each other; `tests/test_formal_laws.cpp` runs the classic code against each
 statement. Neither needs Lean.
 
-**Status (2026-11-25): all 84 theorems compile and use only the standard axioms**
+**Status (2026-11-26): all 92 theorems compile and use only the standard axioms**
 (`propext`, `Classical.choice`, `Quot.sound`), with Lean `v4.37.0-rc1` and Mathlib
 `348837d`, on macOS arm64. Transition counts are proved over mathematical integers.
 Checks for real-valued proofs state a tolerance where the classic results round.

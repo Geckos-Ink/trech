@@ -151,6 +151,24 @@ def parameter_count(plan) -> int:
     return sum(i * o + o for i, o, _ in plan)
 
 
+def occupancy_bins(values, lo: float, hi: float, n: int):
+    """The bin numpy.histogram(range=(lo, hi), bins=n) counts each value in.
+
+    The same rule as the engine's `GenericSurrogate::occupancyBin`: the scaled
+    index, then the correction against the linspace edges, since the scaled
+    index alone lands one bin off within ~1 ulp of an edge. Values outside
+    [lo, hi] get a clipped index; callers mask them out.
+    """
+    import numpy as np
+    v = np.asarray(values, dtype=float)
+    edges = np.linspace(lo, hi, n + 1)
+    idx = np.clip(((v - lo) / (hi - lo) * n).astype(int), 0, n - 1)
+    down = (idx > 0) & (v < edges[idx])
+    idx = np.where(down, idx - 1, idx)
+    up = ~down & (idx != n - 1) & (v >= edges[np.minimum(idx + 1, n)])
+    return np.where(up, idx + 1, idx)
+
+
 def _finite_list(values) -> bool:
     return isinstance(values, list) and all(isinstance(v, (int, float)) and math.isfinite(v) for v in values)
 
@@ -676,7 +694,7 @@ def _coverage_gate(model: dict, x, y, pred, outputs) -> dict:
             n = len(bins)
             if n == 0 or hi[i] <= lo[i]:
                 continue
-            idx = np.clip(((x[:, i] - lo[i]) / (hi[i] - lo[i]) * n).astype(int), 0, n - 1)
+            idx = occupancy_bins(x[:, i], lo[i], hi[i], n)
             inside = (x[:, i] >= lo[i]) & (x[:, i] <= hi[i])
             starved |= inside & (np.asarray(bins)[idx] == 0)
     joint = domain.get("joint") or {}

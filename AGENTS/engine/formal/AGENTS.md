@@ -6,13 +6,13 @@ Related owners: [Builds and dependencies](../../tooling/dependencies/AGENTS.md) 
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
-**Maturity (2026-11-25): nineteen law pairs, 84 proofs verified. Lean stays optional.** The pairs
+**Maturity (2026-11-26): twenty law pairs, 92 proofs verified. Lean stays optional.** The pairs
 ([`formal/laws.json`](../../../formal/laws.json)) are Compton kinematics, the Compton relation
 from four-momentum conservation, the energy balance of a recorded step, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step
 probabilities and declared count conservation, antisymmetric `ctx.interact` exchange, the bounded explicit step of `ctx.evolve` and `ctx.interact`, the order independence of set networks, `ctx.lift` group assembly, the domain learner's split score, the
-method arbiter's proper squared score and its decayed prequential scores, stage order inside a `ctx.evolve` band, `ctx.learnDomains` routing the registration order of `ctx.cascade` and the pruned joint-coverage scan of learned models. Their classic C++/JS code is
+method arbiter's proper squared score and its decayed prequential scores, stage order inside a `ctx.evolve` band, `ctx.learnDomains` routing the registration order of `ctx.cascade`, the pruned joint-coverage scan of learned models, and their per-feature domain verdict and occupancy bin. Their classic C++/JS code is
 checked against each Lean statement by `trech_formal_laws`, and the pair links by
-`trech_formal_law_pairs` (both in the normal suite, no Lean needed). The 84 Lean theorems
+`trech_formal_law_pairs` (both in the normal suite, no Lean needed). The 92 Lean theorems
 compile with Lean `v4.37.0-rc1` and Mathlib `348837d` and depend only on the standard
 axioms (`propext`, `Classical.choice`, `Quot.sound`), checked by the opt-in
 `trech_formal_lean_build`. The count proof uses mathematical integers. The exchange proof uses
@@ -162,6 +162,12 @@ conservation, exponential attenuation from a constant interaction rate, energy c
   of its inputs. `ScaleCascade::run`'s ready-stage choice meets this unless a fact an in-band
   stage writes is already present at band start (a stale read); changing readiness or the band
   sort changes what the pair covers: update it and `cascadePairs` in the same change.
+- **Occupancy bins follow `numpy.histogram` exactly.** Training counts each value with
+  `numpy.histogram`, and the engine's `GenericSurrogate::occupancyBin` applies numpy's one-bin
+  correction against the linspace edges `k * ((hi - lo) / n) + lo`. The C++ trainer
+  (`ArchitectureGenerator`) and the validator (`validate_model.occupancy_bins`) use the same
+  rule. Changing any of them changes what `Trech.Methods.Domain` covers: keep
+  `trech_occupancy_bins_numpy` and `domainPairs` passing in the same change.
 - **Engine-side checks observe only.** `Lattice::checkLaws` runs once per build, touches no
   population, RNG stream, emit or output, and reports through the trace; a failed check is a
   warning, never an exception. Moving walls and Dirichlet links pass the bijection check with a
@@ -184,7 +190,7 @@ conservation, exponential attenuation from a constant interaction rate, energy c
 ## Current pins
 
 The TRECH git tree records the revisions (`git submodule status thirds/lean4 thirds/mathlib4`).
-Current checkout (2026-11-25): lean4 `451d44e` (`master`), mathlib4 `348837d` (`master`),
+Current checkout (2026-11-26): lean4 `1013faf` (`master`), mathlib4 `348837d` (`master`),
 whose `lean-toolchain` is `leanprover/lean4:v4.37.0-rc1`. The lean4 `master` tip is newer than
 that release candidate, so a from-source toolchain build must check out the tag first.
 

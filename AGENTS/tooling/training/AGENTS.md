@@ -59,6 +59,11 @@ Read the root principles and the parent handbook first; then open only the subca
   [`docs/validation/ml_model_recheck.md`](../../../docs/validation/ml_model_recheck.md) (+ `.json`) whenever a recipe or a
   re-checked model changes; CTest `trech_ml_model_recheck` guards staleness without NumPy.
 
+- **Occupancy bins are numpy's.** `train_surrogate.input_domain` counts with
+  `numpy.histogram`; the engine (`GenericSurrogate::occupancyBin`), the C++ trainer and
+  `validate_model.occupancy_bins` all apply numpy's edge correction, checked against
+  `numpy.histogram` by `trech_occupancy_bins_numpy`. Never index bins with the scaled value alone:
+  it lands one bin off within about one ulp of an edge.
 - **Independent validation:** [`validate_model.py`](../../../tools/torch/trech_torch/validate_model.py)
   (`trech-validate-surrogate`, `trech-ml validate`) grades a model with named pass/warn/fail/skip
   gates ([contract](../../../docs/inference/ml_models.md#validating-a-model)). Static gates are pure Python;

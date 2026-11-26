@@ -159,6 +159,10 @@ class GenericSurrogate {
   // outlier edge; the measured hull, when present, always wins over it.
   static constexpr double kDefaultStandardizedDomainRadius = 3.0;
 
+  // The occupancy bin of x over [lo, hi] (lo < hi, n > 0), identical to
+  // numpy.histogram(range=(lo, hi), bins=n), which builds the training counts.
+  static int occupancyBin(double x, double lo, double hi, int n);
+
   Coverage coverage(const std::unordered_map<std::string, double>& inputs) const;
   // Positional form of the same check, over the declared input order (the
   // predictVector() layout).  Batched callers (StateEvolution runs one model per

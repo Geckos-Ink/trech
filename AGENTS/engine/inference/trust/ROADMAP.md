@@ -16,6 +16,7 @@ dated record below, and queue its residuals in the same change.
 
 - **P2** · R4 · Lineage across separate `ctx.predict`/`ctx.cascade` calls and persistent batched-operator state; needs explicit provenance, never value/name matching. ([detail](#dependency-trust-propagation))
 - **P2** · R4 · Resim is a candidate queue only: automatic execution, resim-confirmed labels and retraining, cross-callback/event ancestry, and real transport routing for every batched operator. ([detail](#dependency-trust-propagation))
+- **P2** · R3 · Non-finite inputs pass the per-feature checks: in `GenericSurrogate::coverageVector` a NaN input's excess never compares above the tolerance and never lies in `[lo, hi]`, so it reads as in domain and not starved per feature (only the joint check flags it, as starved at infinite distance, and only for models with a joint reference). Decide whether a non-finite input is out of domain by definition (named in `outOfDomainInputs`, infinite `extrapolation`), with a regression on the predict counters. Found while proving `Trech.Methods.Domain`. ([detail](../../formal/ROADMAP.md#per-feature-domain-and-occupancy-bins-2026-11-26))
 - **P3** · R7 · LibTorch integration of the resim policy (LibTorch is now required) is unvalidated. ([detail](#dependency-trust-propagation))
 
 ## Dependency trust propagation

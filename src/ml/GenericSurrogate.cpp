@@ -1392,6 +1392,31 @@ GenericSurrogate::Coverage GenericSurrogate::coverage(
   return coverageVector(x);
 }
 
+// The bin numpy.histogram(range=(lo, hi), bins=n) counts x in, which is how
+// training builds the occupancy histogram: the scaled index, then numpy's
+// correction against the linspace edges i*((hi-lo)/n) + lo (last edge hi),
+// because the scaled index alone can land one bin off within ~1 ulp of an edge.
+// Without the correction a training value just below an edge read as the next
+// bin up, which could be empty, so a training row was flagged starved.
+// Trech.Methods.Domain (formal/Trech/Methods/Domain.lean): the corrected index
+// is the unique bin whose edges contain x (correct_spec, bin_unique), so a
+// training value always lands in a populated bin (training_value_not_starved).
+int GenericSurrogate::occupancyBin(double x, double lo, double hi, int n) {
+  const double step = (hi - lo) / n;
+  const auto edge = [&](int k) {
+    return k >= n ? hi : static_cast<double>(k) * step + lo;
+  };
+  int bin = static_cast<int>((x - lo) / (hi - lo) * n);
+  if (bin >= n) bin = n - 1;  // x == hi: the last bin is closed
+  if (bin < 0) bin = 0;
+  if (bin > 0 && x < edge(bin)) {
+    --bin;
+  } else if (bin != n - 1 && x >= edge(bin + 1)) {
+    ++bin;
+  }
+  return bin;
+}
+
 GenericSurrogate::Coverage GenericSurrogate::coverageVector(
     const std::vector<double>& inputs) const {
   Workspace workspace;
@@ -1435,9 +1460,7 @@ GenericSurrogate::Coverage GenericSurrogate::coverageVector(
       const double lo = inputMin_[i];
       const double hi = inputMax_[i];
       if (hi > lo && x >= lo && x <= hi) {
-        int bin = static_cast<int>((x - lo) / (hi - lo) * occupancyBins_);
-        if (bin >= occupancyBins_) bin = occupancyBins_ - 1;  // x==hi edge
-        if (bin < 0) bin = 0;
+        const int bin = occupancyBin(x, lo, hi, occupancyBins_);
         if (bin < static_cast<int>(occupancyCounts_[i].size()) &&
             occupancyCounts_[i][bin] == 0) {
           cov.starvedInputs.push_back(inputNames_[i]);
@@ -1448,6 +1471,10 @@ GenericSurrogate::Coverage GenericSurrogate::coverageVector(
   cov.inDomain = cov.outOfDomainInputs.empty();
   std::sort(cov.outOfDomainInputs.begin(), cov.outOfDomainInputs.end());
   std::sort(cov.starvedInputs.begin(), cov.starvedInputs.end());
+
+  // Trech.Methods.Domain: inDomain holds exactly when every excess
+  // |z_i| - radius_i is within the tolerance, and extrapolation is then 0;
+  // otherwise it is the largest excess (extrap_eq_zero_iff, le_extrap).
 
   // Joint starvation: distance in standardized space to the nearest training
   // region the model carries.  This is the check the two per-feature ones

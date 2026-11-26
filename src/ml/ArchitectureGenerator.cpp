@@ -271,12 +271,8 @@ json inputDomain(const ArchitectureJob& job, const std::vector<double>& xMean,
   for (std::size_t j = 0; j < d; ++j) {
     std::vector<long long> c(bins, 0);
     for (const auto& row : job.train.x) {
-      int b = 0;
-      if (hi[j] > lo[j]) {
-        b = row[j] >= hi[j] ? bins - 1
-                            : static_cast<int>(std::floor((row[j] - lo[j]) / (hi[j] - lo[j]) * bins));
-        b = std::min(bins - 1, std::max(0, b));
-      }
+      // The engine's own bin rule, so a training row is never read as starved.
+      const int b = hi[j] > lo[j] ? GenericSurrogate::occupancyBin(row[j], lo[j], hi[j], bins) : 0;
       ++c[b];
     }
     counts.push_back(c);
