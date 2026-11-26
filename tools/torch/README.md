@@ -250,12 +250,19 @@ true; the engine additionally requires `determinism.mode: "predictive"`.
 ## Discrete-scenario operator distillation
 
 `distill_discrete_scenario_operators.py` reproducibly generates build-local,
-run-shaped training/independent-holdout datasets for the retired H2O-cycle and
-efflux JS teachers, then invokes the generic trainer for:
+run-shaped training/independent-holdout datasets for the retired H2O-cycle,
+efflux and osmotic JS teachers, then invokes the generic trainer for:
 
 - `h2o_cycle_transition_operator` (`ctx.react`, meso);
 - `efflux_transport_operator` (`ctx.evolve`, micro);
-- `efflux_crossing_operator` (`ctx.react`, micro).
+- `efflux_crossing_operator` (`ctx.react`, micro);
+- `osmotic_thermostat_operator` (`ctx.evolve`, micro): the per-tick velocity change, trained
+  on mirrored (−v, −noise) row pairs because the bath's velocity memory turns any bias into a
+  drift;
+- `osmotic_crossing_operator` (`ctx.react`, micro): channel passage, with certain passage and
+  blocking written 0.25 past the [0,1] hazard bound so the engine clamp makes them exact.
+
+`--only <name>` (repeatable) retrains a subset.
 
 ```bash
 PYTHONPATH=tools/torch python3 tools/torch/distill_discrete_scenario_operators.py

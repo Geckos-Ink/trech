@@ -44,7 +44,7 @@ never drawn.
 | 2 | **P1** | R2 | [scenarios/spectra](AGENTS/scenarios/spectra/ROADMAP.md#priority-queue) | Particle-trained atomic rung: feed Geant4 material/atomic response (mean excitation energy, photo-absorption) as atomic inputs and re-grade the cascade ablation. |
 | 3 | **P1** | R2 | [scenarios/fluids](AGENTS/scenarios/fluids/ROADMAP.md#priority-queue) | A particle-derived (Geant4-trained) water operator that freezes, replacing the literature mW potential |
 | 4 | **P1** | R2 | [scenarios/chemistry](AGENTS/scenarios/chemistry/ROADMAP.md#priority-queue) | Next learned lift: geometry/charge/isotope-conditioned electronic and bond response trained on Geant4 particle/ionization histories |
-| 5 | **P1** | R3 | [scenarios/migrations](AGENTS/scenarios/migrations/ROADMAP.md#priority-queue) | Row 6 remainder — osmosis (efflux promoted 2026-07-26). |
+| 5 | **P1** | R3 | [scenarios/migrations](AGENTS/scenarios/migrations/ROADMAP.md#priority-queue) | Row 6 remainder — osmosis membrane response: replace the authored `integrateMembrane` pressure/area/bending law with membrane-node operators |
 | 6 | **P2** | R3 | [engine/inference](AGENTS/engine/inference/ROADMAP.md#priority-queue) | Closed-loop deployment of learned-domain operators beyond the furnace thermal law |
 | 7 | **P2** | R6 | [studio/authoring](AGENTS/studio/authoring/ROADMAP.md#priority-queue) | Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics. |
 | 8 | **P2** | R6 | [scenarios/references](AGENTS/scenarios/references/ROADMAP.md#priority-queue) | JS workflow execution: editable training/harvest/inference jobs with provenance, progress/cancellation and safe model activation. |

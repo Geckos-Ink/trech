@@ -866,8 +866,8 @@
    "families": [
     "fluid"
    ],
-   "grade": "E",
-   "physics_status": "reference_only",
+   "grade": "C",
+   "physics_status": "operator_partial",
    "validation": "pass"
   },
   "testscenario_pascal": {

@@ -11,6 +11,7 @@
 #include "trech/sim/PhotonuclearKinematics.hpp"
 #include "trech/core/SimulationBudget.hpp"
 #include "trech/core/FormalLaws.hpp"
+#include "trech/core/HookFailure.hpp"
 #include "trech/core/Trace.hpp"
 
 #include "trech/core/Config.hpp"
@@ -29,6 +30,7 @@
 #include "G4AccumulableManager.hh"
 #include "G4Run.hh"
 #include "G4RunManager.hh"
+#include "G4StateManager.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4VPhysicalVolume.hh"
 #include "G4Threading.hh"
@@ -2512,8 +2514,25 @@ HookInferenceCounts TrechRunAction::dispatchHookContext(const std::string& hookN
     hookOpticsJsonReady_ = true;
   }
   context.opticsJson = hookOpticsJson_;
-  const auto report =
-      options_.hookRuntime->dispatchHook(hookName, context, nullptr, false);
+  // A hook that threw ends the run: no later hook runs, and every event loop that reaches a
+  // dispatch stops (soft abort: the current event finishes).
+  if (trech::hookfailure::failed()) {
+    abortRunAfterHookFailure();
+    return {};
+  }
+  HookDispatchReport report;
+  try {
+    report = options_.hookRuntime->dispatchHook(hookName, context, nullptr, false);
+  } catch (const std::exception& error) {
+    // An exception must not escape a Geant4 user action: on a worker task it ends the task and
+    // the master waits for it forever. Latch it; the runner reports it after BeamOn.
+    if (trech::hookfailure::record(hookName, error.what())) {
+      G4cerr << "TRECH: " << trech::hookfailure::describe() << "\n"
+             << "TRECH: aborting the run (no further hooks are dispatched)." << G4endl;
+    }
+    abortRunAfterHookFailure();
+    return {};
+  }
   if (report.patchApplied) {
     hookPatchCount_ += 1;
   }
@@ -2530,6 +2549,17 @@ HookInferenceCounts TrechRunAction::dispatchHookContext(const std::string& hookN
     hookOutOfDomainCount_ += static_cast<int>(report.outOfDomainCount);
   }
   return {report.outOfDomainCount, report.starvedCount, report.scaleMismatchCount};
+}
+
+void TrechRunAction::abortRunAfterHookFailure() {
+  // The calling thread's run manager: a worker ends its own event loop. A soft abort never
+  // cuts an event short, so tallies stay whole-event.
+  if (auto* manager = G4RunManager::GetRunManager()) {
+    const auto state = G4StateManager::GetStateManager()->GetCurrentState();
+    if (state == G4State_GeomClosed || state == G4State_EventProc) {
+      manager->AbortRun(true);
+    }
+  }
 }
 
 void TrechRunAction::AddLowConfidenceEvent() {

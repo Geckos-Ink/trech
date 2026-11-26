@@ -70,7 +70,7 @@ def main() -> int:
             if re.search(r'_source"?\s*,\s*\{[^}]*"reference"', text):
                 fail(f"{relative}: operator-native scenario declares a reference-law switch")
 
-    # The two migrations unlocked by DiscreteTransition must never regress to
+    # The migrations unlocked by DiscreteTransition must never regress to
     # their old unqualified normal-path function names.
     forbidden = {
         "examples/scenarios/testscenario_h2o_electrolysis_combustion/testscenario_h2o_electrolysis_combustion.js": [
@@ -84,6 +84,11 @@ def main() -> int:
             "function stepRandomVelocity(",
             "function stepInside(",
             "function stepCleared(",
+        ],
+        "examples/scenarios/testscenario_osmotic/testscenario_osmotic.js": [
+            "function applyLangevinThermostat(",
+            "function stepParticle(",
+            "crossable:",
         ],
     }
     for relative, needles in forbidden.items():

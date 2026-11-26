@@ -366,6 +366,8 @@ private:
   int activeNEvents_ = 0;
   std::uint64_t activeSeed_ = 0;
   int activeRunId_ = -1;
+  // Stop the calling thread's event loop after a hook threw (see trech/core/HookFailure.hpp).
+  void abortRunAfterHookFailure();
   HookInferenceCounts dispatchHookContext(const std::string& hookName,
                                           HookRuntimeContext& context);
   std::string activeConfigJson_;

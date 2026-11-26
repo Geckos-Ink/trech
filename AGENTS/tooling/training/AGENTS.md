@@ -160,7 +160,12 @@ Read the root principles and the parent handbook first; then open only the subca
   `train_event_stratifier.py` / `train_surrogate.py` (console scripts `trech-train-*`; `.json`
   paths + planner are numpy-only, `.pt` needs the `[torch]` extra);
   [`distill_discrete_scenario_operators.py`](../../../tools/torch/distill_discrete_scenario_operators.py)
-  owns the validation-only H2O/efflux teachers and regenerates their portable models/manifests;
+  owns the validation-only H2O/efflux/osmotic teachers and regenerates their portable
+  models/manifests (`--only` retrains a subset). Two rules from the osmotic models: a learned
+  velocity response under velocity memory γ amplifies a constant bias by 1/(1−γ), so train the
+  velocity *change* on mirrored (−v, −noise) pairs and check the stationary drift, not only R²;
+  a certain `ctx.react` outcome is a target past the [0,1] bound (±0.25) so the clamp makes it
+  exact, and its quality is the clamped verdict's exactness, which R² understates;
   `plan_experiments.py` (active-learning coverage → `geant4_experiment_plan.json`; `--models`
   reads a trained model's exported domain and names the **operating points to simulate next**
   in raw input units — per-feature empty bins and the joint gaps between the regions training

@@ -4,8 +4,10 @@ This experiment and its scenario should be implemented and used for validation t
 
 <img src="../../studio/previews/testscenario_osmotic.gif" width="360" alt="Studio replay of water crossing a membrane as the simulated cell shrinks">
 
-Studio replays the current three-dimensional hook-layer comparison. The implementation
-notes below describe its evolution from the original two-dimensional model.
+Studio replays the three-dimensional hook-layer comparison. The preview and the classic replay
+were captured on 2026-11-12, before the operator path below became the default; they show the
+JS-law particle motion. The implementation notes below describe the scenario's evolution from the
+original two-dimensional model.
 
 The objective is to validate TRECH physics/chemistry engine by placing a simplified "cell" in a hypertonic environment. The engine must naturally simulate the spontaneous efflux of water driven entirely by microscopic kinetic collisions and dimensional exclusion, without relying on hardcoded macroscopic forces.
 
@@ -19,6 +21,53 @@ Cell-biology upgrade (2026-06-28): the scenario now reads as an evident biologic
 
 The committed validation case (`osmotic_shift_observed`, category `fluid`) now checks **9/9** expected behaviours: dimensional AND polarity exclusion, net osmotic water shift, early pore crossings, macroscopic flux growth, bounded kinetic energy, late external/internal pressure bias, observed membrane crenation, and membrane stability. Latest run: `net_water_flux_out=71`, first crossing tick 3, max mean KE 0.963 vs 0.81 target, late external/internal pressure 1.18, cell mean radius 28 → 21.3 (area −41%, crenated), 3016 wrong-polarized molecules expelled. The [classic replay with flux and pressure charts](../../tools/viz/demos/osmotic_dehydration.gif)
 uses the bath and membrane states emitted by that comparison.
+
+Operator migration (2026-11-26): the particles now move and cross by learned engine operators,
+not by JavaScript laws. Two models under `data/discrete_operators/` are the default
+(`physics_source=operator`):
+
+* **Velocity response** (`osmotic_thermostat_operator`, micro `ctx.evolve`). Each tick it
+  takes a molecule's velocity, mass and three seeded unit random numbers and returns the change
+  in velocity. It replaces `applyLangevinThermostat`, an Ornstein-Uhlenbeck refresh: a random
+  kick plus a pull back toward the bath's thermal speed.
+* **Channel passage** (`osmotic_crossing_operator`, micro `ctx.react`). For every molecule
+  touching the membrane, it decides from the molecule's radius and polarity, whether it meets a
+  pore, and the channel's declared width (0.6) and polarity (+1) whether the molecule crosses.
+  The species table no longer carries a `crossable` flag: that water passes while glucose and
+  the ions do not is the operator's verdict.
+
+JavaScript keeps what is structure or numerical machinery: pore placement, the channel and
+species declarations, free flight (x += v·dt), the bath walls, the reflection of a molecule that
+does not cross, and pressure scoring. The retired laws are `reference*` functions, run only with
+`--param physics_source='"reference"'`, and the reference run reproduces the previous output
+byte for byte. **The membrane's response is still the authored `integrateMembrane` law on both
+paths**: the pressure, area and bending terms that shrink and fold the cell.
+
+Two lessons from training, worth knowing before retraining either model:
+
+* *A velocity bias becomes a drift.* The velocity memory (γ = 0.96) multiplies any constant
+  error b in the learned velocity change by 1/(1−γ) = 25. The first fit, which output the new
+  velocity directly, had b ≈ 0.008 for glucose: a 0.2 steady drift, almost glucose's 0.28
+  thermal speed. Outside glucose piled against one bath wall, and the cell stopped shrinking. The
+  committed model outputs the small velocity *change*, trains on mirrored (−v, −noise) pairs,
+  and samples each mass on its own thermal scale. Its glucose drift is ≈0.013, and the bath
+  kinetic energy is within 1.3% of the teacher's for every species.
+* *Certainty needs a margin.* `ctx.react` clamps each learned hazard to [0, 1]. A blocked
+  molecule trained to exactly 0 would get a small positive prediction and, over thousands of
+  wall strikes, leak across. So the teacher writes certain passage as 1.25 and certain blocking
+  as −0.25. The clamp turns both into exact 1 and 0, and the run counts the clamps
+  (`inference.hazards_clamped`). For the three declared species the clamped hazard is exact on
+  both sides, at a pore or not. On 178,761 fresh rows more than 0.05 from the size threshold, 23
+  were inexact: all were a very small, wrong-polarity molecule in a very wide channel.
+
+The pair case `osmotic_operators_match_reference` compares the default run with the reference
+run on the water left inside, solute that crossed (must be 0), the cell's volume shrink and the
+late bath kinetic energy. At the default seed: inside water 10 vs 16, no solute crossed, shrink
+0.405 vs 0.423, kinetic energy 1.209 vs 1.210, no input outside the trained domain, and all 9
+`osmotic_shift_observed` flags on both paths. One trajectory per side is noisy, so the tolerances
+are set from a three-seed sweep (seeds 101 and 202 also pass all 9 flags on both paths). See the
+[migration ledger](../../AGENTS/scenarios/migrations/ROADMAP.md#scenario-migration-ledger--exact-authored-laws-and-learned-targets)
+for what remains.
 
 **1. Test Substance (The Dynamic Variable)**
 

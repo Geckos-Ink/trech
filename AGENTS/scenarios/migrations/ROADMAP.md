@@ -22,7 +22,10 @@ dated record below, and queue its residuals in the same change.
 
 - **P1** · R3 · Row 2 — CNT material → device → circuit cascade (cheap deterministic scenarios with validation cases). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
 - **P1** · R3 · Row 3 — magnetic-resonance forward dynamics. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
-- **P1** · R3 · Row 6 remainder — osmosis (efflux promoted 2026-07-26). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P1** · R3 · Row 6 remainder — osmosis membrane response: replace the authored `integrateMembrane` pressure/area/bending law with membrane-node operators (efflux promoted 2026-07-26; osmotic particle velocity response and channel passage promoted 2026-11-26). It is the run's hot path (642 vertices × 6 substeps × 6,000 ticks), so cost the per-substep inference before choosing the operator's granularity. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P2** · R3 · Seed-averaged osmotic pair: `osmotic_operators_match_reference` grades one trajectory per side, so its water/shrink tolerances (10 molecules, 0.20) are set from a three-seed sweep. Over seeds 31073101/101/202 the operator's mean shrink was 0.43 against the reference's 0.49 (0.405/0.324/0.550 vs 0.423/0.500/0.557), a possible low bias from the motion operator's residual glucose drift (≈0.013). Grade the means over ≥8 seeds per side and tighten the tolerances. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P2** · R2 · The osmotic operators take no particle-derived input: the bath runs on a 0 MeV geantino and the velocity and passage responses are distilled from the authored teacher alone. Condition them on Geant4-derived material facts, as the efflux crossing operator does with attenuation coefficients and event activation. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P3** · R3 · The osmotic channel-passage operator's clamped verdict is inexact for 23 of 178,761 fresh rows more than 0.05 from the size threshold, all of them a very small (radius ≈0.2) wrong-polarity molecule in a very wide channel (≈1.15). No declared species is there; fix it before the queued pore-width runs reach that corner. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
 - **P2** · R3 · The promoted efflux operators let one essential (retained) molecule cross at seed 201 (29/30 retained, `essentials_retained` false; found 2026-11-22 while pairing the closed-loop deploy run). The suite runs only the default seed, where 30/30 hold. Grade the crossing operator's selectivity over several seeds and fix the leak in the operator, not with a JS guard. ([detail](../../engine/inference/ROADMAP.md#efflux-closed-loop-deployment-2026-11-22))
 - **P2** · R3 · Row 4 — catalytic and oscillatory chemistry (elephant's toothpaste, Briggs–Rauscher). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
 - **P2** · R3 · Row 7 — lava lamp and two-liquid phase/transport (needs the bounded integrator prerequisite). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
@@ -108,7 +111,7 @@ needs.
   cathodes and recovers all 180 waters. `h2o_cycle_operator_matches_reference` passes 4/4 observer
   gaps and 22/22 trust/accounting checks; the original conservation/Geant4 gate remains green.
 
-- [partial: efflux promoted 2026-07-26; osmosis remains] **6 — Cellular efflux and osmosis**
+- [partial: efflux promoted 2026-07-26; osmotic particles promoted 2026-11-26; membrane remains] **6 — Cellular efflux and osmosis**
   ([`testscenario_efflux.js`](../../../examples/scenarios/testscenario_efflux/testscenario_efflux.js),
   [`testscenario_osmotic.js`](../../../examples/scenarios/testscenario_osmotic/testscenario_osmotic.js)).
   **Efflux landed:** `physics_source=operator` is now the default. A committed micro
@@ -121,10 +124,25 @@ needs.
   (transport) and 0.9827 (crossing); the operator run reports 351,232 exact run-accounted
   inferences, zero OOD/starvation, 76/80 waste cleared, 30/30 essential retained and R²=0.984.
   `efflux_operators_match_reference` passes 4/4 observer gaps + 22/22 trust checks.
-  **Osmosis remains:** replace `applyLangevinThermostat`, selective `stepParticle`
-  crossing/rejection and
-  `membraneTargetRadius`/`integrateMembrane` spring/turgor response with particle and membrane-node
-  operators; pores/species selectivity and inside/outside accounting remain declared topology.
+  **Osmotic particles landed (2026-11-26):** `physics_source=operator` is the default. A micro
+  `ctx.evolve` model (`osmotic_thermostat_operator`, holdout R² 0.9998) returns each molecule's
+  velocity change from its velocity, mass and three seeded unit innovations; a micro `ctx.react`
+  model (`osmotic_crossing_operator`) decides channel passage for every molecule at the membrane
+  from its radius, polarity, pore contact and the channel's declared width (0.6) and polarity
+  (+1). The species table lost its `crossable` flag: which species pass is the operator's verdict.
+  Certain passage/blocking is trained 0.25 past the [0,1] hazard bound, so the engine clamp makes
+  it exact for every declared species. JS keeps pore placement, free flight, bath walls, the
+  reflection of a molecule that stays, and pressure scoring. The retired `referenceApplyLangevinThermostat`
+  and `referenceStepParticle` run only with `physics_source=reference`, which reproduces the
+  previous run's 546 emits exactly. Default run: 1,373,463 run-accounted inferences (1,350,000 motion + 23,463 passage), zero OOD,
+  all 9 `osmotic_shift_observed` flags, and `osmotic_operators_match_reference` 4/4 gaps + 22/22
+  trust (inside water 10 vs 16, no solute crossed, shrink 0.405 vs 0.423, late kinetic energy
+  1.209 vs 1.210). Seeds 101 and 202 pass all 9 flags on both paths. A first motion fit that
+  output the new velocity directly carried a 0.008 glucose bias, which the velocity memory
+  amplified 25× into a drift that pinned outside glucose to a bath wall and stopped the shrink;
+  the committed fit learns the velocity change on mirrored (−v, −noise) pairs.
+  **Osmosis remains:** replace the `integrateMembrane` pressure/area/bending response with
+  membrane-node operators; pores and inside/outside accounting remain declared topology.
   Extend `efflux_first_order_kinetics` and `osmotic_shift_observed` with independent compound,
   concentration, temperature and pore-width runs; grade selectivity, clearance rate/half-life,
   flux direction, pressure delta, turgor/crenation and solute retention.

@@ -194,7 +194,7 @@ also rewrite that row.
 | Rank | Scenario | Grade | Evidence | What only it covers | Verdict |
 | --- | --- | --- | --- | --- | --- |
 | 1 | [`testscenario_efflux`](../../examples/scenarios/testscenario_efflux/testscenario_efflux.js) | B | 2 suite cases; [design](testscenario_efflux.md) | A frozen learned operator deployed in closed loop; the promoted row 6 half. | Core |
-| 2 | [`testscenario_osmotic`](../../examples/scenarios/testscenario_osmotic/testscenario_osmotic.js) | E | 1 suite case | Bucket slot 5 (ledger row 6 remainder). Its migration acceptance test. | Core |
+| 2 | [`testscenario_osmotic`](../../examples/scenarios/testscenario_osmotic/testscenario_osmotic.js) | C | 2 suite cases | Distilled particle velocity and channel-passage operators (2026-11-26); its authored membrane law is bucket slot 5 (ledger row 6 remainder), and this bundle is that migration's acceptance test. | Core |
 | 3 | [`testscenario_pascal`](../../examples/scenarios/testscenario_pascal/testscenario_pascal.js) | E | 1 suite case | Pressure transmission in rigid and deformable vessels; last step of ledger row 8. | Keep |
 
 ## 9. Magnetic resonance

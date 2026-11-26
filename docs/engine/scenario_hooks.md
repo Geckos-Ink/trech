@@ -234,6 +234,15 @@ All hooks are optional. `onTrackStart` / `onTrackEnd` (since 2026-11-14) fire on
 track, before its first step and after its last, with `ctx.track`; the engine installs its
 tracking action only when one of them is registered.
 
+**A hook that throws ends the run.** The engine stops the event loop after the current event,
+runs no further hook (not even `onRunEnd`), and `trech run` exits 1 with
+`TRECH error: hook <name> threw: <message>` and the JS stack. Output written before the failure
+stays on disk but is incomplete. Before 2026-11-26 a throw from an event, track or step hook
+hung the run on a Geant4 worker with no message. For example, `ctx.evolve` returns `null` in
+strict mode, so a guard such as
+`if (!report) throw new Error("needs the motion model")` now fails the run, with that text,
+when you forget `determinism: { mode: "predictive" }`.
+
 ### Initialization overrides
 
 `onInit` may return `{ override: { ... } }` before TRECH creates the Geant4 kernel. For
@@ -632,12 +641,19 @@ load. Changing either after startup requires a restart.
   - `testscenario_h2o_electrolysis_combustion.js` defaults to a meso `ctx.react` model over
     90 two-water cells. JS declares only the phase-eligible channel and H/O coefficient vectors;
     the old probability functions are reachable solely with `reaction_source=reference`.
+  - `testscenario_osmotic.js` uses a micro `ctx.evolve` model for each molecule's velocity
+    response and a micro `ctx.react` channel-passage model with two direct hazards
+    (`hazard_cross_out`, `hazard_cross_in`) over `inside`/`outside` molecule identity. The
+    passage model infers selectivity from declared size, polarity and channel width/polarity;
+    certain passage and blocking are trained past the [0,1] bound so the clamp makes them exact.
+    Its membrane response is still an authored law (`physics_source=reference` runs the old
+    Langevin and passage rule).
   - `testscenario_efflux.js` uses micro `ctx.evolve` for continuous particle transport and a
     separate micro `ctx.react` crossing model. Boundary-candidate selection and packet identity are
     topology/invariants; the old OU/advection/drift and crossing law is reachable solely with
     `physics_source=reference`.
 
-  Both summaries include `trech_operator_reference_pair_v1`, and the paired validator checks
+  Each summary includes `trech_operator_reference_pair_v1`, and the paired validator checks
   observer gaps plus contextual selection, held-out accuracy, scale/domain trust and exact
   `hook_predict_count` accounting.
 

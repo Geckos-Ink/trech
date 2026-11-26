@@ -300,6 +300,72 @@
     {
       "accuracy_warnings": [],
       "gates": {
+        "carried_accuracy": "pass",
+        "finite_on_domain": "pass",
+        "portable_metadata": "pass",
+        "structure": "pass",
+        "trust_profile": "pass"
+      },
+      "holdout_n": 6000,
+      "holdout_r2_min": 0.9693,
+      "inputs": 7,
+      "kind": "generic_surrogate_v1",
+      "measured": false,
+      "outputs": 2,
+      "parameter_count": 4802,
+      "path": "data/discrete_operators/osmotic_crossing_operator.json",
+      "problems": [],
+      "profile": {
+        "holdout_r2": true,
+        "joint_reference": true,
+        "measured_flag": false,
+        "measured_hull": true,
+        "occupancy": true,
+        "per_output_rmse": true,
+        "prediction_interval": false,
+        "scale_bands": true
+      },
+      "sha256": "058d498f56cccc463316ab0a56d7e2d25fa808a34ab9435a0c98fe27cda3a5f4",
+      "status": "pass",
+      "structure": "mlp(64x2,silu)",
+      "trust": "complete"
+    },
+    {
+      "accuracy_warnings": [],
+      "gates": {
+        "carried_accuracy": "pass",
+        "finite_on_domain": "pass",
+        "portable_metadata": "pass",
+        "structure": "pass",
+        "trust_profile": "pass"
+      },
+      "holdout_n": 6000,
+      "holdout_r2_min": 0.9998,
+      "inputs": 10,
+      "kind": "generic_surrogate_v1",
+      "measured": false,
+      "outputs": 3,
+      "parameter_count": 5059,
+      "path": "data/discrete_operators/osmotic_thermostat_operator.json",
+      "problems": [],
+      "profile": {
+        "holdout_r2": true,
+        "joint_reference": true,
+        "measured_flag": false,
+        "measured_hull": true,
+        "occupancy": true,
+        "per_output_rmse": true,
+        "prediction_interval": false,
+        "scale_bands": true
+      },
+      "sha256": "6b43752ecd3b7188ba72fbca87398f53e651658cc26b29cd68fc1ab854c218af",
+      "status": "pass",
+      "structure": "mlp(64x2,silu)",
+      "trust": "complete"
+    },
+    {
+      "accuracy_warnings": [],
+      "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
         "portable_metadata": "pass",
@@ -1761,20 +1827,20 @@
   "schema": "trech_ml_model_audit_v1",
   "totals": {
     "carried_r2_negative": 2,
-    "distilled_measured_false": 23,
+    "distilled_measured_false": 25,
     "failing": 0,
-    "finite_on_domain": 53,
-    "models": 53,
-    "structure_ok": 53,
-    "trust_complete": 17,
+    "finite_on_domain": 55,
+    "models": 55,
+    "structure_ok": 55,
+    "trust_complete": 19,
     "trust_none": 28,
     "trust_partial": 8,
-    "with_holdout_r2": 25,
-    "with_joint_reference": 17,
-    "with_measured_hull": 25,
-    "with_occupancy": 25,
-    "with_per_output_rmse": 25,
+    "with_holdout_r2": 27,
+    "with_joint_reference": 19,
+    "with_measured_hull": 27,
+    "with_occupancy": 27,
+    "with_per_output_rmse": 27,
     "with_prediction_interval": 5,
-    "with_scale_bands": 25
+    "with_scale_bands": 27
   }
 }

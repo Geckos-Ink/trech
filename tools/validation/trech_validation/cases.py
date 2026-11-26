@@ -33,6 +33,7 @@ RUN_NITROGEN_CYCLE = "out_nitrogen_cycle"
 RUN_H2O_FLUID = "out_h2o_fluid"
 RUN_PASCAL = "out_pascal"
 RUN_OSMOTIC = "out_osmotic"
+RUN_OSMOTIC_REFERENCE = "out_osmotic_reference"
 RUN_EFFLUX = "out_efflux"
 RUN_EFFLUX_REFERENCE = "out_efflux_reference"
 RUN_EFFLUX_DEPLOY = "out_efflux_learned_deploy"
@@ -3201,6 +3202,40 @@ H2O_CYCLE_OPERATOR_PAIR = OperatorReferencePairSpec(
 )
 
 
+OSMOTIC_OPERATOR_PAIR = OperatorReferencePairSpec(
+    name="osmotic_operators_match_reference",
+    description=(
+        "The default micro ctx.evolve particle velocity response and ctx.react "
+        "channel-passage operators of the osmotic cell are paired against the "
+        "retired JavaScript Langevin refresh and size/polarity passage law. The "
+        "pair grades the water endpoint inside the cell, solute that crossed "
+        "(none may), the cell's volume shrink and the late bath kinetic energy, "
+        "while requiring independent holdouts, contextual selection and exact "
+        "run-level inference accounting. The membrane's pressure/area/bending "
+        "response is still the authored law on both runs."
+    ),
+    category="biology",
+    runs=PairRunAliases(
+        reference=RUN_OSMOTIC_REFERENCE,
+        operator=RUN_OSMOTIC,
+    ),
+    emit_tag="final_summary",
+    pair_key="operator_vs_reference",
+    observables=(
+        "final_inside_h2o",
+        "solute_crossings",
+        "volume_shrink_fraction",
+        "late_mean_kinetic_energy",
+    ),
+    trust=OperatorTrustRequirements(
+        trained_scale="micro",
+        min_holdout_r2=0.96,
+        min_holdout_samples=5000,
+        max_out_of_domain_fraction=0.0,
+    ),
+)
+
+
 EFFLUX_OPERATOR_PAIR = OperatorReferencePairSpec(
     name="efflux_operators_match_reference",
     description=(
@@ -5884,6 +5919,7 @@ ALL_CASES: List[ValidationCase] = [
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),
+    OperatorReferencePairCase(OSMOTIC_OPERATOR_PAIR),
     EffluxFirstOrderKinetics(),
     OperatorReferencePairCase(EFFLUX_OPERATOR_PAIR),
     BeakerWaterPentaneInference(),

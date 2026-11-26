@@ -33,8 +33,8 @@ TRECH_VALIDATIONS["testscenario_osmotic"] = {
     {"id": "membrane_crenation_observed", "tag": "final_summary", "field": "validation.membrane_crenation_observed", "op": "eq", "expected": true},
     {"id": "membrane_stable", "tag": "final_summary", "field": "validation.membrane_stable", "op": "eq", "expected": true}
   ],
-  "physics_status": "reference_only",
-  "limitations": "3D particle transport/crossing and pressure-driven area-conserving membrane response",
+  "physics_status": "operator_backed",
+  "limitations": "The pressure-driven, area-conserving membrane response (integrateMembrane) is still an authored law on both paths; particle velocity response and channel passage are distilled operators (not measurements).",
   "reference": "tools/validation/trech_validation/cases.py"
 };
 

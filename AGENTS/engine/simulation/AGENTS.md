@@ -23,6 +23,18 @@ and pending migration items for the pinned checkout: [`docs/engine/GEANT4_featur
   It only reads Geant4 state. `ActionInitialization` also registers `TrechTrackingAction` while
   tracing (its hooks stay off unless a track hook is declared). End-to-end gate:
   `tests/test_geant4_trace.py` (CTest `trech_geant4_trace`, serial and two workers).
+- **A hook exception never leaves a Geant4 user action (2026-11-26).** `JsRuntime::dispatchHook`
+  turns a JS throw into `std::runtime_error`. Escaping a user action on a PTL worker task, it ends
+  the task and the master waits in `CreateAndStartWorkers` forever (0% CPU, no message; even
+  `threads: 1` runs events on a worker). `TrechRunAction::dispatchHookContext` catches it into the
+  process-wide latch [`trech/core/HookFailure.hpp`](../../../include/trech/core/HookFailure.hpp)
+  (first failure kept), soft-aborts the calling thread's event loop, and dispatches no further
+  hook: every later dispatch re-aborts its own loop instead, so each remaining task ends at its
+  next event. `GeantRunner` resets the latch before a run and, after `BeamOn`, throws
+  `hook <name> threw: <message>`; `trech run` prints `TRECH error: …` and exits 1, and a lab batch
+  fails that batch only. Outputs written before the failure stay on disk; `onRunEnd` does not run.
+  Gate: `tests/test_hook_failure_exit.py` (CTest `trech_hook_failure_exit`: a throw in
+  `onEventStart`, serial and two workers, and in `onRunStart`).
 - **Post-`Initialize` carriers are pre-allocated before `SetUserInitialization`.** `derivedOptics`,
   `analyticChecks`, `materialProbes` are `shared_ptr` carriers on `RunOptions` filled after Geant4
   `Initialize` (tables built) in [`src/sim/GeantRunner.cpp`](../../../src/sim/GeantRunner.cpp) and paired

@@ -250,12 +250,103 @@ def _efflux_crossing_rows(seed: int, count: int) -> List[Row]:
     return rows
 
 
+# --- Osmotic cell (testscenario_osmotic) -------------------------------------------------------
+# Certain passage/blocking is encoded as a margin target this far past the engine's [0,1] hazard
+# bound: any prediction beyond the bound is clamped by ctx.react to exactly 1 (always crosses) or 0
+# (never crosses). A target of exactly 0 would leave a small positive prediction, and with
+# thousands of wall strikes per run that leaks blocked solute across the membrane.
+OSMOTIC_CERTAINTY_MARGIN = 0.25
+
+
+def _bounded_gaussian(rng: random.Random, limit: float = 3.5) -> float:
+    return max(-limit, min(limit, rng.gauss(0.0, 1.0)))
+
+
+def _osmotic_thermostat_rows(seed: int, count: int) -> List[Row]:
+    """Per-particle Ornstein-Uhlenbeck velocity refresh of the osmotic bath.
+
+    gamma = 1 - coupling; sigma = mean_speed * sqrt(m_ref / m); the refreshed velocity is
+    gamma*v + noise*sigma*sqrt(1 - gamma^2). The rule has no position dependence, so positions
+    are not inputs; free flight (x += v dt) is kinematics the scenario integrates.
+
+    Targets are the per-tick velocity change d_v*_dt (small, so the fit's absolute error is
+    small). A constant velocity bias b is amplified
+    by the velocity memory to a drift b/(1-gamma) (25x at coupling 0.04), which pins slow
+    solute to a bath wall, so rows come in mirrored (-v, -noise) pairs: the law is odd in them
+    and the training set then carries no net bias. Velocities are drawn on each mass's own
+    thermal scale (+-4.5 sigma), so heavy, slow solute is covered as densely as water."""
+    rng = random.Random(seed)
+    rows: List[Row] = []
+    for row_index in range(0, count, 2):
+        # Log-uniform mass covers water (1), the ion (1.2) and glucose (10) evenly.
+        mass = math.exp(rng.uniform(math.log(0.8), math.log(12.5)))
+        mean_speed = rng.uniform(0.7, 1.1)
+        mass_ref = rng.uniform(0.8, 1.2)
+        coupling = rng.uniform(0.02, 0.07)
+        sigma = mean_speed * math.sqrt(mass_ref / max(mass, 1e-9))
+        velocity = [sigma * rng.uniform(-4.5, 4.5) for _ in range(3)]
+        # Corner rows pin the bounded-noise extremes into the measured input domain.
+        noise = [_bounded_gaussian(rng) for _ in range(3)]
+        if row_index < 6:
+            noise[row_index // 2] = -3.5
+        gamma = max(0.0, min(0.999, 1.0 - coupling))
+        scale = sigma * math.sqrt(max(0.0, 1.0 - gamma * gamma))
+        for sign in (1.0, -1.0):
+            v = [sign * c for c in velocity]
+            n = [sign * c for c in noise]
+            nv = [gamma * v[k] + n[k] * scale for k in range(3)]
+            rows.append({
+                "vx": v[0], "vy": v[1], "vz": v[2], "mass_u": mass,
+                "noise_x": n[0], "noise_y": n[1], "noise_z": n[2],
+                "water_mean_speed": mean_speed, "water_mass_u": mass_ref,
+                "thermostat_coupling": coupling,
+                "d_vx_dt": nv[0] - v[0], "d_vy_dt": nv[1] - v[1], "d_vz_dt": nv[2] - v[2],
+            })
+    return rows[:count]
+
+
+def _osmotic_crossing_rows(seed: int, count: int) -> List[Row]:
+    """Channel passage of a particle that reached the membrane.
+
+    A particle passes when it meets a pore (`in_pore`), fits the channel
+    (radius <= channel radius) and carries the channel's polarity; otherwise the
+    wall reflects it. The hazard of the direction the particle is on (inside ->
+    out, outside -> in) is certain passage or certain blocking."""
+    rng = random.Random(seed)
+    rows: List[Row] = []
+    for _ in range(count):
+        inside = 1.0 if rng.random() < 0.5 else 0.0
+        in_pore = 1.0 if rng.random() < 0.5 else 0.0
+        channel_radius = rng.uniform(0.40, 1.20)
+        # Half the rows sit within 0.3 of the channel radius, where the size verdict flips.
+        if rng.random() < 0.5:
+            radius = max(0.2, channel_radius + rng.uniform(-0.3, 0.3))
+        else:
+            radius = rng.uniform(0.2, 2.4)
+        polarity = 1.0 if rng.random() < 0.5 else -1.0
+        channel_polarity = 1.0 if rng.random() < 0.5 else -1.0
+        passes = (in_pore > 0.5 and radius <= channel_radius and
+                  polarity * channel_polarity > 0.0)
+        certain = 1.0 + OSMOTIC_CERTAINTY_MARGIN
+        blocked = -OSMOTIC_CERTAINTY_MARGIN
+        rows.append({
+            "inside": inside, "outside": 1.0 - inside, "in_pore": in_pore,
+            "particle_radius": radius, "polarity": polarity,
+            "channel_radius": channel_radius, "channel_polarity": channel_polarity,
+            "hazard_cross_out": certain if passes and inside > 0.5 else blocked,
+            "hazard_cross_in": certain if passes and inside < 0.5 else blocked,
+        })
+    return rows
+
+
 # name -> (row generator, hook tag, characteristic size in mm). Used by `fresh_run` so committed
 # operators can be re-checked on runs they never saw (trech_torch.recheck_models).
 FRESH_RUN_PRODUCERS = {
     "h2o_cycle_transition_operator": (lambda seed, n: _h2o_rows(seed, n), "h2o_cycle_transition_teacher", 120.0),
     "efflux_transport_operator": (lambda seed, n: _efflux_transport_rows(seed, n), "efflux_transport_teacher", 0.10),
     "efflux_crossing_operator": (lambda seed, n: _efflux_crossing_rows(seed, n), "efflux_crossing_teacher", 0.10),
+    "osmotic_thermostat_operator": (lambda seed, n: _osmotic_thermostat_rows(seed, n), "osmotic_thermostat_teacher", 0.10),
+    "osmotic_crossing_operator": (lambda seed, n: _osmotic_crossing_rows(seed, n), "osmotic_crossing_teacher", 0.10),
 }
 
 
@@ -272,7 +363,7 @@ def fresh_run(out_dir: str, seed: int, rows: int, name: str) -> None:
 def _train(name: str, tag: str, inputs: List[str], outputs: List[str],
            root: Path, model_root: Path, rows: Callable[[int, int], List[Row]],
            scale_mm: float, seed: int, hidden: int, epochs: int,
-           teacher: str, description: str) -> None:
+           teacher: str, description: str, extra: Iterable[str] = ()) -> None:
     train_dir = root / name / "train"
     holdout_dir = root / name / "holdout"
     _make_run(train_dir, rows(seed, 24000), tag, scale_mm, seed)
@@ -287,7 +378,7 @@ def _train(name: str, tag: str, inputs: List[str], outputs: List[str],
         "--out-json", str(out_json), "--manifest", str(manifest),
         "--hidden", str(hidden), "--epochs", str(epochs), "--lr", "0.004",
         "--seed", str(seed), "--teacher", teacher, "--measured", "false",
-        "--note", description,
+        "--note", description, *extra,
     ])
     if rc != 0:
         raise SystemExit(rc)
@@ -301,7 +392,7 @@ def main() -> int:
     parser.add_argument("--epochs", type=int, default=900)
     parser.add_argument("--only", action="append", default=None,
                         help="retrain only the named operator(s) (repeatable); "
-                             "default retrains all three")
+                             "default retrains all")
     args = parser.parse_args()
     work_root = Path(args.work_root).resolve()
     model_root = Path(args.model_root).resolve()
@@ -364,6 +455,40 @@ def main() -> int:
           "normal-path selectivity/rate mapping. Packet identity, availability "
           "and seeded stochastic acceptance are engine-owned; targets are not "
           "measurements.")
+
+    if wanted("osmotic_thermostat_operator"):
+        _train(
+          "osmotic_thermostat_operator", "osmotic_thermostat_teacher",
+          ["vx", "vy", "vz", "mass_u", "noise_x", "noise_y", "noise_z",
+           "water_mean_speed", "water_mass_u", "thermostat_coupling"],
+          ["d_vx_dt", "d_vy_dt", "d_vz_dt"],
+          # As for efflux transport: the velocity memory gamma sets the bath's kinetic energy
+          # (variance sigma^2 (1-gamma^2)/(1-gamma'^2)) and amplifies any velocity bias into a
+          # drift, so the fit gets width and epochs.
+          work_root, model_root, _osmotic_thermostat_rows, 0.10, 2026112601,
+          64, max(args.epochs, 4000),
+          "validation-only osmotic Langevin (OU) velocity refresh reference",
+          "Micro per-particle 3D velocity response (Langevin refresh) of the osmotic bath, "
+          "distilled from the retired JS applyLangevinThermostat. Free flight, bath walls, "
+          "membrane reflection and seeded noise generation remain numerical machinery; targets are "
+          "not measurements.",
+          # Anneal the step: the residual bias, not the variance, is what the bath amplifies.
+          extra=("--lr-final-factor", "0.05"))
+
+    if wanted("osmotic_crossing_operator"):
+        _train(
+          "osmotic_crossing_operator", "osmotic_crossing_teacher",
+          ["inside", "outside", "in_pore", "particle_radius", "polarity",
+           "channel_radius", "channel_polarity"],
+          ["hazard_cross_out", "hazard_cross_in"],
+          work_root, model_root, _osmotic_crossing_rows, 0.10, 2026112602,
+          64, max(args.epochs, 2400),
+          "validation-only osmotic channel size/polarity passage reference",
+          "Micro membrane-channel passage hazards distilled from the retired JS stepParticle "
+          "crossing rule (pore alignment, size and polarity). Certain passage/blocking is a target "
+          f"{OSMOTIC_CERTAINTY_MARGIN} past the [0,1] bound so the engine clamp returns exact 1/0. "
+          "Pore placement, inside/outside identity and seeded acceptance are engine/topology; "
+          "targets are not measurements.")
     return 0
 
 

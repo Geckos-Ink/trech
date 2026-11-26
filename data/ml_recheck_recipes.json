@@ -710,6 +710,74 @@
     20261152
    ],
    "note": "distilled from the reduced foaming law authored in polyurethane_foam.js; the original runs (build/dev/operator_harvest/*, incl. boundary/fullpop sampler variants no longer in the scenario) were not recorded: no holdout regeneration; fresh runs are new initial temperatures / steps"
+  },
+  {
+   "model": "data/discrete_operators/osmotic_thermostat_operator.json",
+   "producer": {
+    "kind": "python",
+    "script": "tools/torch/distill_discrete_scenario_operators.py",
+    "function": "fresh_run",
+    "args": {
+     "name": "osmotic_thermostat_operator"
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "osmotic_thermostat_teacher",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    2026112601,
+    2026212604
+   ],
+   "fresh_seeds": [
+    2026512611,
+    2026612612
+   ],
+   "rows": 6000,
+   "training": {
+    "seed": 2026112601,
+    "rows": 24000
+   },
+   "note": "validation-only teacher re-run on new seeded operating points; grades the distillation, not the physics",
+   "holdout": {
+    "seed": 2026212604,
+    "rows": 6000
+   }
+  },
+  {
+   "model": "data/discrete_operators/osmotic_crossing_operator.json",
+   "producer": {
+    "kind": "python",
+    "script": "tools/torch/distill_discrete_scenario_operators.py",
+    "function": "fresh_run",
+    "args": {
+     "name": "osmotic_crossing_operator"
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "osmotic_crossing_teacher",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    2026112602,
+    2026212605
+   ],
+   "fresh_seeds": [
+    2026512621,
+    2026612622
+   ],
+   "rows": 6000,
+   "training": {
+    "seed": 2026112602,
+    "rows": 24000
+   },
+   "note": "validation-only teacher re-run on new seeded operating points; grades the distillation, not the physics",
+   "holdout": {
+    "seed": 2026212605,
+    "rows": 6000
+   }
   }
  ]
 }

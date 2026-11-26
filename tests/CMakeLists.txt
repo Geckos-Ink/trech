@@ -422,6 +422,14 @@ if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
       "$<TARGET_FILE:trech>")
   set_tests_properties(trech_lab_geometry_refusal PROPERTIES TIMEOUT 300)
 endif()
+# A hook that throws ends `trech run` with exit 1 and its message, serial and multi-worker,
+# instead of hanging the master on a dead worker task.
+if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
+  add_test(NAME trech_hook_failure_exit
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_hook_failure_exit.py"
+      "$<TARGET_FILE:trech>")
+  set_tests_properties(trech_hook_failure_exit PROPERTIES TIMEOUT 400)
+endif()
 # Engine trace, Geant4 side: kernel/run/event/track/step records and tallies from a real kernel,
 # serial and with two workers, traced vs untraced byte identity, run_end provenance reference.
 if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)

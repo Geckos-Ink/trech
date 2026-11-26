@@ -34,6 +34,17 @@
 // lobe count, pattern, depth or target volume is prescribed. Particles collide
 // with, cross, and are swept by the ACTUAL deformed membrane.
 //
+// Physics source (`physics_source`, default `operator`): the particle motion
+// response (the Langevin velocity refresh) is a learned micro `ctx.evolve` operator and
+// channel passage is a learned micro `ctx.react` operator that decides, from the
+// particle's size and polarity and the channel's declared width and polarity,
+// whether a molecule at a pore crosses. JS keeps the declared structure (pore
+// placement, channel width/polarity, species size/polarity), the bath walls,
+// the membrane reflection and pressure scoring. The retired JS laws are
+// `reference*` and run only with `physics_source=reference`. The membrane's
+// pressure/area/bending response (`integrateMembrane`) is still an authored law
+// on both paths (migration ledger row 6).
+//
 // The scenario is reproducible because both Geant4 and the hook RNG are
 // seeded; no wall-clock or external state is consulted.
 
@@ -45,6 +56,13 @@ if (!helpers) {
 
 const units = helpers.units;
 const geometry = helpers.geometry;
+
+const physicsSource = TRECH_PARAMETER("physics_source");
+const THERMOSTAT_MODEL = "osmotic_thermostat_operator";
+const CROSSING_MODEL = "osmotic_crossing_operator";
+const THERMOSTAT_ROLE = "osmotic_particle_motion";
+const CROSSING_ROLE = "osmotic_channel_passage";
+const OSMOTIC_ELEMENT_KIND = "osmotic_solute";
 
 // --- Simulation parameters (relative units per docs/scenarios/testscenario_osmotic-todo.md) ---
 // Velocity / time units are chosen so a "tick" corresponds to roughly the
@@ -127,6 +145,8 @@ const cfg = {
   // accumulates deterministically; MT event ordering otherwise varies the net
   // water flux run to run.
   run: { nEvents: TOTAL_TICKS, seed: 31073101, threads: 1 },
+  // Operator inference needs predictive mode; the reference path stays byte-reproducible strict.
+  determinism: { mode: physicsSource === "operator" ? "predictive" : "strict" },
   system: {
     enable: true,
     mode: "steady_state",
@@ -152,6 +172,24 @@ const cfg = {
       })
     ]
   },
+  models: physicsSource === "operator" ? [
+    {
+      name: THERMOSTAT_MODEL,
+      scale: "micro",
+      operator_role: THERMOSTAT_ROLE,
+      element_kind: OSMOTIC_ELEMENT_KIND,
+      required_context_keys: ["water_mean_speed", "water_mass_u", "thermostat_coupling"],
+      path: "data/discrete_operators/osmotic_thermostat_operator.json"
+    },
+    {
+      name: CROSSING_MODEL,
+      scale: "micro",
+      operator_role: CROSSING_ROLE,
+      element_kind: OSMOTIC_ELEMENT_KIND,
+      required_context_keys: ["channel_radius", "channel_polarity"],
+      path: "data/discrete_operators/osmotic_crossing_operator.json"
+    }
+  ] : [],
   hooks: {
     maxStepCallbacks: 1,
     maxEmitsPerCallback: 16,
@@ -159,18 +197,20 @@ const cfg = {
   }
 };
 
-// --- Species table -----------------------------------------------------------
-// polarity: +1 == correctly polarized for the channel; -1 == wrong polarity.
-// crossable: whether the channel will pass this species when aligned with a
-// pore. Only correctly-polarized water crosses; glucose is also size-excluded.
+// --- Species table and channel structure ------------------------------------
+// polarity: +1 == the channel's polarity; -1 == wrong polarity. Which species
+// pass is not declared: on the operator path the channel-passage operator
+// infers it from these sizes/polarities and the channel's declared width and
+// polarity (water fits and matches; glucose is too wide; the ion fits but has
+// the wrong polarity).
 const SPECIES = {
-  h2o: { mass: SCENARIO.waterMass, radius: SCENARIO.waterRadius,
-         polarity: +1, crossable: true },
-  glucose: { mass: SCENARIO.glucoseMass, radius: SCENARIO.glucoseRadius,
-             polarity: -1, crossable: false },
-  ion: { mass: SCENARIO.ionMass, radius: SCENARIO.ionRadius,
-         polarity: -1, crossable: false }
+  h2o: { mass: SCENARIO.waterMass, radius: SCENARIO.waterRadius, polarity: +1 },
+  glucose: { mass: SCENARIO.glucoseMass, radius: SCENARIO.glucoseRadius, polarity: -1 },
+  ion: { mass: SCENARIO.ionMass, radius: SCENARIO.ionRadius, polarity: -1 }
 };
+// Channel (aquaporin-like) structure: the widest molecule radius the pore
+// admits and the polarity its gate accepts.
+const CHANNEL = { radius: 0.6, polarity: +1 };
 
 // --- Coarse-grained MD helpers (closures captured by the hooks) ---
 function thermalSpeed(massU) {
@@ -458,7 +498,10 @@ function clampDomain(particle, half) {
   }
 }
 
-function applyLangevinThermostat(particle, rng) {
+// --- Retired JS laws (physics_source=reference only) -------------------------
+// The validation-only teacher that tools/torch/distill_discrete_scenario_operators.py
+// distils into the osmotic operators. The normal path never calls them.
+function referenceApplyLangevinThermostat(particle, rng) {
   // Ornstein-Uhlenbeck velocity refresh: Brownian randomness without
   // unbounded heating, centered on the scenario's 310 K kinetic scale.
   const gamma = Math.max(0.0, Math.min(0.999, 1.0 - SCENARIO.thermostatCoupling));
@@ -469,8 +512,15 @@ function applyLangevinThermostat(particle, rng) {
   particle.vz = gamma * particle.vz + gaussian01(rng) * noise;
 }
 
-function stepParticle(particle, dt, rng, pores, membrane) {
-  applyLangevinThermostat(particle, rng);
+// The retired passage rule: a molecule crosses at a pore when it fits the
+// channel and carries the channel's polarity.
+function referenceChannelPasses(particle, inPore) {
+  return inPore && particle.radius <= CHANNEL.radius &&
+    particle.polarity * CHANNEL.polarity > 0;
+}
+
+function referenceStepParticle(particle, dt, rng, pores, membrane) {
+  referenceApplyLangevinThermostat(particle, rng);
   particle.x += particle.vx * dt;
   particle.y += particle.vy * dt;
   particle.z += particle.vz * dt;
@@ -486,8 +536,8 @@ function stepParticle(particle, dt, rng, pores, membrane) {
     return { impulse, crossed, rejected, side: particle.inside };
   }
   const radius = localMembraneRadius(membrane, particle.x, particle.y, particle.z, r);
-  const canCross = SPECIES[particle.kind].crossable &&
-    alignsWithPore(particle.x / r, particle.y / r, particle.z / r, pores);
+  const canCross = referenceChannelPasses(particle,
+    alignsWithPore(particle.x / r, particle.y / r, particle.z / r, pores));
   if (particle.inside && r >= radius - particle.radius) {
     if (canCross) {
       particle.inside = false;
@@ -506,6 +556,145 @@ function stepParticle(particle, dt, rng, pores, membrane) {
     }
   }
   return { impulse, crossed, rejected, side: particle.inside };
+}
+
+// --- Operator path (physics_source=operator, the default) ---------------------
+const MOTION_FIELDS = ["vx", "vy", "vz"];
+
+function boundedGaussian01(rng) {
+  // The operator learned the response to unit innovations within +-3.5.
+  return Math.max(-3.5, Math.min(3.5, gaussian01(rng)));
+}
+
+function recordOperatorTrust(state, report) {
+  if (!report || !Array.isArray(report.trace)) {
+    return;
+  }
+  for (let i = 0; i < report.trace.length; i += 1) {
+    const trace = report.trace[i];
+    (trace.outOfDomainInputs || []).forEach((k) => { state.operatorOodInputs[k] = true; });
+    (trace.starvedInputs || []).forEach((k) => { state.operatorStarvedInputs[k] = true; });
+  }
+}
+
+function selectedModel(report, model) {
+  return !!(report && report.ran && report.selection &&
+    report.selection.status === "selected" &&
+    report.selection.selectedModels.indexOf(model) >= 0);
+}
+
+// Every particle's velocity response for one tick, by the learned motion
+// operator. JS supplies the velocity, mass and seeded unit innovations; the
+// operator owns how they change the velocity. Free flight (x += v dt) and the
+// bath walls are kinematics/numerical machinery, as on the reference path.
+function evolveParticlesWithOperator(ctx, state) {
+  const particles = state.particles;
+  const fields = { vx: [], vy: [], vz: [] };
+  const aux = { mass_u: [], noise_x: [], noise_y: [], noise_z: [] };
+  for (let i = 0; i < particles.length; i += 1) {
+    const p = particles[i];
+    for (const k of MOTION_FIELDS) fields[k].push(p[k]);
+    aux.mass_u.push(p.mass);
+    aux.noise_x.push(boundedGaussian01(ctx.rng));
+    aux.noise_y.push(boundedGaussian01(ctx.rng));
+    aux.noise_z.push(boundedGaussian01(ctx.rng));
+  }
+  const report = ctx.evolve({
+    dt: SCENARIO.dt,
+    fields: MOTION_FIELDS,
+    state: fields,
+    aux,
+    context: {
+      water_mean_speed: SCENARIO.waterMeanSpeed,
+      water_mass_u: SCENARIO.waterMass,
+      thermostat_coupling: SCENARIO.thermostatCoupling
+    },
+    operator_role: THERMOSTAT_ROLE
+  });
+  if (!selectedModel(report, THERMOSTAT_MODEL)) {
+    throw new Error("physics_source=operator requires the osmotic motion ctx.evolve model");
+  }
+  for (let i = 0; i < particles.length; i += 1) {
+    const p = particles[i];
+    for (const k of MOTION_FIELDS) p[k] = fields[k][i];
+    p.x += p.vx * SCENARIO.dt;
+    p.y += p.vy * SCENARIO.dt;
+    p.z += p.vz * SCENARIO.dt;
+    clampDomain(p, SCENARIO.domainHalfSize);
+  }
+  state.thermostatInferences += Number(report.inferenceCount || 0);
+  state.operatorOutOfDomain += Number(report.outOfDomainInferences || 0);
+  recordOperatorTrust(state, report);
+  state.thermostatReport = report;
+}
+
+// Molecules that reached the deformed membrane this tick ask the channel-
+// passage operator whether they cross. Pore placement, the particle's size and
+// polarity and the channel's width and polarity are declared structure; which
+// combinations pass is the operator's. A molecule that does not cross is
+// reflected by the wall (numerical contact), which scores its impulse.
+function crossMembraneWithOperator(ctx, state) {
+  const candidates = [];
+  const radii = [];
+  const transition = { inside: [], outside: [] };
+  const aux = { in_pore: [], particle_radius: [], polarity: [] };
+  for (let i = 0; i < state.particles.length; i += 1) {
+    const p = state.particles[i];
+    const r = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+    if (r < 1e-9) continue;
+    const wall = localMembraneRadius(state.membrane, p.x, p.y, p.z, r);
+    const atWall = p.inside ? r >= wall - p.radius : r <= wall + p.radius;
+    if (!atWall) continue;
+    candidates.push(p);
+    radii.push([r, wall]);
+    transition.inside.push(p.inside ? 1 : 0);
+    transition.outside.push(p.inside ? 0 : 1);
+    aux.in_pore.push(alignsWithPore(p.x / r, p.y / r, p.z / r, state.pores) ? 1 : 0);
+    aux.particle_radius.push(p.radius);
+    aux.polarity.push(p.polarity);
+  }
+  const result = { candidates: candidates.length, crossedOut: 0, crossedIn: 0,
+                   impulseInside: 0.0, impulseOutside: 0.0, rejected: [] };
+  if (candidates.length === 0) {
+    return result;
+  }
+  const report = ctx.react({
+    dt: SCENARIO.dt,
+    species: ["inside", "outside"],
+    state: transition,
+    aux,
+    context: { channel_radius: CHANNEL.radius, channel_polarity: CHANNEL.polarity },
+    channels: [
+      { name: "cross_out", delta: { inside: -1, outside: 1 } },
+      { name: "cross_in", delta: { inside: 1, outside: -1 } }
+    ],
+    conservation: [{ name: "molecule_identity", coefficients: { inside: 1, outside: 1 } }],
+    operator_role: CROSSING_ROLE
+  });
+  if (!report || !report.transitionSchemaValid || !report.hazardSchemaValid ||
+      !selectedModel(report, CROSSING_MODEL)) {
+    throw new Error("physics_source=operator requires the osmotic channel ctx.react model");
+  }
+  for (let i = 0; i < candidates.length; i += 1) {
+    const p = candidates[i];
+    const nowInside = transition.inside[i] === 1;
+    if (nowInside !== p.inside) {
+      if (p.inside) result.crossedOut += 1; else result.crossedIn += 1;
+      p.inside = nowInside;
+      continue;
+    }
+    const impulse = reflectAtRadius(p, radii[i][1], radii[i][0]);
+    if (p.inside) result.impulseInside += impulse; else result.impulseOutside += impulse;
+    if (p.kind !== "h2o") result.rejected.push(p);
+  }
+  state.crossingInferences += Number(report.inferenceCount || 0);
+  state.operatorOutOfDomain += Number(report.outOfDomainInferences || 0);
+  state.crossingDraws += Number(report.drawCount || 0);
+  state.crossingTransitions += Number(report.transitionsAccepted || 0);
+  state.hazardsClamped += Number(report.hazardsClamped || 0);
+  recordOperatorTrust(state, report);
+  state.crossingReport = report;
+  return result;
 }
 
 // The membrane is overdamped and moves every tick: a particle it sweeps past is
@@ -653,6 +842,18 @@ function ensureState(ctx) {
     ctx.state.latePressureInternalSum = 0.0;
     ctx.state.latePressureExternalSum = 0.0;
     ctx.state.latePressureWindows = 0;
+    ctx.state.lateMeanKineticEnergySum = 0.0;
+    ctx.state.lateMeanKineticEnergyWindows = 0;
+    ctx.state.thermostatInferences = 0;
+    ctx.state.crossingInferences = 0;
+    ctx.state.crossingDraws = 0;
+    ctx.state.crossingTransitions = 0;
+    ctx.state.hazardsClamped = 0;
+    ctx.state.operatorOutOfDomain = 0;
+    ctx.state.operatorOodInputs = {};
+    ctx.state.operatorStarvedInputs = {};
+    ctx.state.thermostatReport = null;
+    ctx.state.crossingReport = null;
     ctx.state.initialMembraneMeanRadius = ctx.state.membrane.meanRadius;
     ctx.state.minMembraneMeanRadius = ctx.state.membrane.meanRadius;
     ctx.state.initialized = true;
@@ -735,45 +936,59 @@ globalThis.TRECH_HOOKS = {
     let tickImpulseInside = 0.0;
     let tickImpulseOutside = 0.0;
     const particles = state.particles;
-    for (let i = 0; i < particles.length; i += 1) {
-      const p = particles[i];
-      const wasInside = p.inside;
-      const result = stepParticle(p, SCENARIO.dt, ctx.rng, state.pores, state.membrane);
-      if (result.impulse > 0.0) {
-        if (wasInside) {
-          state.impulseAccumInternal += result.impulse;
-          tickImpulseInside += result.impulse;
-        } else {
-          state.impulseAccumExternal += result.impulse;
-          tickImpulseOutside += result.impulse;
-        }
+    const recordRejection = (p) => {
+      state.rejectionsThisWindow += 1;
+      state.totalRejections += 1;
+      // Keep a small, deterministic sample of expulsion points (membrane
+      // strikes by wrong-polarized / oversized molecules) for inspection.
+      if (state.recentExpelled.length < 24 &&
+          (state.totalRejections % 5 === 0)) {
+        state.recentExpelled.push({
+          x: round3(p.x),
+          y: round3(p.y),
+          z: round3(p.z),
+          k: p.kind,
+          i: p.inside
+        });
       }
-      if (result.rejected) {
-        state.rejectionsThisWindow += 1;
-        state.totalRejections += 1;
-        // Keep a small, deterministic sample of expulsion points (membrane
-        // strikes by wrong-polarized / oversized molecules) for inspection.
-        if (state.recentExpelled.length < 24 &&
-            (state.totalRejections % 5 === 0)) {
-          state.recentExpelled.push({
-            x: round3(p.x),
-            y: round3(p.y),
-            z: round3(p.z),
-            k: p.kind,
-            i: p.inside
-          });
+    };
+    if (physicsSource === "operator") {
+      evolveParticlesWithOperator(ctx, state);
+      const crossing = crossMembraneWithOperator(ctx, state);
+      crossingsOut = crossing.crossedOut;
+      crossingsIn = crossing.crossedIn;
+      tickImpulseInside = crossing.impulseInside;
+      tickImpulseOutside = crossing.impulseOutside;
+      state.impulseAccumInternal += crossing.impulseInside;
+      state.impulseAccumExternal += crossing.impulseOutside;
+      crossing.rejected.forEach(recordRejection);
+    } else {
+      for (let i = 0; i < particles.length; i += 1) {
+        const p = particles[i];
+        const wasInside = p.inside;
+        const result = referenceStepParticle(p, SCENARIO.dt, ctx.rng, state.pores, state.membrane);
+        if (result.impulse > 0.0) {
+          if (wasInside) {
+            state.impulseAccumInternal += result.impulse;
+            tickImpulseInside += result.impulse;
+          } else {
+            state.impulseAccumExternal += result.impulse;
+            tickImpulseOutside += result.impulse;
+          }
         }
-      }
-      if (result.crossed) {
-        if (wasInside && !p.inside) {
-          crossingsOut += 1;
-          state.insideWaterCount -= 1;
-        } else if (!wasInside && p.inside) {
-          crossingsIn += 1;
-          state.insideWaterCount += 1;
+        if (result.rejected) {
+          recordRejection(p);
+        }
+        if (result.crossed) {
+          if (wasInside && !p.inside) {
+            crossingsOut += 1;
+          } else if (!wasInside && p.inside) {
+            crossingsIn += 1;
+          }
         }
       }
     }
+    state.insideWaterCount += crossingsIn - crossingsOut;
     state.crossingsOut += crossingsOut;
     state.crossingsIn += crossingsIn;
     const areaPhysical = state.membrane.area * SCENARIO.cellRadius * SCENARIO.cellRadius;
@@ -805,6 +1020,8 @@ globalThis.TRECH_HOOKS = {
       state.maxPressureDelta =
         Math.max(state.maxPressureDelta, Math.abs(externalPressure - internalPressure));
       if (tick >= 500) {
+        state.lateMeanKineticEnergySum += meanKE;
+        state.lateMeanKineticEnergyWindows += 1;
         state.latePressureInternalSum += internalPressure;
         state.latePressureExternalSum += externalPressure;
         state.latePressureWindows += 1;
@@ -944,7 +1161,90 @@ globalThis.TRECH_HOOKS = {
       memMetrics.max <= SCENARIO.membraneRadiusMax * SCENARIO.cellRadius + 1e-6 &&
       Math.abs(areaDrift) < 0.08 &&
       Number.isFinite(memMetrics.mean);
+    const lateMeanKE = state.lateMeanKineticEnergyWindows > 0
+      ? state.lateMeanKineticEnergySum / state.lateMeanKineticEnergyWindows : 0.0;
+    const soluteCrossings =
+      Math.abs(counts.inside_glucose - SCENARIO.initialInsideGlucose) +
+      Math.abs(counts.inside_ion - SCENARIO.initialInsideIon);
+    const motionStage = state.thermostatReport && state.thermostatReport.trace
+      ? state.thermostatReport.trace[0] : null;
+    const crossingStage = state.crossingReport && state.crossingReport.trace
+      ? state.crossingReport.trace[0] : null;
+    const inferenceCount = state.thermostatInferences + state.crossingInferences;
+    const operatorTrust = physicsSource === "operator" ? {
+      // The particle state (motion and side) is advanced by operators only. The membrane's
+      // shape is still the authored integrateMembrane law on both paths (named below).
+      authored_state_law: false,
+      remaining_authored_laws: ["integrateMembrane"],
+      domain_measured: !!(motionStage && crossingStage &&
+        motionStage.domainMeasured && crossingStage.domainMeasured),
+      trained_scale: "micro",
+      scale_mismatch: !!((motionStage && motionStage.scaleMismatch) ||
+        (crossingStage && crossingStage.scaleMismatch)),
+      holdout_r2: Math.min(motionStage ? motionStage.holdoutR2 : 0,
+                           crossingStage ? crossingStage.holdoutR2 : 0),
+      holdout_samples: Math.min(motionStage ? motionStage.holdoutSamples : 0,
+                                crossingStage ? crossingStage.holdoutSamples : 0),
+      missing_inputs: [],
+      starved_inputs: Object.keys(state.operatorStarvedInputs).sort(),
+      inference_count: inferenceCount,
+      out_of_domain_count: state.operatorOutOfDomain,
+      out_of_domain_fraction: inferenceCount > 0 ? state.operatorOutOfDomain / inferenceCount : 0,
+      non_operator_inference_count: 0,
+      non_operator_out_of_domain_count: 0,
+      selection: {
+        mode: "contextual",
+        status: "selected",
+        selectedModels: [THERMOSTAT_MODEL, CROSSING_MODEL]
+      }
+    } : {};
     ctx.emit("final_summary", {
+      physics_source: physicsSource,
+      operator_vs_reference: {
+        schema: "trech_operator_reference_pair_v1",
+        comparison_key: "osmotic_v3_sphere:seed=" +
+          (ctx.runtime && ctx.runtime.seed !== undefined ? ctx.runtime.seed : cfg.run.seed) +
+          ":ticks=" + state.tick +
+          ":water=90/12:glucose=10/88:ion=7/18",
+        source: physicsSource,
+        teacher: "validation-only JS Langevin motion and channel size/polarity passage law",
+        measured: false,
+        observables: {
+          final_inside_h2o: counts.inside_h2o,
+          solute_crossings: soluteCrossings,
+          volume_shrink_fraction: volumeShrinkFraction,
+          late_mean_kinetic_energy: lateMeanKE
+        },
+        tolerances: {
+          // One stochastic 102-molecule trajectory per side, so the water endpoint and the
+          // shrink it drives are graded against trajectory noise, not as an exact replay. Over
+          // seeds 31073101/101/202 the reference alone gave inside water 16/12/7 and shrink
+          // 0.42/0.50/0.56; the operator-reference gaps were 6/2/7 and 0.02/0.18/0.01.
+          // A seed-averaged comparison is queued (migration ledger row 6).
+          final_inside_h2o_absolute: 10,
+          solute_crossings_absolute: 0,
+          volume_shrink_fraction_absolute: 0.20,
+          late_mean_kinetic_energy_relative: 0.10
+        },
+        trust: operatorTrust
+      },
+      inference: {
+        source: physicsSource,
+        fidelity: physicsSource === "operator" ? "distilled" : "reference",
+        motion_model: physicsSource === "operator" ? THERMOSTAT_MODEL : null,
+        crossing_model: physicsSource === "operator" ? CROSSING_MODEL : null,
+        motion_inferences: state.thermostatInferences,
+        crossing_inferences: state.crossingInferences,
+        out_of_domain_inferences: state.operatorOutOfDomain,
+        crossing_draws: state.crossingDraws,
+        crossing_transitions: state.crossingTransitions,
+        // Certain passage/blocking: predictions past the [0,1] hazard bound, clamped.
+        hazards_clamped: state.hazardsClamped,
+        out_of_domain_inputs: Object.keys(state.operatorOodInputs).sort(),
+        starved_inputs: Object.keys(state.operatorStarvedInputs).sort(),
+        membrane_law: "authored integrateMembrane (both paths)"
+      },
+      late_mean_kinetic_energy: lateMeanKE,
       tick: state.tick,
       phase: phaseLabel(state.tick),
       dimensions: 3,

@@ -10,20 +10,20 @@ Static validation of every committed `generic_surrogate` model under `data/`, `p
 
 | Measure | Count |
 | --- | ---: |
-| Models scanned | 53 |
-| Load under engine rules (`structure`) | 53 |
-| Finite on their trained domain | 53 |
+| Models scanned | 55 |
+| Load under engine rules (`structure`) | 55 |
+| Finite on their trained domain | 55 |
 | Failing a static gate | 0 |
-| Trust profile complete / partial / none | 17 / 8 / 28 |
-| Measured hull | 25 |
-| Occupancy histogram | 25 |
-| Joint reference | 17 |
-| Held-out R² | 25 |
-| Per-output measured σ (RMSE) | 25 |
-| Trained scale bands | 25 |
+| Trust profile complete / partial / none | 19 / 8 / 28 |
+| Measured hull | 27 |
+| Occupancy histogram | 27 |
+| Joint reference | 19 |
+| Held-out R² | 27 |
+| Per-output measured σ (RMSE) | 27 |
+| Trained scale bands | 27 |
 | Calibrated prediction interval | 5 |
 | Own holdout R²min below 0 (worse than the mean on some output) | 2 |
-| Labelled `measured:false` (distilled) | 23 |
+| Labelled `measured:false` (distilled) | 25 |
 
 ## Models
 
@@ -38,6 +38,8 @@ Static validation of every committed `generic_surrogate` model under `data/`, `p
 | `data/discrete_operators/efflux_crossing_operator.json` | mlp(32x2,silu) 12→1 | 1505 | yes | yes | — | 0.9827 (6000) | yes | yes | false | partial | warn |
 | `data/discrete_operators/efflux_transport_operator.json` | mlp(64x2,silu) 20→6 | 5894 | yes | yes | yes | 0.9993 (6000) | yes | yes | false | complete | pass |
 | `data/discrete_operators/h2o_cycle_transition_operator.json` | mlp(32x2,silu) 16→2 | 1666 | yes | yes | — | 0.9973 (6000) | yes | yes | false | partial | warn |
+| `data/discrete_operators/osmotic_crossing_operator.json` | mlp(64x2,silu) 7→2 | 4802 | yes | yes | yes | 0.9693 (6000) | yes | yes | false | complete | pass |
+| `data/discrete_operators/osmotic_thermostat_operator.json` | mlp(64x2,silu) 10→3 | 5059 | yes | yes | yes | 0.9998 (6000) | yes | yes | false | complete | pass |
 | `data/elephants_toothpaste_cascade/macro_eruption_response.json` | linear 4→9 | 45 | — | — | — | — | — | — | — | none | warn |
 | `data/elephants_toothpaste_cascade/nano_reagent_descriptors.json` | linear 10→4 | 44 | — | — | — | — | — | — | — | none | warn |
 | `data/glass_cascade/macro_fluid_params.json` | linear 2→3 | 9 | — | — | — | — | — | — | — | none | warn |

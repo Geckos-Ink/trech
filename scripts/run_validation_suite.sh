@@ -377,6 +377,10 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     trech_run examples/scenarios/testscenario_osmotic/testscenario_osmotic.js \
       --events "${N_EVENTS_OSMOTIC}" \
       --output "${RUNS_DIR}/out_osmotic" >/dev/null 2>&1
+    rm -rf "${RUNS_DIR}/out_osmotic_reference"
+    trech_run examples/scenarios/testscenario_osmotic/testscenario_osmotic.js \
+      --events "${N_EVENTS_OSMOTIC}" --param physics_source='"reference"' \
+      --output "${RUNS_DIR}/out_osmotic_reference" >/dev/null 2>&1
 
     echo "  - testscenario_efflux (passive membrane efflux vs first-order law)"
     echo "    PubChem inputs (${PUBCHEM_MODE}) -> ${PUBCHEM_CACHE}"

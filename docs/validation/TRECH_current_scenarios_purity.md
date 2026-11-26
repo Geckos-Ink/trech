@@ -45,9 +45,9 @@ Performance source: [`docs/validation/validation_report.json`](validation_report
 
 ## Summary
 
-71 scenario bundles. Grade distribution: **A** 4, **B** 11, **C** 4, **D** 2, **E** 13, **M** 3, **G** 27, **V** 5, **R** 2.
+71 scenario bundles. Grade distribution: **A** 4, **B** 11, **C** 5, **D** 2, **E** 12, **M** 3, **G** 27, **V** 5, **R** 2.
 
-8 bundles carry review flags (see their sections).
+9 bundles carry review flags (see their sections).
 
 | Scenario | Grade | Status | Inference share | Inference / law sites | Coeff. /100 lines | Models (normal path) | Scales | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -116,7 +116,7 @@ Performance source: [`docs/validation/validation_report.json`](validation_report
 | [testscenario_magnetic_resonance_brain](#testscenario_magnetic_resonance_brain) | **E** | `reference_only` | — | 0 / 0 | 0.0 | — | — | 1 pass |
 | [testscenario_magnetic_resonance_imaging](#testscenario_magnetic_resonance_imaging) | **E** | `reference_only` | 0% | 0 / 1 | 2.2 | — | — | 1 pass |
 | [testscenario_magnetic_resonance_tissues](#testscenario_magnetic_resonance_tissues) | **E** | `reference_only` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [testscenario_osmotic](#testscenario_osmotic) | **E** | `reference_only` | — | 0 / 0 | 1.7 | — | — | 1 pass |
+| [testscenario_osmotic](#testscenario_osmotic) | **C** ⚠ | `operator_partial` | 100% | 2 / 0 | 1.6 | 2×dist | micro | 1 pass |
 | [testscenario_pascal](#testscenario_pascal) | **E** | `reference_only` | — | 0 / 0 | 2.9 | — | — | 1 pass |
 | [validation_glass_of_water](#validation_glass_of_water) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [viz_refraction_demo](#viz_refraction_demo) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 3 info, 11 pass |
@@ -1647,22 +1647,36 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 ### testscenario_osmotic
 
-**Grade E — Authored forward law** · entry [`examples/scenarios/testscenario_osmotic/testscenario_osmotic.js`](../../examples/scenarios/testscenario_osmotic/testscenario_osmotic.js)
+**Grade C — Partially operator-backed** · entry [`examples/scenarios/testscenario_osmotic/testscenario_osmotic.js`](../../examples/scenarios/testscenario_osmotic/testscenario_osmotic.js)
 
 > Validation scenario: Osmotic Dehydration via Dimensional & Polarity Exclusion. See docs/scenarios/testscenario_osmotic-todo.md.
 
 **Purity**
 
-- Status: ledger `reference_only`, companion `reference_only`.
-- Authored residual still forcing behaviour: 3D particle transport/crossing and pressure-driven area-conserving membrane response
-- Inference sites: 0 · law-shaped math: 0 · inference share: —
-- Embedded coefficients: 14 in 834 code lines (1.7/100) · top-level literals: 31 · geometry math: 21
-- Geant4 fact reads: 0 · seeded RNG draws: 2 · hooks: yes
+- Status: ledger `operator_partial`, companion `operator_backed`.
+- Authored residual still forcing behaviour: pressure-driven area-conserving membrane response (integrateMembrane) is still authored on both paths
+- Ledger note: The default physics_source=operator runs a distilled micro ctx.evolve particle velocity response and a ctx.react channel-passage operator that infers which molecules cross from their size/polarity and the channel's declared width/polarity; the retired Langevin refresh and passage rule are reference* and reachable only with physics_source=reference. Free flight, bath walls and membrane reflection are numerical machinery.
+- Inference sites: 2 (`evolve` 1, `react` 1) · law-shaped math: 0 · inference share: 100%
+- Embedded coefficients: 17 in 1042 code lines (1.6/100) · top-level literals: 32 · geometry math: 20
+- Geant4 fact reads: 0 · seeded RNG draws: 5 · hooks: yes
+- Comparison-only (excluded): functions `referenceApplyLangevinThermostat`, `referenceChannelPasses`, `referenceStepParticle`
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
+- Scale bands reached by declared models: micro
+
+**Models**
+
+| Normal-path model | Origin | Scale | Held-out R² (min) | n |
+| --- | --- | --- | --- | --- |
+| [`data/discrete_operators/osmotic_crossing_operator.json`](../../data/discrete_operators/osmotic_crossing_operator.json) | distilled from authored teacher | micro | 0.9693 | 6000 |
+| [`data/discrete_operators/osmotic_thermostat_operator.json`](../../data/discrete_operators/osmotic_thermostat_operator.json) | distilled from authored teacher | micro | 0.9998 | 6000 |
 
 **Performance**
 
 - `osmotic_shift_observed` — **pass**: checks=9/9 net_water_flux_out=74 first_crossing_tick=1 max_ke=1.36/1.22 late_pressure_external/internal=1.04
+
+**Review flags**
+
+- ⚠ ledger says `operator_partial`, validation companion says `operator_backed`
 
 ### testscenario_pascal
 

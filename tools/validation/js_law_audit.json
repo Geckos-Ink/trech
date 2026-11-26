@@ -200,9 +200,13 @@
       "residual": "shared tissue magnetic-resonance forward dynamics"
     },
     "examples/scenarios/testscenario_osmotic/testscenario_osmotic.js": {
-      "status": "reference_only",
-      "operators": [],
-      "residual": "3D particle transport/crossing and pressure-driven area-conserving membrane response"
+      "status": "operator_partial",
+      "operators": [
+        "ctx.evolve",
+        "ctx.react"
+      ],
+      "residual": "pressure-driven area-conserving membrane response (integrateMembrane) is still authored on both paths",
+      "note": "The default physics_source=operator runs a distilled micro ctx.evolve particle velocity response and a ctx.react channel-passage operator that infers which molecules cross from their size/polarity and the channel's declared width/polarity; the retired Langevin refresh and passage rule are reference* and reachable only with physics_source=reference. Free flight, bath walls and membrane reflection are numerical machinery."
     },
     "examples/scenarios/testscenario_pascal/testscenario_pascal.js": {
       "status": "reference_only",

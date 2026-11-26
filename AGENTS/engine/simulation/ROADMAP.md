@@ -23,10 +23,19 @@ dated record below, and queue its residuals in the same change.
 - **P3** · R5 · A lab geometry change still needs a new lab process; an in-process kernel restart would also need a fresh overlap report (today `RunOptions::geometryResolution` is filled once per kernel). Tracked with the runtime reinitialization P1. (dated records below)
 - **P3** · R5 · Overlap sampling is a bound, not a proof (thin slivers can be missed). (dated records below)
 - **P3** · R5 · Diagnostics depth: fixed log10 grid cannot resolve sub-decade structure; no per-species per-volume histograms; per-volume entries are keyed by name (repeated placements share one); species summaries lack min/skew/kurtosis and a per-process split. (dated records below)
+- **P3** · R5 · Hook-failure coverage: no test throws from `onRunEnd`, or from a hook the master run action dispatches in a multi-worker run; both go through the same latch as the tested worker hooks. (dated records below)
 - **P3** · R5 · The scored-volume pointer cache has no direct CTest and was not profiled with many volumes or optical-photon-heavy runs. (dated records below)
 
 ## Delivery records
 
+- [x] A throwing scenario hook ends the run instead of hanging it (2026-11-26). Found while
+  migrating the osmotic cell: a guard that threw from `onEventStart` left `trech run` waiting on a
+  dead worker task with no output. The dispatch site now latches the failure, soft-aborts the
+  event loop and skips later hooks; the run exits 1 with the hook's message. The new CTest
+  `trech_hook_failure_exit` times out on the previous binary and passes now (serial, two
+  workers, and a throw in `onRunStart`). A JS throw inside `onInit` is reported before Geant4
+  starts and was not affected. Residual (queued): no test throws from `onRunEnd`, or from a hook
+  the master run action dispatches in a multi-worker run.
 - [x] Lab-mode geometry refusal tested through a real kernel (2026-11-17). The CLI lab loop now
   catches a refused (or restart-required) batch, prints `lab error: …` and keeps an interactive
   session up, so the remembered refusal is reachable: a second `simulate` is refused again with

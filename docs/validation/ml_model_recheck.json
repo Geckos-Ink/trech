@@ -775,6 +775,126 @@
    },
    "status": "warn",
    "training_regenerated": false
+  },
+  {
+   "details": {},
+   "fresh_conditions": null,
+   "fresh_rows": 12000,
+   "fresh_seeds": [
+    2026512611,
+    2026612612
+   ],
+   "gates": {
+    "beats_linear_baseline": "pass",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "portable_metadata": "pass",
+    "run_leakage": "pass",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "pass"
+   },
+   "measured": false,
+   "model": "data/discrete_operators/osmotic_thermostat_operator.json",
+   "producer": "python",
+   "producer_reproduces_holdout": {
+    "max_relative_rmse_difference": 0.0,
+    "ok": true,
+    "rows": 6000
+   },
+   "r2": {
+    "d_vx_dt": {
+     "carried": 0.99983,
+     "fresh": 0.999806
+    },
+    "d_vy_dt": {
+     "carried": 0.99984,
+     "fresh": 0.999831
+    },
+    "d_vz_dt": {
+     "carried": 0.999825,
+     "fresh": 0.999825
+    }
+   },
+   "recipe_hash": "sha256:8df9c934e62468f5",
+   "sha256": "6b43752ecd3b7188ba72fbca87398f53e651658cc26b29cd68fc1ab854c218af",
+   "sigma": {
+    "d_vx_dt": {
+     "test_over_carried_rmse": 1.04735,
+     "within_1_sigma": 0.82625
+    },
+    "d_vy_dt": {
+     "test_over_carried_rmse": 1.00835,
+     "within_1_sigma": 0.818667
+    },
+    "d_vz_dt": {
+     "test_over_carried_rmse": 0.989007,
+     "within_1_sigma": 0.83
+    }
+   },
+   "status": "pass",
+   "training_regenerated": true
+  },
+  {
+   "details": {},
+   "fresh_conditions": null,
+   "fresh_rows": 12000,
+   "fresh_seeds": [
+    2026512621,
+    2026612622
+   ],
+   "gates": {
+    "beats_linear_baseline": "pass",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "portable_metadata": "pass",
+    "run_leakage": "pass",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "pass"
+   },
+   "measured": false,
+   "model": "data/discrete_operators/osmotic_crossing_operator.json",
+   "producer": "python",
+   "producer_reproduces_holdout": {
+    "max_relative_rmse_difference": 0.0,
+    "ok": true,
+    "rows": 6000
+   },
+   "r2": {
+    "hazard_cross_in": {
+     "carried": 0.96935,
+     "fresh": 0.972443
+    },
+    "hazard_cross_out": {
+     "carried": 0.978441,
+     "fresh": 0.976119
+    }
+   },
+   "recipe_hash": "sha256:43d745720633093d",
+   "sha256": "058d498f56cccc463316ab0a56d7e2d25fa808a34ab9435a0c98fe27cda3a5f4",
+   "sigma": {
+    "hazard_cross_in": {
+     "test_over_carried_rmse": 0.982984,
+     "within_1_sigma": 0.869667
+    },
+    "hazard_cross_out": {
+     "test_over_carried_rmse": 1.05073,
+     "within_1_sigma": 0.870083
+    }
+   },
+   "status": "pass",
+   "training_regenerated": true
   }
  ],
  "not_rechecked": "Every other committed model: the illustrative cascade maps and untrained teachers have no data producer; the particle observer (`tools/torch/build_particle_observer_models.py`, strict serial Geant4 harvests with frozen final cases) and the spectrum models (`projects/spectrum_prediction`) have their own builders and no fresh-run recipe yet (open work in the training roadmap). The glass-furnace and polyurethane operators ARE re-checked above on fresh operating points of the current scenarios, but their ORIGINAL runs (`build/glass_train/*`, `build/dev/operator_harvest/*`) cannot be regenerated: the glass operators were harvested from the 2D revision of glass_from_sand (36e979d, `CELL_COUNT = SIDE*SIDE`, today 3D) with unrecorded holdout knobs, so no holdout reproduction is claimed for them.",

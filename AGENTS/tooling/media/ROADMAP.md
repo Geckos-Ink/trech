@@ -13,7 +13,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 dated record below, and queue its residuals in the same change.
 
 - **P3** · R3 · General process models and true spatial crystallization/3D airflow are absent; the driver reports the limit instead of synthesizing motion. ([detail](#unified-engine--studio-media-refresh))
-- **gated** · R6 · Recapture media that predate fixes (Briggs–Rauscher, MR-tissues and `beaker_water_pentane` geometry, aerodynamics/NaCl beam origin) and refresh historical native screenshots deliberately (media gates). ([detail](#unified-engine--studio-media-refresh))
+- **gated** · R6 · Recapture media that predate fixes (Briggs–Rauscher, MR-tissues and `beaker_water_pentane` geometry, aerodynamics/NaCl beam origin, and the osmotic replay and Studio preview, captured 2026-11-12 from the JS-law particle motion before the operator path became the default on 2026-11-26) and refresh historical native screenshots deliberately (media gates). ([detail](#unified-engine--studio-media-refresh))
 
 ## Unified engine / Studio media refresh
 

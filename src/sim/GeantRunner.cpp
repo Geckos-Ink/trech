@@ -1,4 +1,5 @@
 #include "trech/sim/GeantRunner.hpp"
+#include "trech/core/HookFailure.hpp"
 #include "trech/sim/Geant4Trace.hpp"
 #include "trech/core/LabSession.hpp"
 #include "trech/core/SimulationBudget.hpp"
@@ -245,7 +246,11 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
       throw std::runtime_error(
           "A persistent lab kernel supports direct BeamOn batches only.");
     }
+    trech::hookfailure::reset();
     runManager->BeamOn(cfg.run.nEvents);
+    if (trech::hookfailure::failed()) {
+      throw std::runtime_error(trech::hookfailure::describe());
+    }
     return 0;
   }
 
@@ -615,6 +620,7 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
   }
 
   auto* uiManager = G4UImanager::GetUIpointer();
+  trech::hookfailure::reset();
   if (ui) {
     if (!options.macroPath.empty()) {
       uiManager->ApplyCommand("/control/execute " + options.macroPath);
@@ -633,6 +639,11 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
   if (!retainRunManager) {
     delete runManager;
     runManager = nullptr;
+  }
+  // A hook that threw aborted the run (RunAction latches it rather than letting it escape a
+  // worker task); fail the run with the hook's message.
+  if (trech::hookfailure::failed()) {
+    throw std::runtime_error(trech::hookfailure::describe());
   }
   return 0;
 }
