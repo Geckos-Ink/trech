@@ -942,6 +942,30 @@ void domainPairs() {
   expect(formal::checkAgreement("domain.extrapolation_exact", "Trech.Methods.Domain.le_extrap", fullExtrap,
                                 engineExtrap, 0.0, 0.0));
 
+  // nonfinite_out_of_domain: NaN or an infinity in any slot names that input, and only it,
+  // with infinite extrapolation.
+  std::size_t nonfiniteSamples = 0, nonfiniteErrors = 0;
+  for (double bad : {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                     -std::numeric_limits<double>::infinity()})
+    for (std::size_t slot = 0; slot < names.size(); ++slot) {
+      std::vector<double> x(names.size(), 0.0);
+      x[slot] = bad;
+      const auto cov = verdictModel.coverageVector(x);
+      ++nonfiniteSamples;
+      if (cov.inDomain || cov.outOfDomainInputs != std::vector<std::string>{names[slot]} ||
+          !std::isinf(cov.extrapolation) || cov.extrapolation < 0.0)
+        ++nonfiniteErrors;
+    }
+  formal::LawCheck nonfinite;
+  nonfinite.law = "domain.nonfinite";
+  nonfinite.leanDeclaration = "Trech.Methods.Domain.nonfinite_out_of_domain";
+  nonfinite.kind = "invariant";
+  nonfinite.samples = nonfiniteSamples;
+  nonfinite.violations = nonfiniteErrors;
+  nonfinite.passed = nonfiniteErrors == 0;
+  nonfinite.detail = std::to_string(nonfiniteErrors) + " non-finite inputs not named out of domain";
+  expect(nonfinite);
+
   // Occupancy bin: the engine's bin contains x for values at, just below and just above every
   // edge, and for interior values; the uncorrected scaled index does not.
   auto edge = [](int k, double lo, double hi, int n) {

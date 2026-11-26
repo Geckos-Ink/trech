@@ -1437,6 +1437,15 @@ GenericSurrogate::Coverage GenericSurrogate::coverageVector(
     const double x = (i < inputs.size()) ? inputs[i] : 0.0;  // missing -> 0
     const double z = (x - inputMean_[i]) / inputStd_[i];  // std_ floored at load
     if (checkJoint) workspace.a[i] = z;
+    if (!std::isfinite(x)) {
+      // A non-finite input is out of domain by definition, infinitely far out: its
+      // excess would otherwise be NaN, which never compares above the tolerance, so
+      // it read as in domain (Trech.Methods.Domain, nonfinite_out_of_domain).
+      cov.outOfDomainInputs.push_back(inputNames_[i]);
+      cov.extrapolation = std::numeric_limits<double>::infinity();
+      cov.maxStandardizedDeviation = std::numeric_limits<double>::infinity();
+      continue;
+    }
     const double absZ = std::abs(z);
     if (absZ > cov.maxStandardizedDeviation) {
       cov.maxStandardizedDeviation = absZ;

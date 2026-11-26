@@ -18,7 +18,7 @@ Standing constraint for every item: Lean stays optional. Each law keeps its clas
 implementation as the running path, with the Lean definition beside it for validation
 ([rule](AGENTS.md#rules)).
 
-- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Added declared `ctx.react` count conservation, antisymmetric `ctx.interact` exchange, the energy balance of recorded Geant4 Compton steps, the Compton relation from four-momentum conservation (momentum balance checked on recorded steps) and the bounded explicit step of `ctx.evolve`/`ctx.interact` (ordered bounds enforced at the JS boundary). Also added the order independence of set networks (`ctx.lift`, set operators) with its slot-standardisation hypothesis enforced at load. Also added `ctx.lift` group assembly (one parent per element; total weight and weighted first moment kept per level). Also added the domain learner's split score (error from summed statistics, additive statistics, a split never raises training error). Also added the learner's BIC gate as a threshold and the ridge split bound. Also added the arbiter's decayed prequential scores (closed form, monotone ranking on shared calls, counterexample without them), which `ctx.evolveField` selects by. Also added stage order inside a `ctx.evolve` band (disjoint commuting stages, order-free rate-only bands, the order dependence of a read assignment). Also added `ctx.learnDomains` routing (a partition of the input; splits and merges move only their own rows). Also added `ScaleCascade` registration order (producer-first band orders agree; permuting registration permutes bands only; rivals and stale reads are order-dependent). Also added the pruned joint-coverage scan of `GenericSurrogate` (same verdict as a full scan; exact starved distance). Also added its per-feature domain verdict and occupancy bin (extrapolation is 0 exactly in domain; the corrected bin is the unique containing bin, so training values are never starved), which fixed the engine's bin rule to match `numpy.histogram`. Next: the `ctx.lift` level recursion beyond one level. Search Mathlib first. ([detail](#per-feature-domain-and-occupancy-bins-2026-11-26))
+- **P1** · R8 · Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. Added declared `ctx.react` count conservation, antisymmetric `ctx.interact` exchange, the energy balance of recorded Geant4 Compton steps, the Compton relation from four-momentum conservation (momentum balance checked on recorded steps) and the bounded explicit step of `ctx.evolve`/`ctx.interact` (ordered bounds enforced at the JS boundary). Also added the order independence of set networks (`ctx.lift`, set operators) with its slot-standardisation hypothesis enforced at load. Also added `ctx.lift` group assembly (one parent per element; total weight and weighted first moment kept per level). Also added the domain learner's split score (error from summed statistics, additive statistics, a split never raises training error). Also added the learner's BIC gate as a threshold and the ridge split bound. Also added the arbiter's decayed prequential scores (closed form, monotone ranking on shared calls, counterexample without them), which `ctx.evolveField` selects by. Also added stage order inside a `ctx.evolve` band (disjoint commuting stages, order-free rate-only bands, the order dependence of a read assignment). Also added `ctx.learnDomains` routing (a partition of the input; splits and merges move only their own rows). Also added `ScaleCascade` registration order (producer-first band orders agree; permuting registration permutes bands only; rivals and stale reads are order-dependent). Also added the pruned joint-coverage scan of `GenericSurrogate` (same verdict as a full scan; exact starved distance). Also added its per-feature domain verdict and occupancy bin (extrapolation is 0 exactly in domain; the corrected bin is the unique containing bin, so training values are never starved; a non-finite input is out of domain), which fixed the engine's bin rule to match `numpy.histogram`. Next: the `ctx.lift` level recursion beyond one level. Search Mathlib first. ([detail](#per-feature-domain-and-occupancy-bins-2026-11-26))
 - **P2** · R8 · Energy balance on every recorded step: today `energy.step_balance` reads only a primary photon's first Compton scatter. Extend it to every process and generation with the rest-mass term `Q` (gamma conversion `−2 m_e c²`, positron annihilation, nuclear reactions from Geant4's mass table), behind the same observe-only contract and only in runs that ask for it. ([detail](#geant4-step-energy-balance-2026-11-22))
 - **P2** · R8 · Conformance harness: a Lean reference evaluator (`@[export]` C symbols linked behind an opt-in `TRECH_ENABLE_LEAN`, default OFF, or a separate `lake exe` fed JSON) that checks the classic kernel on sampled or recorded inputs offline. Measure its cost; it never runs per step in production and never changes physics, RNG or emits. ([detail](#route-opened--2026-11-22))
 - **P2** · R8 · Hardware acceleration contract: Lean compiles to scalar CPU code, so accelerated kernels (C++ SIMD, LibTorch, GPU) stay the compute path. Define how a proof about an algorithm's model transfers to its accelerated implementation (shared algorithm spec, sampled conformance, documented reduction-order and fused-operation differences). ([detail](#route-opened--2026-11-22))
@@ -41,7 +41,7 @@ implementation as the running path, with the Lean definition beside it for valid
   tolerance, `extrapolation` is 0 exactly when every excess `|z| - radius` is within it, the
   `inDomain` verdict), `le_extrap`, `extrap_attained`, `extrap_mono`; `correct_spec` (numpy's
   one-bin correction of a guess at most one bin off gives a containing bin; no monotonicity
-  needed), `bin_unique` (monotone edges) and `training_value_not_starved`. Audit 92/92.
+  needed), `bin_unique` (monotone edges) and `training_value_not_starved`.
 - [x] Classic side fixed: the engine indexed bins by `(x - lo) / (hi - lo) * n` alone, which lands
   one bin up within about one ulp below an edge, while training counts with `numpy.histogram`
   (which corrects against its linspace edges). A training value there read as the next bin and,
@@ -54,8 +54,12 @@ implementation as the running path, with the Lean definition beside it for valid
   index outside its bin on 13,393 (negative control); training values beside edges never
   starved, both empty bins flagged. `trech_occupancy_bins_numpy`: the engine's and validator's
   bins equal `numpy.histogram`'s on every sampled value.
-- A non-finite input passes both per-feature checks; queued in the
-  [trust roadmap](../inference/trust/ROADMAP.md#priority-queue).
+- [x] Non-finite inputs (same day): a NaN input's excess never compared above the tolerance, so
+  it read as in domain. The engine now names a non-finite input out of domain with infinite
+  `extrapolation` and `maxStandardizedDeviation`; `nonfinite_out_of_domain` and
+  `extrapN_eq_zero_iff` cover it (`Option ℝ` excesses, `WithTop ℝ` extrapolation). Conformance
+  `domain.nonfinite`: NaN, `+∞` and `−∞` in each of four slots. Audit 94/94. The validator
+  already treated NaN as outside the hull.
 
 ## Joint coverage scan (2026-11-25)
 
@@ -68,9 +72,9 @@ implementation as the running path, with the Lean definition beside it for valid
 - [x] Conformance (`trech_formal_laws`, Debug and Release): 48 centres in 3D, 1,183 grid inputs
   (276 covered, 907 starved) against a full scan: verdicts identical, starved distances bit
   identical; covered distances differ from the minimum (negative control, 0.20 at worst).
-- Not covered: a non-finite input (a NaN distance never compares below the best, so the input
-  reads as starved with an infinite distance). The per-feature checks are covered since
-  2026-11-26.
+- Not covered: a non-finite input's joint distance (a NaN distance never compares below the
+  best, so the input reads as starved with an infinite distance). Since 2026-11-26 such an input
+  is also out of domain per feature, so the verdicts agree.
 
 ## Cascade registration order (2026-11-25)
 

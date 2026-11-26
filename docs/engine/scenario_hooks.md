@@ -916,7 +916,11 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
   as described below), `domainMeasured`
   (the hull came from training, not a heuristic fallback), `extrapolation` (how far past the hull
   edge the worst input sat, in training-σ units; 0 in-domain), `maxStandardizedDeviation` (max |z|
-  over the inputs), `outOfDomainInputs` (the input names beyond their domain). The domain is the
+  over the inputs), `outOfDomainInputs` (the input names beyond their domain). A non-finite input
+  (NaN or an infinity) is always out of domain: it is named, and `extrapolation` and
+  `maxStandardizedDeviation` are `Infinity` (which `JSON.stringify` writes as `null`). Before
+  2026-11-26 a NaN input read as in domain, because its NaN excess never compared above the
+  radius; a scenario that passes a NaN now sees it counted out of domain. The domain is the
   per-feature standardized hull the trainer exports as `input_domain.standardized_radius`
   (`trech-train-surrogate`); models without it (committed ridge/logistic, illustrative hand-authored
   maps) fall back to a heuristic 3σ radius and report `domainMeasured: false`. A missing

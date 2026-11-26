@@ -20,6 +20,10 @@ with a small tolerance; an excess above it names the input out-of-domain and rai
 * `le_extrap`, `extrap_attained`: otherwise it is the largest excess above the tolerance, and
   is one of them.
 * `extrap_mono`: moving every input farther out (each excess no smaller) never lowers it.
+* `nonfinite_out_of_domain`, `extrapN_eq_zero_iff`: a non-finite input (NaN or infinite) is out
+  of domain with infinite `extrapolation`, and the verdict is "every input finite and within
+  its radius". Before 2026-11-26 a NaN excess never compared above the tolerance, so a NaN
+  input read as in domain.
 
 **Occupancy bin.** Training (`numpy.histogram`) counts a value in the bin `b` whose edges contain
 it: `e b ≤ x < e (b+1)`, the last bin closed. The engine finds the bin from a scaled-index guess
@@ -141,6 +145,46 @@ theorem extrap_mono (tol : ℝ) {os os' : List ℝ} (h : List.Forall₂ (· ≤ 
   induction h with
   | nil => intro m m' hm; exact hm
   | cons ho _ ih => intro m m' hm; exact ih _ _ (stepE_mono tol hm ho)
+
+/-- With non-finite inputs: each excess is `none` when its input is not finite, and the
+engine's `extrapolation` is `⊤` (infinite) as soon as one is; otherwise as above. -/
+noncomputable def extrapN (tol : ℝ) (os : List (Option ℝ)) : WithTop ℝ :=
+  if os.all Option.isSome then ((extrap tol (os.filterMap id) : ℝ) : WithTop ℝ) else ⊤
+
+/-- A non-finite input makes the input out of domain, infinitely far out. -/
+theorem nonfinite_out_of_domain (tol : ℝ) {os : List (Option ℝ)} (h : none ∈ os) :
+    extrapN tol os = ⊤ := by
+  have : os.all Option.isSome = false := by
+    rw [Bool.eq_false_iff]
+    intro hall
+    have := (List.all_eq_true.mp hall) none h
+    simp at this
+  simp [extrapN, this]
+
+/-- `extrapolation` is 0 exactly when every input is finite and its excess within the
+tolerance: the `inDomain` verdict with non-finite inputs. -/
+theorem extrapN_eq_zero_iff {tol : ℝ} (htol : 0 ≤ tol) (os : List (Option ℝ)) :
+    extrapN tol os = 0 ↔ ∀ o ∈ os, ∃ v, o = some v ∧ v ≤ tol := by
+  unfold extrapN
+  split_ifs with hall
+  · have hall' := List.all_eq_true.mp hall
+    rw [show (0 : WithTop ℝ) = ((0 : ℝ) : WithTop ℝ) from rfl, WithTop.coe_inj,
+      extrap_eq_zero_iff htol]
+    constructor
+    · intro h o ho
+      obtain ⟨v, hv⟩ := Option.isSome_iff_exists.mp (hall' o ho)
+      exact ⟨v, hv, h v (List.mem_filterMap.mpr ⟨o, ho, by simp [hv]⟩)⟩
+    · intro h v hv
+      obtain ⟨o, ho, hov⟩ := List.mem_filterMap.mp hv
+      obtain ⟨w, rfl, hw⟩ := h o ho
+      simp at hov
+      exact hov ▸ hw
+  · simp only [WithTop.top_ne_zero, false_iff]
+    intro h
+    apply hall
+    exact List.all_eq_true.mpr fun o ho => by
+      obtain ⟨v, rfl, _⟩ := h o ho
+      rfl
 
 /-! ## Occupancy bin -/
 

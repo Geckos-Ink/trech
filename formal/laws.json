@@ -258,7 +258,7 @@
     {
       "id": "domain.per_feature",
       "role": "method_property",
-      "statement": "GenericSurrogate's per-feature checks: an input whose excess |z| - radius is above a non-negative tolerance is out-of-domain, and extrapolation is the largest such excess, so extrapolation is 0 exactly when the input is in domain, is otherwise one of the excesses, and never falls when every excess grows. The occupancy bin is the scaled-index guess corrected by one against the edges, as numpy.histogram does; a guess at most one bin off is corrected to a bin containing the value, at most one bin contains it for monotone edges, so a training value always lands in a bin the trainer counted and is never read as starved.",
+      "statement": "GenericSurrogate's per-feature checks: an input whose excess |z| - radius is above a non-negative tolerance is out-of-domain, and extrapolation is the largest such excess, so extrapolation is 0 exactly when the input is in domain, is otherwise one of the excesses, and never falls when every excess grows; a non-finite input is out of domain with infinite extrapolation. The occupancy bin is the scaled-index guess corrected by one against the edges, as numpy.histogram does; a guess at most one bin off is corrected to a bin containing the value, at most one bin contains it for monotone edges, so a training value always lands in a bin the trainer counted and is never read as starved.",
       "lean": {
         "file": "formal/Trech/Methods/Domain.lean",
         "declarations": [
@@ -267,6 +267,8 @@
           "Trech.Methods.Domain.le_extrap",
           "Trech.Methods.Domain.extrap_attained",
           "Trech.Methods.Domain.extrap_mono",
+          "Trech.Methods.Domain.nonfinite_out_of_domain",
+          "Trech.Methods.Domain.extrapN_eq_zero_iff",
           "Trech.Methods.Domain.correct_spec",
           "Trech.Methods.Domain.bin_unique",
           "Trech.Methods.Domain.training_value_not_starved"
@@ -275,7 +277,7 @@
       "classic": [
         {"path": "src/ml/GenericSurrogate.cpp", "cites": "Trech.Methods.Domain"}
       ],
-      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["domain.verdict", "domain.extrapolation_exact", "domain.bin_contains", "domain.raw_index_negative_control", "domain.training_not_starved"]}
+      "conformance": {"test": "tests/test_formal_laws.cpp", "checks": ["domain.verdict", "domain.extrapolation_exact", "domain.nonfinite", "domain.bin_contains", "domain.raw_index_negative_control", "domain.training_not_starved"]}
     },
     {
       "id": "evolve.band_order",
