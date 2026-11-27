@@ -309,6 +309,11 @@ if (Python3_Interpreter_FOUND)
     NAME trech_evolvo_arch
     COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_evolvo_arch.py
   )
+  # Search-strategy comparison harness: shared trainer, equal budgets, refusals, knowledge reuse.
+  add_test(
+    NAME trech_compare_search
+    COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_compare_search.py
+  )
   add_test(
     NAME trech_media_coverage
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_media_coverage.py

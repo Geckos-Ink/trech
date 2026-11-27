@@ -16,7 +16,6 @@ dated record below, and queue its residuals in the same change.
 
 - **P2** · R4 · Soft deadlines cannot interrupt a long event, hook or initialization; confidence/error-driven space/time refinement needs validated scenario error estimates first. ([detail](#adaptive-precision-inference-depth-and-resource-scheduling))
 - **P2** · R4 · Shared per-run inference budget: cascade caps are per call and batched `evolve`/`react`/`interact` calls are atomic. ([detail](#adaptive-precision-inference-depth-and-resource-scheduling))
-- **P3** · R2 · Evolutionary model search beyond uniform MLP width/depth (DAGs, activations, cross-family discovery) and measured search-quality comparisons. ([detail](#adaptive-precision-inference-depth-and-resource-scheduling))
 
 ## Adaptive precision, inference depth and resource scheduling
 
@@ -35,6 +34,12 @@ dated record below, and queue its residuals in the same change.
   estimates. No automatic accuracy claim follows from a resource budget.
 - [ ] Residual: batched evolve/react/interact calls remain atomic; cascade caps are per property
   call, not a shared per-run inference budget. Model discovery/training/deployment remain explicit.
-- [ ] Residual: evolutionary search currently varies uniform MLP width/depth, not arbitrary DAGs,
-  activations or cross-family model discovery. Candidate training is atomic under its time budget.
-  Broader learned-physics benchmarks and search-quality comparisons remain to be measured.
+- [x] Evolutionary search beyond uniform MLP width/depth: the GFSL-NN language (2026-11-17)
+  searches DAGs of primitives and macros with per-row activations. Candidate training stays
+  atomic under its time budget.
+- [x] (2026-11-27) Measured search-quality comparison on Geant4 runs: `trech-compare-search`
+  ranks grid, random, Evolvo width/depth, random GFSL-NN, learned GFSL-NN and knowledge reuse with
+  one trainer and equal budgets on the 222 particle-observer runs (20 seeds). No strategy beats a
+  24-point grid on held-out runs; the learned search transfers worse than its selection loss.
+  [Results](../../../docs/inference/evolvo_architectures.md#search-quality-on-geant4-runs-2026-11-27);
+  follow-ups are owned by the [training queue](../../tooling/training/ROADMAP.md#priority-queue).

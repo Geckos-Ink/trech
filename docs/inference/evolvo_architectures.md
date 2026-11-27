@@ -224,6 +224,78 @@ knowledge:
 run and interact, not that they beat grid/random search or the hand-set trainers. No Geant4 run
 has been searched yet.
 
+## Search quality on Geant4 runs (2026-11-27)
+
+Does a search strategy find better models than a plain grid? `trech-compare-search`
+([`compare_search.py`](../../tools/torch/trech_torch/compare_search.py)) answers that on one table
+with everything else held fixed:
+
+- **Same trainer.** Every candidate of every strategy is a GFSL-NN genome trained by Evolvo's
+  `TorchTask` (full-batch Adam on training-standardized data, learned plateau stop, best
+  selection weights restored, at most 1,500 epochs).
+- **Same budget.** Each strategy trains exactly 24 distinct candidates per seed. Proposals the
+  space refuses (over the parameter budget) are counted, not trained.
+- **Same selection.** The winner has the lowest selection-split MSE (size cost 0). Its test MSE
+  is computed once.
+
+Strategies: `grid` (uniform MLPs: widths 6, 11, 23, 45 × depth 1–3 × SiLU/tanh), `random_mlp`,
+`evolvo_mlp` (the bounded Evolvo width/depth search), `random_gfsl` (random genomes of the whole
+language), `gfsl` (the learned search) and `gfsl_reuse` (the learned search started from the
+knowledge the previous seed's `gfsl` run saved).
+
+**Data.** The 222 committed Geant4 runs of the particle observer
+([`data/particle_observer/rows.json`](../../data/particle_observer/rows.json)): gamma beams
+through CHNO molecules, with the uncollided and deposited-energy fractions tallied by Geant4.
+Each row is a whole run. There are 192 training runs, 12 development runs used for selection and
+18 test runs (three held-out molecules, plus a final campaign). The five inputs are the lower
+cascade rungs' cross sections, the areal density and the photon energy. This is a non-optics
+family: gamma transport, not optical photons.
+
+**Results** over 20 seeds. MSE is in training-standardized output units, and "vs grid" is the
+mean ± standard error of the per-seed difference in ln(test MSE) (negative is better than the grid):
+
+| Strategy | Geo-mean selection MSE | Geo-mean test MSE | Test MSE range | Median test R²min | vs grid | Seeds better than grid | Median params | Mean epochs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `grid` | 0.00300 | 0.00427 | 0.00093–0.0244 | 0.9927 | — | — | 186 | 5,089 |
+| `random_mlp` | 0.00248 | 0.00454 | 0.00029–0.0407 | 0.9876 | +0.06 ± 0.39 | 8/20 | 850 | 3,745 |
+| `evolvo_mlp` | 0.00244 | 0.00288 | 0.00034–0.0079 | 0.9938 | −0.40 ± 0.28 | 9/20 | 258 | 4,920 |
+| `random_gfsl` | 0.00357 | 0.00789 | 0.00044–0.104 | 0.9803 | +0.61 ± 0.32 | 6/20 | 4,133 | 5,211 |
+| `gfsl` | 0.00246 | 0.00524 | 0.00025–0.204 | 0.9876 | +0.20 ± 0.46 | 8/20 | 4,408 | 4,186 |
+| `gfsl_reuse` (19 seeds) | 0.00319 | 0.00586 | 0.00042–0.0366 | 0.9838 | +0.28 ± 0.34 | 9/19 | 4,502 | 3,976 |
+
+Linear ridge reaches test MSE 0.26 (R² 0.53/0.56), so every search finds a strongly nonlinear
+model. The whole comparison took 11 minutes on CPU (torch 2.8).
+
+What this shows:
+
+- **No strategy is distinguishable from the grid** on held-out runs at 24 candidates. Every
+  difference is within about 1.9 standard errors. `evolvo_mlp` has the best mean (−0.40 ± 0.28,
+  about a third lower test MSE) and the narrowest spread. Random genomes of the whole language
+  are the worst (+0.61 ± 0.32).
+- **The learned GFSL-NN search reaches low selection loss but transfers worse.** It ties the best
+  geo-mean selection loss and picks models over 20 times larger than the grid's (median parameters), with the
+  heaviest test tail (one seed at 0.20). Its 12-run selection split rewards fits that do not
+  generalize. Across all chosen models, ln(selection MSE) and ln(test MSE) correlate at 0.90, so
+  the tail is the selection split's small size, not a test-split artefact.
+- **Knowledge reuse did not help** here: +0.28 ± 0.34 against the grid, no better than the fresh
+  search.
+- **The hand-built model is still better.** The committed observer model
+  (`tools/torch/build_particle_observer_models.py`: decoded-probability loss, 10,900 epochs)
+  reaches test R²min 0.9994. That is above every strategy's median (0.980–0.994). The trainer and
+  the output transform matter more than the architecture search on this table.
+
+Reproduce:
+
+```bash
+PYTHONPATH=tools/torch build/render-venv/bin/python -m trech_torch.compare_search \
+  --table data/particle_observer/rows.json --seeds 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 \
+  --budget 24 --out build/search_compare/particle_observer.json
+```
+
+The committed report is
+[`docs/validation/search_comparison_particle_observer.json`](../validation/search_comparison_particle_observer.json)
+(per-seed winners, summaries, the ridge reference; `--keep-trials` also keeps every candidate).
+
 ## Tests
 
 - CTest `trech_architecture_generator`
@@ -239,6 +311,10 @@ has been searched yet.
   - the removed `auto` generator and `require_engine_native` are refused.
 - CTest `trech_architecture_evolvo_live`: the real worker through `TRECH_ML_PYTHON`, which must
   return a model the engine reloads and re-scores in agreement. An unavailable worker fails.
+- CTest `trech_compare_search` ([`tests/test_compare_search.py`](../../tests/test_compare_search.py)):
+  every strategy trains exactly the budget of distinct candidates, refused proposals are never
+  trained, knowledge reuse loads only an earlier seed's knowledge, overlapping splits are
+  refused, and a repeated comparison selects the same candidates.
 - CTest `trech_evolvo_arch` ([`tests/test_evolvo_arch.py`](../../tests/test_evolvo_arch.py)):
   - `evolvo.nnarch` imports without NumPy, and 200 random genomes validate.
   - NumPy and torch (required; it runs under `TRECH_ML_PYTHON` and fails without them):
@@ -267,4 +343,6 @@ has been searched yet.
 - `TRECH_ML.defineSearch({strategy: "evolvo"})` still routes to the older bounded MLP search
   (`evolve_structure`), not to `trech arch`. The `trech-ml` store does not register evolved or
   engine-generated models.
-- Not benchmarked against grid/random search on Geant4-harvested data.
+- Search quality is measured on one small Geant4 table only (the particle observer, 12 selection
+  runs); there the learned search does not beat a 24-point grid. Larger Geant4 tables (fluid
+  parcels, CNT devices) and selection splits large enough to rank candidates are not measured.

@@ -49,7 +49,7 @@ never drawn.
 | 7 | **P2** | R6 | [studio/authoring](AGENTS/studio/authoring/ROADMAP.md#priority-queue) | Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics. |
 | 8 | **P2** | R6 | [scenarios/references](AGENTS/scenarios/references/ROADMAP.md#priority-queue) | JS workflow execution: editable training/harvest/inference jobs with provenance, progress/cancellation and safe model activation. |
 | 9 | **P2** | R3 | [tooling/training](AGENTS/tooling/training/ROADMAP.md#priority-queue) | Next set-network users: efflux/foam parcel operators, an MPNN where neighbour-of-neighbour structure matters, a conservative set operator through `ctx.interact`. |
-| 10 | **P3** | R2 | [engine/precision](AGENTS/engine/precision/ROADMAP.md#priority-queue) | Evolutionary model search beyond uniform MLP width/depth (DAGs, activations, cross-family discovery) |
+| 10 | **P3** | R1 | [engine/core](AGENTS/engine/core/ROADMAP.md#priority-queue) | Trace reference checks: the validation suite does not yet read the `run_end` `trace` reference or check its `summary_hash` against the trace file's batch record; a run that fails before `run_end` has no reference (only the trace file's run summary). |
 | 11 | **P3** | R4 | [studio/workspace](AGENTS/studio/workspace/ROADMAP.md#priority-queue) | Automatic accuracy/convergence control (needs engine error estimates) |
 | 12 | **P3** | R3 | [scenarios/processes](AGENTS/scenarios/processes/ROADMAP.md#priority-queue) | Coupled thermal/latent energy, mass transport and 3D solution state |
 

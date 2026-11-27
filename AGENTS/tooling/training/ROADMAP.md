@@ -24,7 +24,8 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Particle-observer coverage holes and physical uncertainty calibration. (owned by the [engine/inference queue](../../engine/inference/ROADMAP.md#priority-queue))
 - **P2** · R2 · Make the synthetic hierarchy demo beat its additive baseline before trusting the trainer on Geant4 data: more systems, minibatching, block-level capacity/latent sweeps, and a structure search over levels. Today the system level loses 0.09 R² to adding up its own block predictions. ([detail](#recursive-group-hierarchies-2026-11-17))
 - **P2** · R2 · Hierarchy tooling parity with single models: TorchScript twins per level, `trech-ml` store registration and a JS `defineModel` hierarchy family, validator gates for chained-holdout reproduction and capacity coverage, and integrate the particle-hierarchy replay recipe into the recheck registry. ([detail](#recursive-group-hierarchies-2026-11-17))
-- **P2** · R2 · First `trech-evolve-arch` search on Geant4-harvested runs of a non-optics family (CNT device metrics or fluid parcels), graded against grid/random `defineSearch` on the same splits. Record test-run R², evaluations and epochs, with and without reused knowledge. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
+- **P2** · R2 · Search quality beyond one small table. On the Geant4 particle-observer runs (2026-11-27, 20 seeds) no strategy beats a 24-point grid on held-out runs, the learned GFSL-NN search picks 20× larger models that transfer worse than their selection loss, and knowledge reuse does not help. Repeat on a larger Geant4 table (fluid parcels, CNT devices) with a selection split large enough to rank candidates, through `defineSearch`'s own trainer too, and test a size cost or selection-noise penalty for the learned search. ([detail](#search-quality-on-geant4-runs-2026-11-27))
+- **P3** · R2 · The hand-built particle-observer trainer (decoded-probability loss, 10,900 epochs; test R²min 0.9994) beats every searched model's median (0.980–0.994): let searches choose the output transform and loss, not only the architecture. ([detail](#search-quality-on-geant4-runs-2026-11-27))
 - **P2** · R2 · Route `TRECH_ML.defineSearch({strategy: "evolvo"})` and the `trech-ml` store to GFSL-NN (preferably through the engine's `trech arch`, which already applies the classic reference bar): genome and knowledge in the checkpoint, `format: "torchscript"` registration for non-dense winners, and validator gates for evolved models (TorchScript parity, sidecar binding, retrain reproduction). ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
 - **P2** · R2 · Evolve set networks and hierarchy levels: masked/padded `set` inputs in GFSL-NN, a lowering of DeepSets/MPNN-shaped genomes to `generic_surrogate_v3`, then per-level search in `trech-train-hierarchy`. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
 - **P3** · R2 · Extend specialist training to density-connected regimes with measured assignment stability and add typed store registration for standalone specialist modules. ([study](../../../docs/inference/multiscale_domain_study.md))
@@ -125,6 +126,21 @@ dated record below, and queue its residuals in the same change.
   `defineSearch`/store/validator routing, no set inputs or hierarchy levels, no domain in the
   sidecar, no native C++ evaluation of non-dense primitives. Macro mining and FLOP/latency costs
   are Evolvo roadmap items.
+
+## Search quality on Geant4 runs (2026-11-27)
+
+- [x] `tools/torch/trech_torch/compare_search.py` (`trech-compare-search`, CTest
+  `trech_compare_search`): six strategies (grid, random MLP, Evolvo width/depth, random GFSL-NN,
+  learned GFSL-NN, knowledge reuse) proposing GFSL-NN genomes trained by one shared `TorchTask`,
+  24 distinct trained candidates each, winner by selection MSE, test computed once.
+- [x] Measured on `data/particle_observer/rows.json` (192/12/18 whole Geant4 runs), 20 seeds,
+  11 min CPU. Geo-mean test MSE: grid 0.00427, Evolvo width/depth 0.00288 (−0.40 ± 0.28 vs grid,
+  paired ln), random MLP 0.00454, learned GFSL-NN 0.00524, reuse 0.00586, random GFSL-NN 0.00789;
+  no difference beyond ~1.9 SE. Committed report
+  [`docs/validation/search_comparison_particle_observer.json`](../../../docs/validation/search_comparison_particle_observer.json),
+  [discussion](../../../docs/inference/evolvo_architectures.md#search-quality-on-geant4-runs-2026-11-27).
+- Residuals (queued above): one small table, a 12-run selection split, the learned search's
+  overfit to selection, and the trainer/output transform mattering more than the architecture.
 
 ## Recursive group hierarchies (2026-11-17)
 

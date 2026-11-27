@@ -90,6 +90,10 @@ Read the root principles and the parent handbook first; then open only the subca
   non-loadable `trech_evolved_arch_v1` record. The general language/search lives in Evolvo; the
   adapter only harvests, scales, exports and records provenance
   ([contract](../../../docs/inference/evolvo_architectures.md)). Pull Evolvo before using it (Evolvo workflow).
+  `compare_search.py` (`trech-compare-search`) grades search strategies on one rows table:
+  strategies only propose genomes; one `TorchTask` trains them all with the same budget of
+  distinct candidates (its `Recorder` raises `BudgetExhausted`, an `Exception` that is not a
+  `RuntimeError`, because both searches swallow `RuntimeError` as a failed candidate).
   `tools/torch/trech_torch/arch_worker.py` is the engine's worker (`trech arch`): request/result
   `trech_arch_request_v1`/`_result_v1` and classic seed genomes. The worker always searches the
   whole language, because LibTorch is required. It refuses the removed `engine_native_only`. The

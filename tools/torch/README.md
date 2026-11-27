@@ -353,3 +353,9 @@ stopping, on disjoint train/selection/test runs. Dense chains export as native
 `generic_surrogate_v1` JSON; anything else exports as TorchScript + sidecar. `--knowledge`
 carries what one search learned into the next. Contract, outputs and the synthetic
 demonstration: [`docs/inference/evolvo_architectures.md`](../../docs/inference/evolvo_architectures.md).
+
+`python -m trech_torch.compare_search` (`trech-compare-search`) compares grid, random, the
+Evolvo width/depth search, random GFSL-NN genomes, the learned GFSL-NN search and its
+knowledge-reuse variant on one rows table, with one shared trainer and equal budgets of distinct
+trained candidates. Measured result on the Geant4 particle-observer runs:
+[search quality](../../docs/inference/evolvo_architectures.md#search-quality-on-geant4-runs-2026-11-27).

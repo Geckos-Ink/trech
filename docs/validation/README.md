@@ -39,6 +39,7 @@ of these results. Its camera, clock or color mapping can come from the viewer.
 | [Static model audit](ml_model_audit.md) | Committed-model structure and carried trust checks. |
 | [ml_model_recheck.json](ml_model_recheck.json) | Machine-readable sidecar for the corresponding Markdown report. |
 | [Fresh-run model rechecks](ml_model_recheck.md) | Independent seed checks and producer-replay results. |
+| [search_comparison_particle_observer.json](search_comparison_particle_observer.json) | Architecture-search strategies compared on the Geant4 particle-observer runs; explained in [evolved architectures](../inference/evolvo_architectures.md#search-quality-on-geant4-runs-2026-11-27). |
 | [validation_glass_of_water.json](validation_glass_of_water.json) | Machine-readable sidecar for the corresponding Markdown report. |
 | [Glass-of-Water validation](validation_glass_of_water.md) | Optical inverse checks against recorded trajectories. |
 | [validation_optics_surrogate.json](validation_optics_surrogate.json) | Machine-readable sidecar for the corresponding Markdown report. |
