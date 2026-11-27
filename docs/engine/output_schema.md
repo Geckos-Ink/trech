@@ -79,7 +79,8 @@ Example: `{"entry":"examples/lab/live_hook_tuning.js","generation":2,"trigger":"
 
 ## trech_provenance.jsonl
 
-Each run emits at least two records (`run_start`, `run_end`). Fields:
+Each run emits at least two records (`run_start`, `run_end`); a run that is refused or fails
+before Geant4 runs writes one (`geometry_refused` or `run_failed`). Fields:
 
 - `phase` (string): `"run_start"` or `"run_end"`, or `"geometry_refused"` for a run that
   `geometry.refuseOn` stopped after Geant4 construction (the only record of that run: `n_events`
@@ -91,7 +92,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   call; a scenario-backed session counts each load's `onInit` in the first batch after it),
   and `stratify_model_hash`, `precision_*`, `nuclear_*` and `time_budget_seconds` match `run_start`; it
   carries `geometry_resolution`, `geometry_overlap_check` when the check ran, and
-  `geometry_refusal`; no scores file is written).
+  `geometry_refusal`; no scores file is written), or `"run_failed"` for a `trech run` that stopped
+  before it wrote any other record (see [`run_failed` records](#run_failed-records)).
 - `config_json` (string): full config JSON string from the JS experiment.
 - `config_hash` (string): 64-bit FNV-1a hash of `config_json` in hex.
 - `geant4_version` (string): version string from the active Geant4 build.
@@ -226,7 +228,7 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   Present on both provenance phases when a registry or separate loader is configured.
 - `lab_script` (object, optional): the [hook script identity](#lab-script-identity) of a
   scenario-backed `trech lab` batch; absent otherwise.
-- `trace` (object, optional, `run_end` only): written only when the [engine trace](engine_trace.md)
+- `trace` (object, optional, `run_end` and `run_failed` only): written only when the [engine trace](engine_trace.md)
   is on. It is a reference to the batch's trace summary, so a provenance record says whether and
   how the run was traced: `schema` (`trech_trace_ref_v1`), `level`, `categories`, `path` (the
   trace file, empty when none), `batch` (1 for the first Geant4 run, then one per `trech lab`
@@ -254,6 +256,40 @@ Example:
 ```json
 {"phase":"run_start","config_json":"{\"run\":{\"nEvents\":100}}","config_hash":"f74a5db5b0f602a7","geant4_version":"geant4-11-1","physics_list":"QBBC","rng_engine":"HepJamesRandom","cli_args":["trech","run","exp.js"],"macro_path":"","output_dir":".","n_events":100,"seed":424242,"determinism_mode":"strict","predictive_mode":false,"stratify_enabled":false,"stratify_model_path":"","stratify_model_hash":"","stratify_model_hash_available":false,"stratify_total_count":0,"stratify_predictable_count":0,"stratify_exceptional_count":0,"stratify_unclassified_count":0,"stratify_source_thresholds_count":0,"stratify_source_model_count":0,"stratify_source_unknown_count":0,"hooks_enabled":false,"hooks_registered":[],"hooks_guardrail_max_step_callbacks":100000,"hooks_guardrail_max_emits_per_callback":0,"hooks_guardrail_max_emit_payload_bytes":0,"hook_on_init_count":0,"hook_on_run_start_count":0,"hook_on_event_start_count":0,"hook_on_step_count":0,"hook_on_step_raw_count":0,"hook_on_step_dropped_count":0,"hook_on_event_end_count":0,"hook_on_run_end_count":0,"hook_unknown_registered_count":0,"hook_patch_count":0,"hook_emit_count":0,"hook_emit_dropped_count":0}
 ```
+
+### `run_failed` records
+
+A `trech run` that stops before Geant4 writes any provenance record appends one `run_failed`
+record and exits 1. Before 2026-11-27 such a run left no provenance at all. Runs that already wrote a
+record (`run_start`/`run_end`, including a hook that throws during the run, or
+`geometry_refused`) never add one. `trech lab` sessions do not write it yet.
+
+The record holds only what was known when the run stopped, so it never carries zero counters
+that would read as a run that dispatched nothing:
+
+- `failure` (object): `schema` (`trech_run_failure_v1`), `stage`, `error` (the message printed
+  after `TRECH error: `), `script` (the entry script: `path`, `readable`, and when readable its
+  `fnv1a64`, `sha256` and `size_bytes`; imported modules are not hashed), `config_evaluated` and
+  `config_parsed`. Stages, in order: `evaluate` (the scenario script threw or set no config),
+  `config` (the evaluated config did not parse, or `--strict-config` refused unknown keys),
+  `on_init` (the `onInit` hook threw), `prepare` (run overrides after `onInit`, for example
+  `--strict-config` refusing an unapplied `onInit` patch) and `geant4` (Geant4 refused the setup
+  before its first batch, for example an unknown `beam.particle`).
+- `config_json` / `config_hash`: the canonical config once it parsed (with any `onInit`
+  patches applied), the evaluated JSON when it did not, and `""` for both when evaluation failed.
+- `geant4_version` (the linked library, in the `run_start` format), `cli_args`, `macro_path`,
+  `output_dir`, and `n_events` (always 0).
+- Only once the config parsed: `requested_events`, `seed`, `determinism_mode`,
+  `predictive_mode`, `hooks_registered`, `hook_on_init_count` (1 when `onInit` completed),
+  `models_loaded`, `model_artifacts` and `config_unknown_keys` (when non-empty).
+- `trace` when the engine trace is on: the reference to the batch summary the failure closed.
+
+Example: `trech run broken.js --output out` on a script whose first line throws prints
+`TRECH error: Error: boom ...` and writes
+`{"phase":"run_failed","failure":{"stage":"evaluate","config_evaluated":false,...},"config_json":"",...}`
+to `out/trech_provenance.jsonl`. `tests/test_run_failure_provenance.py` (CTest
+`trech_run_failure_provenance`) checks every stage, the cases that must not write one, and an
+output directory that already holds an earlier run's records (the failure is appended after them).
 
 ### Scenario model artifact manifest
 

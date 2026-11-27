@@ -16,7 +16,20 @@ dated record below, and queue its residuals in the same change.
 
 - **P2** · R4 · Lineage across separate `ctx.predict`/`ctx.cascade` calls and persistent batched-operator state; needs explicit provenance, never value/name matching. ([detail](#dependency-trust-propagation))
 - **P2** · R4 · Resim is a candidate queue only: automatic execution, resim-confirmed labels and retraining, cross-callback/event ancestry, and real transport routing for every batched operator. ([detail](#dependency-trust-propagation))
-- **P3** · R7 · LibTorch integration of the resim policy (LibTorch is now required) is unvalidated. ([detail](#dependency-trust-propagation))
+- **P3** · R7 · The resim gate runs TorchScript models through `ctx.predict` and `ctx.cascade` only; TorchScript operators through `ctx.evolve`/`ctx.react`/`ctx.interact`, and the Python torch 2.8 writer against LibTorch 2.14, are not graded across versions. ([detail](#torchscript-resim-policy-2026-11-27))
+
+## TorchScript resim policy (2026-11-27)
+
+- [x] [`scripts/validate_inference_resim.py`](../../../../scripts/validate_inference_resim.py)
+  `--backend both` (the default) runs each of its 18 cases twice: on JSON networks and on
+  TorchScript modules (`torch.jit.script` of the same affine map) loaded by LibTorch, whose
+  `.pt.io.json` sidecars carry the same `input_domain` and `trained_scale_bands`. Both must give
+  the expected counts and reasons, replay byte-identically, and agree on scores (the
+  `model_artifacts` block masked), event scores, emits and queue; TorchScript runs must report an
+  `io_sidecar_sha256` for every model. Locally 36/36 in 67 s on the Release build. Dropping the
+  sidecar's `input_domain` fails `point_starved[torchscript]`. CTest
+  `trech_inference_resim_backends` runs seven cases on both backends (27 s). Synthetic maps grade
+  routing and bookkeeping, not accuracy.
 
 ## Non-finite inputs out of domain (2026-11-26)
 
@@ -80,8 +93,8 @@ dated record below, and queue its residuals in the same change.
   not refreshed. Existing default-thread strict transport replay remains a separate runtime gap.
 - [ ] Resim remains a candidate queue. Automatic execution, resim-confirmed labels/retraining,
   cross-callback/event ancestry and persistent operator-state lineage are not implemented.
-  The manual policy fixture covers point/cascade routing; real transport routing with each
-  batched operator and optional LibTorch policy integration remain unvalidated.
+  The policy fixture covers point/cascade routing on JSON and TorchScript models (2026-11-27);
+  real transport routing with each batched operator remains unvalidated.
 
 ## Workstream 3 — coverage and uncertainty
 

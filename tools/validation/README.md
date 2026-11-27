@@ -76,8 +76,8 @@ an edited/unreadable snapshot `invalid`; without one it says no snapshot was rec
 
 ## Trace reference check
 
-`python -m trech_validation.trace_ref <run_dir>...` checks that each `run_end` provenance
-`trace` reference matches the run's `trech_trace.jsonl` (recomputed `summary_hash`, `seq`,
+`python -m trech_validation.trace_ref <run_dir>...` checks that each `run_end` or `run_failed`
+provenance `trace` reference matches the run's `trech_trace.jsonl` (recomputed `summary_hash`, `seq`,
 `totals`, `verdict`). The suite case `trace_reference_matches_file` applies it to a traced run
 and a two-batch lab session. See [the engine trace guide](../../docs/engine/engine_trace.md#batches-and-provenance).
 

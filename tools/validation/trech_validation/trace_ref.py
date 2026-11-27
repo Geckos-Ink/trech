@@ -7,11 +7,15 @@ When the engine trace is on, every Geant4 batch writes a ``batch attribution sum
 it. This module recomputes the hash from the bytes of that record's ``data`` object (it never
 re-serializes the JSON, so float formatting cannot differ) and compares every field.
 
-A traced run that stopped before ``run_end`` has no reference. Its trace file can still end with
-the ``run attribution summary``; :func:`verify_run` reports which of the two is present.
+A ``trech run`` that stops before Geant4 writes any provenance (the scenario fails to evaluate,
+its config does not parse, ``onInit`` throws, or Geant4 refuses the setup) writes one
+``run_failed`` record instead; when traced, it closes a batch and carries the same reference,
+which is checked like a ``run_end`` one. A run that wrote neither has no reference. Its trace file
+can still end with the ``run attribution summary``; :func:`verify_run` reports which is present.
 
 States: ``ok`` (every reference matches), ``mismatch``, ``unreferenced`` (a trace file but no
-``run_end`` record, e.g. the scenario failed to evaluate) and ``untraced``.
+``run_end`` or ``run_failed`` record, e.g. a lab session that failed before its first batch) and
+``untraced``.
 
 Usage: ``python -m trech_validation.trace_ref <run_dir> [<run_dir> ...]`` (exit 1 on a mismatch).
 """
@@ -75,10 +79,13 @@ def verify_run(run_dir: Path, provenance: Optional[List[Dict]] = None) -> Dict:
         provenance = [json.loads(l) for l in prov_path.read_text(encoding="utf-8").splitlines() if l.strip()] \
             if prov_path.exists() else []
     ends = [r for r in provenance if r.get("phase") == "run_end"]
-    refs = [r["trace"] for r in ends if isinstance(r.get("trace"), dict)]
+    failed = [r for r in provenance if r.get("phase") == "run_failed"]
+    refs = [r["trace"] for r in ends + failed if isinstance(r.get("trace"), dict)]
     trace_file = run_dir / TRACE_FILE
-    report: Dict = {"run_dir": str(run_dir), "run_end_records": len(ends), "references": [], "problems": [],
-                    "trace_file": trace_file.is_file()}
+    report: Dict = {"run_dir": str(run_dir), "run_end_records": len(ends), "run_failed_records": len(failed),
+                    "references": [], "problems": [], "trace_file": trace_file.is_file()}
+    if failed:
+        report["failure_stages"] = [(r.get("failure") or {}).get("stage") for r in failed]
     records = _summary_records(trace_file.read_text(encoding="utf-8")) if trace_file.is_file() else []
     batches = {r["data"].get("batch"): r for r in records if r["msg"] == BATCH_MSG}
     run_summary = next((r for r in reversed(records) if r["msg"] == RUN_MSG), None)
@@ -89,9 +96,10 @@ def verify_run(run_dir: Path, provenance: Optional[List[Dict]] = None) -> Dict:
         # evaluate): nothing to compare. A batch record without a reference is a mismatch.
         report["traced"] = trace_file.is_file()
         report["state"] = "unreferenced" if trace_file.is_file() else "untraced"
-        if batches and ends:
-            report["problems"].append(f"{len(batches)} batch record(s) but no run_end record carries a trace reference")
-        report["note"] = ("traced, but no run_end provenance record: the run stopped before Geant4 finished a batch; "
+        if batches and (ends or failed):
+            report["problems"].append(
+                f"{len(batches)} batch record(s) but no run_end/run_failed record carries a trace reference")
+        report["note"] = ("traced, but no run_end or run_failed provenance record: the run stopped before Geant4 finished a batch; "
                           f"the trace file {'ends with' if run_summary else 'has no'} run attribution summary"
                           if report["state"] == "unreferenced" else "not traced")
         report["ok"] = not report["problems"]
@@ -128,7 +136,7 @@ def verify_run(run_dir: Path, provenance: Optional[List[Dict]] = None) -> Dict:
         report["references"].append(entry)
         report["problems"] += [f"batch {entry['batch']}: {p}" for p in problems]
     if len({r.get("batch") for r in refs}) != len(refs):
-        report["problems"].append("two run_end records reference the same batch")
+        report["problems"].append("two provenance records reference the same batch")
     if run_summary is not None and run_summary["data"].get("batches") not in (None, len(batches)):
         report["problems"].append(
             f"run summary counts {run_summary['data'].get('batches')} batches, the file has {len(batches)}")
@@ -148,6 +156,7 @@ def main(argv=None) -> int:
         refs = report["references"]
         print(f"{arg}: {report['state']}; {len(refs)} reference(s), {report['batch_records']} batch record(s), "
               f"run summary {'present' if report['run_summary'] else 'absent'}" +
+              (f"; run_failed at {', '.join(map(str, report['failure_stages']))}" if report.get("failure_stages") else "") +
               (f" ({report['note']})" if report.get("note") else ""))
         for p in report["problems"]:
             print("  - " + p)

@@ -1055,6 +1055,15 @@ first inference reason and `source: "cascade_coverage"`. `low_confidence_inferen
 even if queue writing is disabled. Hull OOD counts retain their original meaning. These are
 resimulation candidates; the runtime does not automatically rerun or retrain them.
 
+The policies read the trust metadata a model carries, whatever its format. A TorchScript module
+(`.pt`, run by LibTorch) carries it in its `.pt.io.json` sidecar: `input_domain`
+(`standardized_radius`, `input_min`/`input_max`, `occupancy`, `joint`) and
+`trained_scale_bands`, exactly as a JSON network carries them in its own file. Without an
+`input_domain` the module has no measured reference, so it never reports starvation or an
+out-of-domain input. The [resim policy gate](../../scripts/validate_inference_resim.py) runs every
+case on both formats and requires identical scores (apart from the loaded-model block), event
+scores, emits and queue; CTest `trech_inference_resim_backends` runs seven of its cases.
+
 ## Allowed operations
 
 - Read `ctx.config` and `ctx.runtime` fields.

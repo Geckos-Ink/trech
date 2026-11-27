@@ -442,6 +442,23 @@ if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
       "$<TARGET_FILE:trech>")
   set_tests_properties(trech_beam_particle_refusal PROPERTIES TIMEOUT 400)
 endif()
+# A run that stops before Geant4 (evaluate, config, onInit, Geant4 setup) writes one run_failed
+# provenance record with a checked trace reference; runs that already write provenance do not.
+if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
+  add_test(NAME trech_run_failure_provenance
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_run_failure_provenance.py"
+      "$<TARGET_FILE:trech>")
+  set_tests_properties(trech_run_failure_provenance PROPERTIES TIMEOUT 400)
+endif()
+# Resim policies on both model backends: JSON networks and TorchScript modules (LibTorch) with the
+# same sidecar trust metadata route identically and write identical scores/events/emits/queue.
+if (TRECH_ENABLE_GEANT4)
+  add_test(NAME trech_inference_resim_backends
+    COMMAND ${TRECH_ML_PYTHON} ${PROJECT_SOURCE_DIR}/scripts/validate_inference_resim.py
+      --binary "$<TARGET_FILE:trech>" --output ${CMAKE_BINARY_DIR}/inference_resim_checks
+      --backend both --cases legacy_ood point_starved point_off_band all_causes joint clean strict)
+  set_tests_properties(trech_inference_resim_backends PROPERTIES TIMEOUT 400)
+endif()
 # Engine trace, Geant4 side: kernel/run/event/track/step records and tallies from a real kernel,
 # serial and with two workers, traced vs untraced byte identity, run_end provenance reference.
 if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)

@@ -146,6 +146,13 @@ struct ProvenanceRecord {
   bool geometryRefused = false;
   std::vector<std::string> geometryRefuseOn;
   int geometryRefusedCount = 0;
+  // phase "run_failed" only (a `trech run` that stopped before any other provenance record):
+  // canonical JSON of the `failure` block (schema trech_run_failure_v1: stage, error, entry
+  // script identity). The record is reduced to the facts known at the failure; the seed,
+  // determinism and hook fields are written only when the config was parsed
+  // (failureConfigParsed), so a script that failed to evaluate claims no seed or mode.
+  std::string failureJson;
+  bool failureConfigParsed = false;
 };
 
 class ProvenanceWriter {
@@ -156,6 +163,10 @@ public:
 private:
   std::string path_;
 };
+
+// Provenance records this process has written (any phase, any writer). `trech run` writes a
+// run_failed record only when it stops before writing any other.
+std::uint64_t provenanceRecordsWritten();
 
 // Stable algorithm-specific fingerprint for byte identities (not cryptographic).
 std::string fnv1a64Hex(const std::string& bytes);

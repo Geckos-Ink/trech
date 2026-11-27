@@ -315,10 +315,10 @@ class TraceReferenceTests(unittest.TestCase):
     RUN = ('{"cat":"summary","data":{"batches":%d,"totals":{"calls":0}},"level":"summary",'
            '"msg":"run attribution summary","schema":"trech_trace_v1","seq":%d}')
 
-    def make(self, directory: Path, batches=(1, 2), tamper=None, reference=True) -> Path:
+    def make(self, directory: Path, batches=(1, 2), tamper=None, reference=True, phase="run_end") -> Path:
         from trech_validation.trace_ref import fnv1a64
         directory.mkdir(parents=True)
-        lines, prov = [], [{"phase": "run_start"}]
+        lines, prov = [], [{"phase": "run_start"}] if phase == "run_end" else []
         for k, batch in enumerate(batches, 1):
             line = self.BATCH % (batch, 10 * batch, k)
             lines.append(line)
@@ -327,7 +327,8 @@ class TraceReferenceTests(unittest.TestCase):
                    "path": str(directory / "trech_trace.jsonl"), "batch": batch, "seq": k,
                    "summary_hash": fnv1a64(data.encode()), "totals": {"calls": 0, "emits": 10 * batch},
                    "verdict": "No ctx inference call ran."}
-            prov.append({"phase": "run_end", **({"trace": ref} if reference else {})})
+            extra = {"failure": {"schema": "trech_run_failure_v1", "stage": "evaluate"}} if phase == "run_failed" else {}
+            prov.append({"phase": phase, **extra, **({"trace": ref} if reference else {})})
         lines.append(self.RUN % (len(batches), len(batches) + 1))
         if tamper:
             lines[0] = lines[0].replace(*tamper)
@@ -360,6 +361,15 @@ class TraceReferenceTests(unittest.TestCase):
             (failed / "trech_trace.jsonl").write_text(self.RUN % (0, 1) + "\n")
             early = verify_run(failed)
             self.assertEqual((early["state"], early["ok"], early["run_summary"]), ("unreferenced", True, True))
+            # A run that failed before Geant4 closes one batch; its run_failed record is checked too.
+            stopped = verify_run(self.make(tmp / "stopped", batches=(1,), phase="run_failed"))
+            self.assertEqual((stopped["state"], stopped["failure_stages"]), ("ok", ["evaluate"]))
+            self.assertEqual((stopped["run_end_records"], stopped["run_failed_records"]), (0, 1))
+            forged = verify_run(self.make(tmp / "forged", batches=(1,), phase="run_failed",
+                                          tamper=('"emits":10', '"emits":12')))
+            self.assertEqual(forged["state"], "mismatch")
+            bare = verify_run(self.make(tmp / "bare", batches=(1,), phase="run_failed", reference=False))
+            self.assertEqual(bare["state"], "mismatch")
             plain = tmp / "plain"
             plain.mkdir()
             (plain / "trech_provenance.jsonl").write_text('{"phase":"run_end"}\n')

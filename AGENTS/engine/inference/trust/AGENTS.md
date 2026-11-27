@@ -57,8 +57,9 @@ When either new policy is enabled, event/queue records add exact cause counts an
 `inference_resim_reasons` in policy order; otherwise legacy fields/bytes remain unchanged. OOD
 counts remain hull-only. Candidates are recorded, never automatically rerun or used to retrain a model.
 
-The [manual Geant4 gate](../../../../scripts/validate_inference_resim.py) checks point/cascade
-routing, legacy bytes/hashes, strict gating, combined causes, feature precedence, disabled
+The [Geant4 gate](../../../../scripts/validate_inference_resim.py) checks point/cascade
+routing on JSON networks and on TorchScript modules whose `.pt.io.json` sidecars carry the same
+domain/band metadata (both must write identical scores, events, emits and queue), legacy bytes/hashes, strict gating, combined causes, feature precedence, disabled
 queue/stratification, dispatch isolation and replay. Operator cause counts are checked in C++
 and at the JS boundary. See [`docs/engine/scenario_hooks.md`](../../../../docs/engine/scenario_hooks.md)
 and the [output schema](../../../../docs/engine/output_schema.md) for field contracts.

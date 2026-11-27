@@ -1,5 +1,6 @@
 #include "trech/core/Config.hpp"
 #include "trech/core/LabSession.hpp"
+#include "trech/core/Provenance.hpp"
 #include "trech/core/RunOptions.hpp"
 #include "trech/core/Trace.hpp"
 #include "trech/js/JsRuntime.hpp"
@@ -12,9 +13,11 @@
 #endif
 
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -54,6 +57,77 @@ void warnIgnoredInitPaths(const trech::HookInitTallies& init) {
   for (const auto& path : init.ignoredPatchPaths) {
     std::cerr << "TRECH hooks: onInit override '" << path
               << "' was not applied (not a patchable field, or wrong type)\n";
+  }
+}
+
+// Where a `trech run` stopped. A run that stops before Geant4 writes any provenance record
+// writes one `run_failed` record instead, so its output directory says which script failed, at
+// which stage and why, and a traced run's reference points at the batch summary it closed.
+struct RunFailureContext {
+  std::string stage = "evaluate";
+  std::string configJson;                  // the evaluated config, once evaluation returned
+  std::optional<trech::TrechConfig> config;  // once it parsed (onInit patches included)
+};
+
+nlohmann::json scriptIdentity(const std::string& path) {
+  std::ifstream in(path, std::ios::binary);
+  const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  if (!in && !in.eof()) return {{"path", path}, {"readable", false}};
+  if (!std::filesystem::is_regular_file(path)) return {{"path", path}, {"readable", false}};
+  return {{"path", path},
+          {"readable", true},
+          {"fnv1a64", trech::fnv1a64Hex(bytes)},
+          {"sha256", trech::sha256Hex(bytes)},
+          {"size_bytes", bytes.size()}};
+}
+
+void writeRunFailure(const RunFailureContext& context, const trech::RunOptions& options,
+                     const trech::JsRuntime& js, const std::string& error) {
+  if (trech::provenanceRecordsWritten() > 0) return;  // run_start/run_end/refusal already speak
+  trech::ProvenanceRecord record;
+  record.phase = "run_failed";
+  if (context.config) {
+    record.configJson = trech::configToJsonString(*context.config);
+  } else {
+    record.configJson = context.configJson;
+  }
+  record.configHash = record.configJson.empty() ? "" : trech::hashConfigJson(record.configJson);
+#ifdef TRECH_HAS_GEANT4
+  record.geant4Version = trech::geant4LibraryVersion();
+#endif
+  record.cliArgs = options.cliArgs;
+  record.macroPath = options.macroPath;
+  record.outputDir = options.outputDir;
+  if (context.config) {
+    const auto& cfg = *context.config;
+    record.failureConfigParsed = true;
+    record.requestedEvents = cfg.run.nEvents;
+    record.seed = cfg.run.seed;
+    record.determinismMode = cfg.determinism.mode == "predictive" ? "predictive" : "strict";
+    record.predictiveMode = record.determinismMode == "predictive";
+    record.hooksRegistered = cfg.hooks.registered;
+    record.hookOnInitCount = options.hookInitDispatched ? 1 : 0;
+    record.modelsLoaded = js.loadedModelNames();
+    record.modelArtifactsJson = js.modelArtifactsJson();
+    record.configUnknownKeys = cfg.unknownKeys;
+  }
+  nlohmann::json failure = {{"schema", "trech_run_failure_v1"},
+                            {"stage", context.stage},
+                            {"error", error},
+                            {"script", scriptIdentity(options.experimentPath)},
+                            {"config_evaluated", !context.configJson.empty()},
+                            {"config_parsed", context.config.has_value()}};
+  record.failureJson = failure.dump();
+  trech::trace::record(trech::trace::Level::Info, "run", "error",
+                       {{"what", error}, {"stage", context.stage}});
+  const auto reference = trech::trace::batchSummary(-1);
+  if (!reference.is_null()) record.traceJson = reference.dump();
+  try {
+    std::filesystem::path path(options.outputDir.empty() ? "." : options.outputDir);
+    std::filesystem::create_directories(path);
+    trech::ProvenanceWriter((path / "trech_provenance.jsonl").string()).write(record);
+  } catch (const std::exception& writeError) {
+    std::cerr << "TRECH error: could not write run_failed provenance: " << writeError.what() << "\n";
   }
 }
 
@@ -311,72 +385,85 @@ int main(int argc, char** argv) {
     }
 
     trech::JsRuntime js;
-    js.setScriptParameterOverrides(options.scriptParameterOverrides);
-    if (options.refinement > 0.0) js.setPrecisionRefinement(options.refinement);
-    const std::string cfgJson = js.evalExperimentAndGetConfigJson(options.experimentPath);
-    if (options.command == trech::CliCommand::Inspect) {
-      nlohmann::json inspection;
-      inspection["config"] = nlohmann::json::parse(cfgJson);
-      inspection["parameters"] = nlohmann::json::parse(js.scriptParametersJson());
-      inspection["authoring"] = nlohmann::json::parse(js.authoringMetadataJson());
-      // Inspect does not require a parseable config; report unknown keys when
-      // it is, and the located parse error (config_error) when it is not.
-      try {
-        const auto parsed = trech::configFromJsonString(cfgJson);
-        if (!parsed.unknownKeys.empty()) {
-          inspection["config_unknown_keys"] = parsed.unknownKeys;
+    RunFailureContext failure;
+    try {
+      js.setScriptParameterOverrides(options.scriptParameterOverrides);
+      if (options.refinement > 0.0) js.setPrecisionRefinement(options.refinement);
+      const std::string cfgJson = js.evalExperimentAndGetConfigJson(options.experimentPath);
+      failure.configJson = cfgJson;
+      failure.stage = "config";
+      if (options.command == trech::CliCommand::Inspect) {
+        nlohmann::json inspection;
+        inspection["config"] = nlohmann::json::parse(cfgJson);
+        inspection["parameters"] = nlohmann::json::parse(js.scriptParametersJson());
+        inspection["authoring"] = nlohmann::json::parse(js.authoringMetadataJson());
+        // Inspect does not require a parseable config; report unknown keys when
+        // it is, and the located parse error (config_error) when it is not.
+        try {
+          const auto parsed = trech::configFromJsonString(cfgJson);
+          if (!parsed.unknownKeys.empty()) {
+            inspection["config_unknown_keys"] = parsed.unknownKeys;
+          }
+        } catch (const std::exception& error) {
+          if (options.strictConfig) {
+            throw;  // strict inspect requires a parseable config
+          }
+          inspection["config_error"] = error.what();
         }
-      } catch (const std::exception& error) {
-        if (options.strictConfig) {
-          throw;  // strict inspect requires a parseable config
+        if (options.strictConfig && inspection.contains("config_unknown_keys")) {
+          trech::requireNoUnknownConfigKeys(
+              trech::configFromJsonString(cfgJson));  // throws, naming the keys
         }
-        inspection["config_error"] = error.what();
+        std::cout << inspection.dump() << "\n";
+        return 0;
       }
-      if (options.strictConfig && inspection.contains("config_unknown_keys")) {
-        trech::requireNoUnknownConfigKeys(
-            trech::configFromJsonString(cfgJson));  // throws, naming the keys
+      trech::TrechConfig& cfg = failure.config.emplace(trech::configFromJsonString(cfgJson));
+      warnUnknownConfigKeys(cfg, options);
+      failure.stage = "on_init";
+      trech::HookRuntimeContext initContext;
+      initContext.seed = cfg.run.seed;
+      initContext.nEvents = cfg.run.nEvents;
+      initContext.determinismMode = cfg.determinism.mode;
+      initContext.maxEmitsPerCallback = cfg.hooks.maxEmitsPerCallback;
+      initContext.maxEmitPayloadBytes = cfg.hooks.maxEmitPayloadBytes;
+      const auto initReport = js.dispatchHook("onInit", initContext, &cfg, true);
+      options.hookInitDispatched = true;
+      failure.stage = "prepare";
+      options.hookInitPatchCount = initReport.patchApplied ? 1 : 0;
+      options.hookInitIgnoredPatchPaths = initReport.ignoredPatchPaths;
+      for (const auto& path : initReport.ignoredPatchPaths) {
+        std::cerr << "TRECH hooks: onInit override '" << path
+                  << "' was not applied (not a patchable field, or wrong type)\n";
       }
-      std::cout << inspection.dump() << "\n";
-      return 0;
-    }
-    trech::TrechConfig cfg = trech::configFromJsonString(cfgJson);
-    warnUnknownConfigKeys(cfg, options);
-    trech::HookRuntimeContext initContext;
-    initContext.seed = cfg.run.seed;
-    initContext.nEvents = cfg.run.nEvents;
-    initContext.determinismMode = cfg.determinism.mode;
-    initContext.maxEmitsPerCallback = cfg.hooks.maxEmitsPerCallback;
-    initContext.maxEmitPayloadBytes = cfg.hooks.maxEmitPayloadBytes;
-    const auto initReport = js.dispatchHook("onInit", initContext, &cfg, true);
-    options.hookInitDispatched = true;
-    options.hookInitPatchCount = initReport.patchApplied ? 1 : 0;
-    options.hookInitIgnoredPatchPaths = initReport.ignoredPatchPaths;
-    for (const auto& path : initReport.ignoredPatchPaths) {
-      std::cerr << "TRECH hooks: onInit override '" << path
-                << "' was not applied (not a patchable field, or wrong type)\n";
-    }
-    if (options.strictConfig && !initReport.ignoredPatchPaths.empty()) {
-      throw std::invalid_argument("--strict-config: onInit override has " +
-                                  std::to_string(initReport.ignoredPatchPaths.size()) +
-                                  " path(s) that were not applied");
-    }
-    options.hookInitEmitCount = static_cast<int>(initReport.emitCount);
-    options.hookInitEmitDroppedCount =
-        static_cast<int>(initReport.emitDroppedCount);
-    options.hookInitPredictCount = static_cast<int>(initReport.predictCount);
-    options.hookInitOutOfDomainCount =
-        static_cast<int>(initReport.outOfDomainCount);
-    options.modelsLoaded = js.loadedModelNames();
-    trech::applyRunOverrides(cfg, options);
-    options.hookRuntime = &js;
-    traceRunStart("run", cfg, options);
+      if (options.strictConfig && !initReport.ignoredPatchPaths.empty()) {
+        throw std::invalid_argument("--strict-config: onInit override has " +
+                                    std::to_string(initReport.ignoredPatchPaths.size()) +
+                                    " path(s) that were not applied");
+      }
+      options.hookInitEmitCount = static_cast<int>(initReport.emitCount);
+      options.hookInitEmitDroppedCount =
+          static_cast<int>(initReport.emitDroppedCount);
+      options.hookInitPredictCount = static_cast<int>(initReport.predictCount);
+      options.hookInitOutOfDomainCount =
+          static_cast<int>(initReport.outOfDomainCount);
+      options.modelsLoaded = js.loadedModelNames();
+      trech::applyRunOverrides(cfg, options);
+      options.hookRuntime = &js;
+      traceRunStart("run", cfg, options);
+      failure.stage = "geant4";
 
 #ifdef TRECH_HAS_GEANT4
-    return trech::runGeant4(cfg, options, argc, argv);
+      return trech::runGeant4(cfg, options, argc, argv);
 #else
-    std::cout << "Config parsed OK (Geant4 disabled)\n";
-    return 0;
+      std::cout << "Config parsed OK (Geant4 disabled)\n";
+      return 0;
 #endif
+    } catch (const std::exception& ex) {
+      if (options.command != trech::CliCommand::Run || trech::provenanceRecordsWritten() > 0) throw;
+      writeRunFailure(failure, options, js, ex.what());  // also writes the trace error record
+      std::cerr << "TRECH error: " << ex.what() << "\n";
+      return 1;
+    }
   } catch (const std::exception& ex) {
     trech::trace::record(trech::trace::Level::Info, "run", "error", {{"what", ex.what()}});
     std::cerr << "TRECH error: " << ex.what() << "\n";

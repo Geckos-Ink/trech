@@ -17,6 +17,7 @@
 #include "trech/sim/HookRegistration.hpp"
 
 #include "G4Element.hh"
+#include "G4Version.hh"
 #include "G4Material.hh"
 #include "G4NistManager.hh"
 
@@ -58,6 +59,7 @@
 #include <sstream>
 #include "Randomize.hh"
 
+#include <algorithm>
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -664,6 +666,20 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
 }
 
 } // namespace
+
+std::string geant4LibraryVersion() {
+  std::string name = G4Version;
+  name.erase(std::remove(name.begin(), name.end(), '$'), name.end());
+  const auto trim = [](std::string text) {
+    const auto first = text.find_first_not_of(" \t\n\r");
+    if (first == std::string::npos) return std::string();
+    return text.substr(first, text.find_last_not_of(" \t\n\r") - first + 1);
+  };
+  name = trim(name);
+  const std::string date = trim(G4Date);
+  if (name.empty()) return std::to_string(G4VERSION_NUMBER);
+  return "Geant4 version " + name + (date.empty() ? "" : "   " + date);
+}
 
 int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv) {
   G4RunManager* runManager = nullptr;

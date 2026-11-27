@@ -358,10 +358,14 @@ PYTHONPATH=tools/validation python3 -m trech_validation.trace_ref build/out_lab
 
 The checker hashes the exact bytes of each batch record's `data` object, so it does not depend on
 how a JSON library spells numbers. It also compares `seq`, `totals` and `verdict`, and exits 1 on
-any mismatch. A traced run that failed before Geant4 ran (for example, a scenario that throws
-while it is evaluated) has a trace file with only the run summary and no provenance; the checker
-reports it as `unreferenced`, not as a mismatch. A hook that throws during the run still writes
-`run_end` with a matching reference. The validation suite runs this check in the
+any mismatch. A traced `trech run` that fails before Geant4 runs (for example, a scenario that
+throws while it is evaluated) closes one batch and writes a
+[`run_failed` provenance record](output_schema.md#run_failed-records) with the same reference; the
+checker verifies it like a `run_end` one and names the stage
+(`out: ok; 1 reference(s), 1 batch record(s), run summary present; run_failed at evaluate`).
+A run with neither record (a `trech lab` session that failed before its first batch) is reported
+as `unreferenced`, not as a mismatch. A hook that throws during the run still writes `run_end`
+with a matching reference. The validation suite runs this check in the
 `trace_reference_matches_file` case.
 
 ```sh

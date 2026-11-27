@@ -4,8 +4,14 @@
 #include "trech/core/RunOptions.hpp"
 
 #include <memory>
+#include <string>
 
 namespace trech {
+// The linked Geant4 library in the run manager's format ("Geant4 version Name:
+// geant4-11-04-patch-02 [MT]   (12-June-2026)"), read from G4Version.hh, so a record written
+// when no kernel exists (run_failed provenance) names the same version as run_start.
+std::string geant4LibraryVersion();
+
 int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv);
 
 // Reuses one initialized Geant4 kernel across real-time BeamOn batches. Event

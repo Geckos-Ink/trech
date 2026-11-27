@@ -1,5 +1,6 @@
 #include "trech/core/Provenance.hpp"
 
+#include <atomic>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -20,7 +21,53 @@ std::uint64_t fnv1a64(const std::string& input) {
   return hash;
 }
 
+std::atomic<std::uint64_t> recordsWritten{0};
+
+void append(const std::string& path, const nlohmann::json& j) {
+  std::ofstream out(path, std::ios::app);
+  out << j.dump() << '\n';
+  recordsWritten.fetch_add(1, std::memory_order_relaxed);
+}
+
+// A run that stopped before Geant4 ran: only what was known at the failure. Never the zero
+// counters of a full record, which would read as a run that dispatched nothing.
+nlohmann::json failureRecord(const ProvenanceRecord& record) {
+  nlohmann::json j;
+  j["phase"] = record.phase;
+  j["failure"] = nlohmann::json::parse(record.failureJson);
+  j["config_json"] = record.configJson;
+  j["config_hash"] = record.configHash;
+  j["geant4_version"] = record.geant4Version;
+  j["cli_args"] = record.cliArgs;
+  j["macro_path"] = record.macroPath;
+  j["output_dir"] = record.outputDir;
+  j["n_events"] = 0;
+  if (record.failureConfigParsed) {
+    j["requested_events"] = record.requestedEvents;
+    j["seed"] = record.seed;
+    j["determinism_mode"] = record.determinismMode;
+    j["predictive_mode"] = record.predictiveMode;
+    j["hooks_registered"] = record.hooksRegistered;
+    j["hook_on_init_count"] = record.hookOnInitCount;
+    j["models_loaded"] = record.modelsLoaded;
+    if (!record.modelArtifactsJson.empty()) {
+      j["model_artifacts"] = nlohmann::json::parse(record.modelArtifactsJson);
+    }
+    if (!record.configUnknownKeys.empty()) {
+      j["config_unknown_keys"] = record.configUnknownKeys;
+    }
+  }
+  if (!record.traceJson.empty()) {
+    j["trace"] = nlohmann::json::parse(record.traceJson);
+  }
+  return j;
+}
+
 } // namespace
+
+std::uint64_t provenanceRecordsWritten() {
+  return recordsWritten.load(std::memory_order_relaxed);
+}
 
 std::string fnv1a64Hex(const std::string& bytes) {
   const std::uint64_t hash = fnv1a64(bytes);
@@ -50,6 +97,10 @@ std::string hashFileContents(const std::string& path) {
 ProvenanceWriter::ProvenanceWriter(const std::string& path) : path_(path) {}
 
 void ProvenanceWriter::write(const ProvenanceRecord& record) const {
+  if (record.phase == "run_failed") {
+    append(path_, failureRecord(record));
+    return;
+  }
   nlohmann::json j;
   j["phase"] = record.phase;
   j["config_json"] = record.configJson;
@@ -226,8 +277,7 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
                              {"refused_count", record.geometryRefusedCount}};
   }
 
-  std::ofstream out(path_, std::ios::app);
-  out << j.dump() << '\n';
+  append(path_, j);
 }
 
 } // namespace trech

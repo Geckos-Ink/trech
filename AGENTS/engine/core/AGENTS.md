@@ -149,6 +149,14 @@ The observation-only engine trace (2026-11-22): a process-wide, mutex-guarded ve
   `TrechRunAction::EndOfRunAction` on the master): level, categories, path, batch index, seq,
   summary hash, totals, verdict. Absent when off, so untraced records keep their bytes. Tallies
   are kept twice (session and since-last-batch); `summary()` is the session.
+- **Failure provenance:** `trech run` (`apps/trech-cli/main.cpp`, `RunFailureContext`) tracks the
+  stage (`evaluate`, `config`, `on_init`, `prepare`, `geant4`). When the command throws and
+  `provenanceRecordsWritten()` (a process counter in `Provenance.cpp`) is still 0, it appends one
+  reduced `run_failed` record: `failure` (`trech_run_failure_v1`: stage, error, entry-script
+  FNV-1a/SHA-256), the config once evaluated (canonical once parsed), the linked Geant4 version
+  (`geant4LibraryVersion()`), and seed/mode/hook fields only once the config parsed. When traced
+  it calls `batchSummary(-1)` and stores the reference as `trace`. `run_start`/`run_end` and
+  `geometry_refused` runs never get one; `trech lab` does not write it yet.
 - **Tallies and children:** `tally(section, key, n)` (session and batch; summary `tallies`; the
   verdict adds a Geant4 sentence when `geant4.events` exists and a Torch one for
   `torch.forwards_by_model`/`torch.train_steps_by_learner`; stderr prints the top six per

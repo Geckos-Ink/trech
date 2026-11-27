@@ -265,8 +265,13 @@ its own `*.build_record.json` written by `tools/torch/publish_domain_learner.py`
   runs isolated synthetic point/cascade fixtures through serial Geant4, checking policies, exact
   cause accounting, strict/disabled behavior, event/callback isolation and byte replay. Optional
   `--baseline-binary` compares legacy scores/events/emits/queue and config hashes. Artifacts live
-  in a unique `build/inference_resim_checks/validation_*` directory. This is a manual diagnostics
-  gate, not physical model validation or an automatic resimulation executor.
+  in a unique `build/inference_resim_checks/validation_*` directory. `--backend both` (the
+  default) runs each case on JSON networks and on TorchScript modules loaded by LibTorch, whose
+  `.pt.io.json` sidecars carry the same domain/band metadata, and requires identical scores
+  (`model_artifacts` masked), event scores, emits and queue; `--backend json|torchscript` runs one,
+  `--cases` a subset. CTest `trech_inference_resim_backends` runs seven cases on both backends
+  through `TRECH_ML_PYTHON`. This is a diagnostics gate, not physical model validation or an
+  automatic resimulation executor.
 - **Strict worker transport gate:** [`scripts/validate_strict_worker_transport.py`](../../../scripts/validate_strict_worker_transport.py)
   requires exact event/trajectory identities and scientific artifact bytes, including run scores,
   across real Tasking/MT workers. It checks provenance replay for the same invocation and verifies
