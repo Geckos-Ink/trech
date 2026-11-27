@@ -88,6 +88,9 @@ SUITE_EXIT_STATUS_FILE = "suite_exit_status.txt"
 # hooks_track_ledger.js (300 events, threads 1): onTrackStart/onStep/onTrackEnd
 # bookkeeping of Geant4 tracks for the track-hook contract.
 RUN_HOOKS_TRACK_LEDGER = "out_hooks_track_ledger"
+# The same scenario traced (--trace summary): one trech run and a two-batch trech lab session.
+RUN_TRACE_REFERENCE = "out_trace_reference_run"
+RUN_TRACE_REFERENCE_LAB = "out_trace_reference_lab"
 GEOMETRY_REFUSE_KINDS = ("material_fallback", "parent_fallback", "volume_skipped", "overlap")
 RUN_ANALYTIC_PHOTO_FRACTION = "out_analytic_photo_fraction"
 RUN_ANALYTIC_COMPTON = "out_analytic_compton"
@@ -2019,6 +2022,49 @@ class PascalPrincipleHolds(ValidationCase):
                       "deformable_wall_displacement": deform,
                       "deformable_elastic_wall_displacement": elastic,
                       "deformable_plastic_wall_displacement": plastic})
+
+
+class TraceReferenceMatchesFile(ValidationCase):
+    name = "trace_reference_matches_file"
+    description = (
+        "Engine trace provenance: for a traced trech run and a two-batch trech lab session of "
+        "hooks_track_ledger.js, every run_end trace reference (trech_trace_ref_v1) names a batch "
+        "attribution summary in the trace file whose FNV-1a 64 hash, recomputed from the record's "
+        "own bytes, equals summary_hash, with the same seq, totals and verdict; the lab session "
+        "references batches 1 and 2; the untraced run has no trace key; and tracing changes no emit."
+    )
+    category = "engine"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_TRACE_REFERENCE, RUN_TRACE_REFERENCE_LAB, RUN_HOOKS_TRACK_LEDGER]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        from .trace_ref import verify_run
+        runs = {}
+        for name in self.required_runs():
+            run = _need_run(ctx, name)
+            if run is None:
+                return _skip(self.name, self.description, self.category, name)
+            runs[name] = run
+        single = verify_run(runs[RUN_TRACE_REFERENCE].directory, runs[RUN_TRACE_REFERENCE].provenance)
+        lab = verify_run(runs[RUN_TRACE_REFERENCE_LAB].directory, runs[RUN_TRACE_REFERENCE_LAB].provenance)
+        control = runs[RUN_HOOKS_TRACK_LEDGER]
+        flags = {
+            "run_reference_matches": single["state"] == "ok" and len(single["references"]) == 1,
+            "lab_references_match": lab["state"] == "ok" and sorted(r["batch"] for r in lab["references"]) == [1, 2],
+            "untraced_run_has_no_reference": all("trace" not in r for r in control.provenance)
+            and not (control.directory / "trech_trace.jsonl").exists(),
+            "trace_changes_no_emit": [(e.get("tag"), e.get("payload")) for e in runs[RUN_TRACE_REFERENCE].hook_emits]
+            == [(e.get("tag"), e.get("payload")) for e in control.hook_emits],
+        }
+        problems = single["problems"] + lab["problems"]
+        hashes = ", ".join(f"batch {r['batch']} {r['summary_hash']}" for r in single["references"] + lab["references"])
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if all(flags.values()) else "fail",
+            summary=f"{sum(flags.values())}/{len(flags)} checks; references {hashes}",
+            notes=[f"{k}: {'yes' if v else 'NO'}" for k, v in flags.items()] + problems,
+        )
 
 
 class HooksTrackLedgerConsistent(ValidationCase):
@@ -5966,6 +6012,7 @@ ALL_CASES: List[ValidationCase] = [
     SystemVolumeEventEdepConsistent(),
     GeometryRefusalGuardRefusesDefects(),
     HooksTrackLedgerConsistent(),
+    TraceReferenceMatchesFile(),
     SystemEventHistogramConsistent(),
     VizSceneSchemaV1(),
     VizTrajectoriesPointCount(),

@@ -20,7 +20,8 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R4 · Engine trace depth: attribution is per hook invocation, not per emitted value (an invocation with one engine call and one unreported authored law counts as engine-backed). Carry value-level origin (lineage) into emit records, and trace the inner decisions of `RivalArbitration` (evolve/react/cascade/interact rivals), cascade stages and `ctx.evolve` operator routing as their own categories instead of only the `trace`-level result digest. ([engine trace](#engine-trace-2026-11-22))
 - **P2** · R6 · Studio engine trace residuals: link a trace row to its emit/timeline frame (`hook`+`event` → Emits tab), show the summary's `roles` (validation/reference work) in the Attribution tab, and change the level of a running live lab (today it applies from the next start). No committed reference capture of the panel yet. ([script logging and Studio panel](#script-logging-and-studio-trace-panel-2026-11-22), [batches and roles](#trace-batches-provenance-and-roles-2026-11-22))
 - **P3** · R3 · Library logging residuals: `trech_helpers.js` and the `.ui.js`/`.view.js` companions have no channel and no role. The host wraps only the functions of a validation companion's `TRECH_CHECKS[<stem>]` entry: a companion that registers under another key, or a scenario that runs a reference solver outside its companion without `TRECH_TRACE.role`, is still counted as the scenario's own path. ([library channels](#library-trace-channels-2026-11-22), [batches and roles](#trace-batches-provenance-and-roles-2026-11-22))
-- **P3** · R1 · Trace reference checks: the validation suite does not yet read the `run_end` `trace` reference or check its `summary_hash` against the trace file's batch record; a run that fails before `run_end` has no reference (only the trace file's run summary). ([batches and roles](#trace-batches-provenance-and-roles-2026-11-22))
+- **P3** · R1 · A traced run that stops before Geant4 runs (the scenario fails to evaluate, or construction fails) writes no provenance at all; its trace file holds only the run attribution summary, which names no config or script. Decide whether such runs write a failure provenance record that the trace reference can point to. A hook that throws does reach `run_end` with a valid reference (checked 2026-11-27). ([trace reference checks](#trace-reference-checks-2026-11-27))
+- **P3** · R5 · The committed validation report does not list `trace_reference_matches_file` yet: it needs a full `run_validation_suite.sh` run. ([trace reference checks](#trace-reference-checks-2026-11-27))
 - **P3** · R5 · Geant4 trace depth: steps name the limiting process only, not the hadronic model or cross-section data set that sampled an interaction (`G4HadronicProcess` model/dataset of the step), and `NoProcess` steps (no defining process on the post-step point) are not explained. Geometry resolution issues are already in provenance but not yet mirrored as `geant4` records. ([library trace](#library-trace-geant4-torch-python-2026-11-22))
 - **P3** · R4 · Library trace residuals: Evolvo's per-epoch training inside a candidate is not traced (only each candidate's result; tracing inside needs an Evolvo hook, a first-party Evolvo change); the `tools/torch/*.py` study and build scripts outside the `trech_torch` package log only through the trainers they call; Node `tools/ml/lib/orchestrate.js` does not yet pass the trace to the Python trainers it spawns or import their records the way `trech arch` does; Studio's trace panel shows `tallies` only in the record detail, not as a table. ([library trace](#library-trace-geant4-torch-python-2026-11-22))
 - **P2** · R1 · Runtime (non-`onInit`) hooks cannot patch config, so ignored-override reporting covers `onInit` only; decide whether later hooks may patch at all before extending it. (dated records below)
@@ -58,6 +59,21 @@ dated record below, and queue its residuals in the same change.
   candidate and 180 classic training steps, and produced the same TorchScript bytes and weights
   as an untraced run. A dangling `items()` of a temporary in the first `importRecords` crashed
   `trech arch` and was fixed before landing. Residuals queued above.
+
+<a name="trace-reference-checks-2026-11-27"></a>
+
+- [x] Trace reference checks (2026-11-27). `tools/validation/trech_validation/trace_ref.py`
+  (`python -m trech_validation.trace_ref <run_dir>…`) recomputes each `run_end` reference's
+  `summary_hash` from the exact bytes of the batch record's `data` object (no JSON
+  re-serialization) and compares batch, seq, totals and verdict. States: `ok`, `mismatch`,
+  `unreferenced` (trace file, no `run_end`), `untraced`. Suite case
+  `trace_reference_matches_file` (runs `out_trace_reference_run` and a two-batch
+  `out_trace_reference_lab` of `hooks_track_ledger.js` at `--trace summary`, the untraced
+  `out_hooks_track_ledger` as control): 4/4 locally, hashes `15a0458ab82c57cf` (run) and
+  `dbdc5d52e4220fd6`/`07bbf3cd4f765f9a` (lab), emits identical traced vs untraced. Probed by
+  hand: a hook that throws still writes a matching reference; a scenario that fails to evaluate
+  leaves only the run summary (`unreferenced`). Offline tests (FNV-1a vectors, a re-spelled
+  float, changed totals, a missing batch, an orphan batch, unreferenced, untraced): 16/16.
 
 <a name="trace-batches-provenance-and-roles-2026-11-22"></a>
 

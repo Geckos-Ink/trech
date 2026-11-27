@@ -74,6 +74,13 @@ span ratios, `argmax`); `validate_scenario.py --sweep CASE --run ID=DIR` grades 
 (Markdown and `pubchem_inputs` in JSON) records its verified digest and record count, or marks
 an edited/unreadable snapshot `invalid`; without one it says no snapshot was recorded.
 
+## Trace reference check
+
+`python -m trech_validation.trace_ref <run_dir>...` checks that each `run_end` provenance
+`trace` reference matches the run's `trech_trace.jsonl` (recomputed `summary_hash`, `seq`,
+`totals`, `verdict`). The suite case `trace_reference_matches_file` applies it to a traced run
+and a two-batch lab session. See [the engine trace guide](../../docs/engine/engine_trace.md#batches-and-provenance).
+
 ## Scenario purity report
 
 `python -m trech_validation.purity` writes `docs/validation/TRECH_current_scenarios_purity.md`, with one section

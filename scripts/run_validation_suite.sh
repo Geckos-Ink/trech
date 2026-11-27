@@ -281,6 +281,16 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   trech_run examples/scenarios/hooks_track_ledger/hooks_track_ledger.js \
     --output "${RUNS_DIR}/out_hooks_track_ledger" >/dev/null 2>&1
 
+  echo "  - hooks_track_ledger traced (engine trace reference: one run and a two-batch lab session)"
+  rm -rf "${RUNS_DIR}/out_trace_reference_run" "${RUNS_DIR}/out_trace_reference_lab"
+  trech_run examples/scenarios/hooks_track_ledger/hooks_track_ledger.js \
+    --trace summary --output "${RUNS_DIR}/out_trace_reference_run" >/dev/null 2>&1
+  printf '%s\n' '{"action":"simulate","events":2}' '{"action":"simulate","events":3}' '{"action":"quit"}' \
+    > "${RUNS_DIR}/trace_reference_lab_commands.jsonl"
+  "${TRECH_BIN}" lab examples/scenarios/hooks_track_ledger/hooks_track_ledger.js \
+    --commands "${RUNS_DIR}/trace_reference_lab_commands.jsonl" --trace summary \
+    --output "${RUNS_DIR}/out_trace_reference_lab" >/dev/null 2>&1
+
   echo "  - analytic_csda_range (Geant4 stopping power -> CSDA range vs measured track length, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_csda"
   trech_run examples/scenarios/analytic_csda_range/analytic_csda_range.js \

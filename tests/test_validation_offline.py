@@ -306,5 +306,65 @@ if sys.argv[1:3] == ['-m', 'trech_pubchem'] and os.environ.get('PUBCHEM_MODE') =
         self.assertEqual(self.calls(), [])
 
 
+class TraceReferenceTests(unittest.TestCase):
+    """trech_validation.trace_ref against hand-written trace files in the engine's format."""
+
+    BATCH = ('{"cat":"summary","data":{"batch":%d,"calls":{},"totals":{"calls":0,"emits":%d},'
+             '"verdict":"No ctx inference call ran.","x":1.5e-07},"level":"summary",'
+             '"msg":"batch attribution summary","schema":"trech_trace_v1","seq":%d}')
+    RUN = ('{"cat":"summary","data":{"batches":%d,"totals":{"calls":0}},"level":"summary",'
+           '"msg":"run attribution summary","schema":"trech_trace_v1","seq":%d}')
+
+    def make(self, directory: Path, batches=(1, 2), tamper=None, reference=True) -> Path:
+        from trech_validation.trace_ref import fnv1a64
+        directory.mkdir(parents=True)
+        lines, prov = [], [{"phase": "run_start"}]
+        for k, batch in enumerate(batches, 1):
+            line = self.BATCH % (batch, 10 * batch, k)
+            lines.append(line)
+            data = line[line.index('"data":') + 7:line.index(',"level"')]
+            ref = {"schema": "trech_trace_ref_v1", "level": "summary", "categories": [],
+                   "path": str(directory / "trech_trace.jsonl"), "batch": batch, "seq": k,
+                   "summary_hash": fnv1a64(data.encode()), "totals": {"calls": 0, "emits": 10 * batch},
+                   "verdict": "No ctx inference call ran."}
+            prov.append({"phase": "run_end", **({"trace": ref} if reference else {})})
+        lines.append(self.RUN % (len(batches), len(batches) + 1))
+        if tamper:
+            lines[0] = lines[0].replace(*tamper)
+        (directory / "trech_trace.jsonl").write_text("\n".join(lines) + "\n")
+        (directory / "trech_provenance.jsonl").write_text("".join(json.dumps(r) + "\n" for r in prov))
+        return directory
+
+    def test_states(self):
+        from trech_validation.trace_ref import fnv1a64, verify_run
+        # Reference vectors of FNV-1a 64.
+        self.assertEqual(fnv1a64(b""), "cbf29ce484222325")
+        self.assertEqual(fnv1a64(b"a"), "af63dc4c8601ec8c")
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            good = verify_run(self.make(tmp / "good"))
+            self.assertEqual(good["state"], "ok", good["problems"])
+            self.assertEqual([r["batch"] for r in good["references"]], [1, 2])
+            # The hash covers the record's bytes: re-spelling one float is caught.
+            spelled = verify_run(self.make(tmp / "spelled", tamper=("1.5e-07", "1.5E-7")))
+            self.assertEqual(spelled["state"], "mismatch")
+            self.assertTrue(any("summary_hash" in p for p in spelled["problems"]))
+            totals = verify_run(self.make(tmp / "totals", tamper=('"emits":10', '"emits":11')))
+            self.assertTrue(any("totals differs" in p for p in totals["problems"]))
+            missing = verify_run(self.make(tmp / "missing", tamper=('"batch":1,', '"batch":7,')))
+            self.assertTrue(any("no batch attribution summary for batch 1" in p for p in missing["problems"]))
+            orphan = verify_run(self.make(tmp / "orphan", reference=False))
+            self.assertEqual(orphan["state"], "mismatch")
+            failed = tmp / "failed"
+            failed.mkdir()
+            (failed / "trech_trace.jsonl").write_text(self.RUN % (0, 1) + "\n")
+            early = verify_run(failed)
+            self.assertEqual((early["state"], early["ok"], early["run_summary"]), ("unreferenced", True, True))
+            plain = tmp / "plain"
+            plain.mkdir()
+            (plain / "trech_provenance.jsonl").write_text('{"phase":"run_end"}\n')
+            self.assertEqual(verify_run(plain)["state"], "untraced")
+
+
 if __name__ == "__main__":
     unittest.main()

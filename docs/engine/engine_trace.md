@@ -349,6 +349,21 @@ The same batch is referenced from the `run_end` record of `trech_provenance.json
 belongs to a provenance record. Two identical batches have the same hash. The reference is
 written only when the trace is on, and it never enters `config_json` or `config_hash`.
 
+To check a run, recompute the hashes:
+
+```sh
+PYTHONPATH=tools/validation python3 -m trech_validation.trace_ref build/out_lab
+# build/out_lab: ok; 2 reference(s), 2 batch record(s), run summary present
+```
+
+The checker hashes the exact bytes of each batch record's `data` object, so it does not depend on
+how a JSON library spells numbers. It also compares `seq`, `totals` and `verdict`, and exits 1 on
+any mismatch. A traced run that failed before Geant4 ran (for example, a scenario that throws
+while it is evaluated) has a trace file with only the run summary and no provenance; the checker
+reports it as `unreferenced`, not as a mismatch. A hook that throws during the run still writes
+`run_end` with a matching reference. The validation suite runs this check in the
+`trace_reference_matches_file` case.
+
 ```sh
 # Per-batch verdicts of a lab session
 jq -c 'select(.msg=="batch attribution summary") | {batch: .data.batch, emits: .data.totals.emits}' \
