@@ -28,6 +28,12 @@ dated record below, and queue its residuals in the same change.
 
 ## Delivery records
 
+- [x] An unknown beam particle fails the run instead of firing electrons (2026-11-27). Found
+  while probing traced failures: `beam.particle: "no_such_particle"` exited 0 after transporting
+  three `e-`, and the scores reported the requested name. The generator now throws and the runner
+  checks the particle table after `Initialize`. CTest `trech_beam_particle_refusal` fails on the
+  previous binary (2 failures) and passes now; no committed scenario used an unknown name.
+
 - [x] A throwing scenario hook ends the run instead of hanging it (2026-11-26). Found while
   migrating the osmotic cell: a guard that threw from `onEventStart` left `trech run` waiting on a
   dead worker task with no output. The dispatch site now latches the failure, soft-aborts the

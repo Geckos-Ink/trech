@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 #include "G4Event.hh"
 #include "G4ParticleGun.hh"
@@ -31,9 +32,11 @@ G4ThreeVector perpendicularSeed(const G4ThreeVector& w) {
 TrechPrimaryGeneratorAction::TrechPrimaryGeneratorAction(const trech::BeamConfig& cfg)
     : cfg_(cfg), particleGun_(new G4ParticleGun(1)) {
   auto* table = G4ParticleTable::GetParticleTable();
+  // GeantRunner refuses an unknown beam particle before any action is built; never substitute.
   auto* particle = table->FindParticle(cfg_.particle);
   if (!particle) {
-    particle = table->FindParticle("e-");
+    throw std::runtime_error("beam.particle '" + cfg_.particle +
+                             "' is not in the Geant4 particle table of this physics list");
   }
   particleGun_->SetParticleDefinition(particle);
 

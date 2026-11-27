@@ -42,6 +42,7 @@
 #include "G4VPhysicsConstructor.hh"
 #endif
 #include "G4OpticalPhysics.hh"
+#include "G4ParticleTable.hh"
 #include "G4RunManager.hh"
 #include "G4RunManagerFactory.hh"
 #include "G4UIExecutive.hh"
@@ -449,6 +450,20 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
 
   runManager->Initialize();
   trech::sim::g4trace::kernelInitialized(cfg, options.physicsList, runManager->GetNumberOfThreads());
+
+  // The particle table is complete once the physics list is constructed. A beam particle it
+  // does not know used to be replaced by e- in the primary generator, so the run reported the
+  // requested particle while Geant4 transported electrons. Fail closed instead.
+  if (!G4ParticleTable::GetParticleTable()->FindParticle(cfg.beam.particle)) {
+    delete ui;
+    delete vis;
+    if (!retainRunManager) {
+      delete runManager;
+      runManager = nullptr;
+    }
+    throw std::runtime_error("beam.particle '" + cfg.beam.particle + "' is not a particle of physics list '" +
+                             options.physicsList + "' (Geant4 particle table)");
+  }
 
   if (!cfg.geometry.refuseOn.empty()) {
     const auto refused =

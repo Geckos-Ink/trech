@@ -255,6 +255,11 @@ onInit() {
 }
 ```
 
+`beam.particle` must be a name in the Geant4 particle table of the run's physics list
+(`gamma`, `e-`, `proton`, `geantino`, `opticalphoton`, …). An unknown name ends the run with
+`TRECH error: beam.particle '<name>' …` and exit status 1. Until 2026-11-27 the primary generator
+silently fired electrons instead, while the scores still reported the requested name.
+
 `beam.originMm` and `beam.direction` both accept `[x, y, z]` or an object such as
 `{ z: -5 }` that changes only the named axes. The first three array components must all
 be numeric for the vector to apply. `run.threads` accepts a nonnegative integer within

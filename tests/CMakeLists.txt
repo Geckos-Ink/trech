@@ -435,6 +435,13 @@ if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
       "$<TARGET_FILE:trech>")
   set_tests_properties(trech_hook_failure_exit PROPERTIES TIMEOUT 400)
 endif()
+# An unknown beam particle exits 1 instead of silently running electrons (serial and MT).
+if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
+  add_test(NAME trech_beam_particle_refusal
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_beam_particle_refusal.py"
+      "$<TARGET_FILE:trech>")
+  set_tests_properties(trech_beam_particle_refusal PROPERTIES TIMEOUT 400)
+endif()
 # Engine trace, Geant4 side: kernel/run/event/track/step records and tallies from a real kernel,
 # serial and with two workers, traced vs untraced byte identity, run_end provenance reference.
 if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)

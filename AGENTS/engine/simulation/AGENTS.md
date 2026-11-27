@@ -35,6 +35,11 @@ and pending migration items for the pinned checkout: [`docs/engine/GEANT4_featur
   fails that batch only. Outputs written before the failure stay on disk; `onRunEnd` does not run.
   Gate: `tests/test_hook_failure_exit.py` (CTest `trech_hook_failure_exit`: a throw in
   `onEventStart`, serial and two workers, and in `onRunStart`).
+- **An unknown beam particle fails closed (2026-11-27).** `TrechPrimaryGeneratorAction` used to
+  replace a name missing from the particle table with `e-`; it now throws, and `GeantRunner`
+  also refuses the name right after `Initialize`. Either way `trech run` exits 1 with
+  `beam.particle '<name>' …`. Gate: CTest `trech_beam_particle_refusal` (serial, two workers, and
+  a known particle that still runs).
 - **Post-`Initialize` carriers are pre-allocated before `SetUserInitialization`.** `derivedOptics`,
   `analyticChecks`, `materialProbes` are `shared_ptr` carriers on `RunOptions` filled after Geant4
   `Initialize` (tables built) in [`src/sim/GeantRunner.cpp`](../../../src/sim/GeantRunner.cpp) and paired
