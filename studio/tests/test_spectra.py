@@ -244,3 +244,28 @@ def test_window_spectra_mode_declares_runs_and_loads_engine_output(tmp_path):
         if window:
             window.close()
         module.create_viewport = original
+
+
+def test_ablation_text_groups_trainer_rows_by_kind():
+    from trech_studio.ui.spectra import ablation_text
+    rows = [{"kind": "geant4_atomic", "with": "atomic_ridge_geant4", "without": "atomic_ridge", "cv_rmse_delta": 0.03, "test_rmse_delta": 0.05},
+            {"with": "molecular_mlp_cascade", "without": "molecular_mlp", "cv_rmse_delta": -0.001, "test_rmse_delta": 0.003},
+            {"kind": "cascade_geant4", "with": "molecular_mlp_cascade_geant4", "without": "molecular_mlp_cascade",
+             "cv_rmse_delta": -0.0009, "test_rmse_delta": -0.003}]
+    text = ablation_text(rows)
+    # Rows without a kind predate the Geant4 inputs and read as cascade rows; groups keep a fixed order.
+    assert text.index("cascade ablation") < text.index("Geant4 atomic-input ablation") < text.index("Cascade source ablation")
+    assert "atomic_ridge_geant4 vs atomic_ridge: ΔCV RMSE +0.0300" in text
+    assert "molecular_mlp_cascade_geant4 vs molecular_mlp_cascade: ΔCV RMSE -0.0009" in text
+
+
+def test_geant4_input_lines_describe_the_live_probe():
+    from trech_studio.spectra import geant4_input_lines
+    check = {"source": "live Geant4 material probe G4_C (QBBC_LIV)", "mean_excitation_energy_ev": 81.0,
+             "photoabs_barn": [1.0] * 10, "max_rel_diff_vs_training_catalog": 0.0}
+    atom = geant4_input_lines({"label": "C I", "geant4_atomic_inputs": check})
+    assert atom == ["C: I = 81.0 eV, 10 photo-absorption cross sections (live Geant4 material probe G4_C (QBBC_LIV)); "
+                    "max relative difference from the training catalogue 0.0e+00"]
+    molecule = geant4_input_lines({"label": "benzene", "geant4_atomic_inputs": {"C": check, "H": dict(check, mean_excitation_energy_ev=19.2)}})
+    assert [line.split(":")[0] for line in molecule] == ["C", "H"]
+    assert geant4_input_lines({"label": "benzene"}) == []

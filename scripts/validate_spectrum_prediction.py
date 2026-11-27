@@ -54,6 +54,22 @@ def tagged(emits, tag):
     return [e["payload"] for e in emits if e["tag"] == tag]
 
 
+def live_geant4_features(out, energies, process):
+    """g4_* inputs recomputed here from the run's own material_probes (independent of the JS library)."""
+    probes = next(r["material_probes"] for r in rows(out / "trech_scores.jsonl") if "material_probes" in r)
+    features = {}
+    for probe in probes:
+        if not probe["name"].startswith("G4_") or len(probe.get("elements", [])) != 1:
+            continue
+        atoms_per_mm3 = probe["elements"][0]["atoms_per_cm3"] * 1e-3
+        by_energy = {round(i["energy_mev"] * 1e6, 6): i["cross_sections_per_mm"][process] for i in probe["interactions"]}
+        row = {"g4_ln_mean_excitation_ev": math.log(probe["mean_excitation_energy_ev"])}
+        for e in energies:
+            row[f"g4_ln_photoabs_barn_{e}ev"] = math.log(max(by_energy[round(float(e), 6)] / atoms_per_mm3 / 1e-22, 1e-6))
+        features[probe["elements"][0]["symbol"]] = row
+    return features
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--trech", default=str(ROOT / "build/dev/trech"))
@@ -65,6 +81,8 @@ def main():
     report = json.loads((DATA / "report.json").read_text())
     models = {name: json.loads((DATA / "models" / f"{name}.json").read_text()) for name in ("spectrum_atomic", "spectrum_molecular")}
     facts = dataset["element_facts"]
+    geant4_inputs = [n for n in models["spectrum_atomic"]["input_features"] if n.startswith("g4_")]
+    probe_def = (dataset.get("geant4_atomic") or {}).get("probe") or {}
 
     # 1 + 2: held-out split through the engine.
     emits, prov = run(binary, out / "test_split", ("selection", "test_split"))
@@ -72,12 +90,22 @@ def main():
     assert prov["hook_emit_dropped_count"] == 0 and prov["predictive_mode"] is True
     assert {r["split"] for r in records} == {"test"}
     assert len(records) == len(models["spectrum_atomic"]["trained_from"]["test_ids"]) + len(models["spectrum_molecular"]["trained_from"]["test_ids"])
-    worst = 0.0
+    live = live_geant4_features(out / "test_split", probe_def.get("energies_ev", []), probe_def.get("process")) if geant4_inputs else {}
+    worst = worst_g4 = worst_catalog = 0.0
     for r in records:
         model = models[r["model"]]
         if r["kind"] == "atom":
-            # Independent input source for the atomic rung: the dataset's element facts.
-            assert r["model_inputs"] == facts[r["id"].split("_", 1)[1]]["features"]
+            symbol = r["id"].split("_", 1)[1]
+            trained = facts[symbol]["features"]
+            # Independent input sources for the atomic rung: the dataset's PubChem facts, and the
+            # Geant4 inputs recomputed from this run's own probe (not the committed catalogue).
+            assert {k: v for k, v in r["model_inputs"].items() if not k.startswith("g4_")} == \
+                {k: v for k, v in trained.items() if not k.startswith("g4_")}, symbol
+            if geant4_inputs:
+                assert r["geant4_atomic_inputs"]["source"].startswith("live Geant4 material probe G4_" + symbol)
+                for name in geant4_inputs:
+                    worst_g4 = max(worst_g4, abs(r["model_inputs"][name] - live[symbol][name]))
+                    worst_catalog = max(worst_catalog, abs(trained[name] - live[symbol][name]))
         else:
             molecule = next(m for m in dataset["molecules"] if m["id"] == r["id"])
             assert molecule["smiles"] == r["smiles"]
@@ -92,6 +120,12 @@ def main():
         for p, lo, hi, w in zip(r["predicted"], interval["lower"], interval["upper"], interval["half_width"]):
             assert abs(hi - (p + w)) < 1e-12 and abs(lo - max(0.0, p - w)) < 1e-12
     assert worst < 1e-9, f"engine vs Python dense forward differs by {worst}"
+    if geant4_inputs:
+        assert prov["physics_list"] == probe_def["physics_list"], prov["physics_list"]
+        assert worst_g4 < 1e-12, f"atomic Geant4 inputs differ from the run's probe by {worst_g4}"
+        assert worst_catalog < 1e-12, f"live Geant4 probe differs from the training catalogue by {worst_catalog}"
+        print(f"atomic Geant4 inputs: {len(geant4_inputs)} per element from the live probe (max |Δ| {worst_g4:.1e}; "
+              f"vs training catalogue {worst_catalog:.1e})")
     summary = tagged(emits, "spectrum_summary")[0]["models"]
     for name, stats in summary.items():
         trainer = next(a for a in report["architectures"] if a["exported"] == name)["test"]
@@ -109,6 +143,8 @@ def main():
     emits, prov = run(binary, out / "single", ("molecule", "naphthalene"), ("studio_mode", True))
     record = tagged(emits, "spectrum_prediction")[0]
     assert prov["hook_predict_count"] == 3, prov["hook_predict_count"]  # C, H atomic + molecular
+    if geant4_inputs:
+        assert sorted(record["geant4_atomic_inputs"]) == ["C", "H"], record["geant4_atomic_inputs"]
     assert record["inference"] == "predicted" and record["predicted"] is not None
     molecular_stage = record["stages"][-1]
     assert molecular_stage["model"] == "spectrum_molecular" and molecular_stage["holdoutR2"] is not None

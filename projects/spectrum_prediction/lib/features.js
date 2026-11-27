@@ -90,6 +90,46 @@
     return out;
   }
 
+  // Geant4 atomic response (the particle-derived atomic inputs). The harvest scenario
+  // projects/spectrum_prediction/geant4/atomic_probe.js probes G4_<symbol> for Z 1-56 under
+  // GEANT4_PROBE.physicsList; `spectra.cjs geant4` stores one row per element in
+  // catalog/geant4_atomic.json, and the scenario reads the same quantities from its live probe.
+  const ELEMENTS_Z1_56 = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl',
+    'Ar', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb',
+    'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba'];
+  const GEANT4_PROBE = Object.freeze({symbols: Object.freeze(ELEMENTS_Z1_56.slice()), physicsList: 'QBBC_LIV',
+    process: 'phot', energiesEv: Object.freeze([10, 20, 30, 50, 100, 200, 500, 1000, 3000, 10000])});
+  const BARN_MM2 = 1e-22;
+  const GEANT4_ATOMIC_FEATURES = ['g4_ln_mean_excitation_ev'].concat(GEANT4_PROBE.energiesEv.map(e => 'g4_ln_photoabs_barn_' + e + 'ev'));
+
+  // One Geant4 material probe of a pure element (the JSON shape of ctx.materials[name] and of
+  // trech_scores.jsonl material_probes) -> the per-atom response row. Cross sections per volume
+  // are divided by the atom number density, so the row does not depend on the declared density.
+  function geant4AtomicRow(probe) {
+    if (!probe || !probe.available) throw new Error('Geant4 probe unavailable' + (probe && probe.name ? ' for ' + probe.name : ''));
+    if (!probe.elements || probe.elements.length !== 1) throw new Error('Geant4 probe ' + probe.name + ' is not a pure element');
+    const element = probe.elements[0], atomsPerMm3 = element.atoms_per_cm3 * 1e-3;
+    if (!(atomsPerMm3 > 0) || !(probe.mean_excitation_energy_ev > 0)) throw new Error('Geant4 probe ' + probe.name + ' lacks a number density or I');
+    const samples = probe.interactions || [];
+    const photoabs = GEANT4_PROBE.energiesEv.map(energy => {
+      const s = samples.find(x => Math.abs(x.energy_mev * 1e6 - energy) <= 1e-9 * energy);
+      const perMm = s && s.available && s.cross_sections_per_mm ? s.cross_sections_per_mm[GEANT4_PROBE.process] : undefined;
+      if (!Number.isFinite(perMm) || perMm < 0)
+        throw new Error('Geant4 probe ' + probe.name + ' has no ' + GEANT4_PROBE.process + ' cross section at ' + energy + ' eV' + (s && s.note ? ': ' + s.note : ''));
+      return perMm / atomsPerMm3 / BARN_MM2;
+    });
+    return {symbol: element.symbol, z: element.z, mean_excitation_energy_ev: probe.mean_excitation_energy_ev,
+      photoabs_barn: photoabs};
+  }
+  // Model inputs from a row: logs, because I and the cross sections span decades. A zero cross
+  // section (below a modelled edge) reads as the 1e-6 barn floor.
+  function geant4Features(row) {
+    if (!row || row.photoabs_barn.length !== GEANT4_PROBE.energiesEv.length) throw new Error('Geant4 atomic row does not match GEANT4_PROBE');
+    const out = {g4_ln_mean_excitation_ev: Math.log(row.mean_excitation_energy_ev)};
+    GEANT4_PROBE.energiesEv.forEach((e, i) => { out['g4_ln_photoabs_barn_' + e + 'ev'] = Math.log(Math.max(row.photoabs_barn[i], 1e-6)); });
+    return out;
+  }
+
   // One molecule -> every input form used by the catalogue (shared by trainer and scenario).
   // `summaries` (element -> atomic-model profile summary) is optional; without it the
   // cascade features are absent and only non-cascade architectures can consume the record.
@@ -109,7 +149,7 @@
     });
   }
 
-  S.features = Object.freeze({ATOMIC_FEATURES, MOLECULAR_DESCRIPTORS, ATOMIC_POOL, NODE_ELEMENTS, NODE_FEATURES,
+  S.features = Object.freeze({ATOMIC_FEATURES, GEANT4_PROBE, GEANT4_ATOMIC_FEATURES, geant4AtomicRow, geant4Features, MOLECULAR_DESCRIPTORS, ATOMIC_POOL, NODE_ELEMENTS, NODE_FEATURES,
     atomicFeatures, molecularDescriptor, graphTensors, profileSummary, poolAtomic, moleculeInputs, vector});
   if (typeof module !== 'undefined' && module.exports) module.exports = S.features;
 })(globalThis);

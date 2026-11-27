@@ -107,7 +107,9 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   wrong-length or non-finite vectors, keeps null predictions null and shows only engine-set badges
   (an unchecked joint test reads JOINT NOT CHECKED). `ui/spectra.py` holds the plot, leaderboard and
   training tabs; the leaderboard adds the emitted atomic `split_noise` (Repeated-CV / Group-CV RMSE,
-  worst group, per-group tooltip) without recomputing it. `engine/spectra.py` launches the Node pipeline (`TRECH_NODE` or PATH) via QProcess.
+  worst group, per-group tooltip) without recomputing it. Ablation rows are grouped by the
+  trainer's `kind` (`ablation_text`; rows without one read as cascade rows), and the details pane
+  lists each record's emitted `geant4_atomic_inputs` (`geant4_input_lines`). `engine/spectra.py` launches the Node pipeline (`TRECH_NODE` or PATH) via QProcess.
   The dock is visible when `is_spectrum_mode` sees the declared schema/extension, or when a loaded
   run carries spectrum emits. `ScenarioOptions.set_value` flips `studio_mode` / `data_dir`. Tests:
   `studio/tests/test_spectra.py`. Contract: [spectrum branch](../../scenarios/spectra/AGENTS.md).

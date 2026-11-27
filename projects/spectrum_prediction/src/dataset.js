@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const S = require('../lib/index.js');
 const {Cache, catalogNames, slug, sha256} = require('./collect.js');
+const geant4 = require('./geant4.js');
 
 function readJson(cache, key) {
   const hit = cache.read(key);
@@ -97,19 +98,39 @@ function buildMolecules(cache, catalog, facts) {
   return {molecules, rejected};
 }
 
+// Geant4 atomic responses (catalog/geant4_atomic.json) join every element's features as g4_*
+// inputs. Without a catalogue the dataset is the PubChem-only one and *_geant4 architectures
+// refuse to train.
+function attachGeant4(atomic, file, root) {
+  if (!file || !fs.existsSync(file)) return null;
+  const text = fs.readFileSync(file, 'utf8'), rows = geant4.index(JSON.parse(text));
+  for (const symbol of Object.keys(atomic.facts)) {
+    const row = rows[symbol];
+    if (!row) throw new Error('Geant4 atomic catalogue has no row for ' + symbol);
+    const g4 = S.features.geant4Features(row);
+    atomic.facts[symbol].geant4 = {mean_excitation_energy_ev: row.mean_excitation_energy_ev, photoabs_barn: row.photoabs_barn};
+    Object.assign(atomic.facts[symbol].features, g4);
+  }
+  const catalog = JSON.parse(text);
+  return {path: path.relative(root || process.cwd(), file), sha256: sha256(text), probe: catalog.probe, provenance: catalog.provenance};
+}
+
 function build(options) {
   const cache = new Cache(options.cacheDir, {offline: true});
   const catalog = JSON.parse(fs.readFileSync(options.catalog, 'utf8'));
   const atomic = buildAtoms(cache, options);
+  const geant4Source = attachGeant4(atomic, options.geant4Catalog, options.root);
   const molecular = buildMolecules(cache, catalog, atomic.facts);
   const dataset = {
     schema: 'trech_spectrum_dataset_v1',
     note: 'Measured reference spectra: NIST ASD neutral-atom line lists reached through PubChem element records, and PubChem (mostly HSDB) UV/Vis absorption maxima. Labels are measurements, not Geant4 output; targets are the declared grid representations.',
     grids: {atomic: S.grid.ATOMIC_GRID, molecular: S.grid.MOLECULAR_GRID},
-    feature_sets: {atomic: S.features.ATOMIC_FEATURES, molecular: S.features.MOLECULAR_DESCRIPTORS},
+    feature_sets: Object.assign({atomic: S.features.ATOMIC_FEATURES, molecular: S.features.MOLECULAR_DESCRIPTORS},
+      geant4Source ? {geant4_atomic: S.features.GEANT4_ATOMIC_FEATURES} : {}),
     catalog: {path: path.relative(options.root || process.cwd(), options.catalog), sha256: sha256(fs.readFileSync(options.catalog, 'utf8'))},
     counts: {elements_with_facts: Object.keys(atomic.facts).length, atoms: atomic.atoms.length, molecules: molecular.molecules.length,
       rejected: atomic.rejected.length + molecular.rejected.length},
+    ...(geant4Source ? {geant4_atomic: geant4Source} : {}),
     element_facts: atomic.facts,
     atoms: atomic.atoms,
     molecules: molecular.molecules,

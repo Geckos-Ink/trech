@@ -41,7 +41,7 @@ never drawn.
 | # | Key | Route | Owning queue | Item |
 | --- | --- | --- | --- | --- |
 | 1 | **P1** | R8 | [engine/formal](AGENTS/engine/formal/ROADMAP.md#priority-queue) | Law inventory, continued. Done: Compton kinematics, Beer–Lambert attenuation, lattice mass conservation, scalar-lattice conservation, `ctx.react` step probabilities, the arbiter's proper squared score. |
-| 2 | **P1** | R2 | [scenarios/spectra](AGENTS/scenarios/spectra/ROADMAP.md#priority-queue) | Particle-trained atomic rung: feed Geant4 material/atomic response (mean excitation energy, photo-absorption) as atomic inputs and re-grade the cascade ablation. |
+| 2 | **P1** | R2 | [project/north-star](AGENTS/project/north-star/ROADMAP.md#priority-queue) | Sputnik water molecule: thermal ensembles, more atoms and a force field graded against measured spectroscopy, on the way to a particle-derived (Geant4-trained) water operator. |
 | 3 | **P1** | R2 | [scenarios/fluids](AGENTS/scenarios/fluids/ROADMAP.md#priority-queue) | A particle-derived (Geant4-trained) water operator that freezes, replacing the literature mW potential |
 | 4 | **P1** | R2 | [scenarios/chemistry](AGENTS/scenarios/chemistry/ROADMAP.md#priority-queue) | Next learned lift: geometry/charge/isotope-conditioned electronic and bond response trained on Geant4 particle/ionization histories |
 | 5 | **P1** | R3 | [scenarios/migrations](AGENTS/scenarios/migrations/ROADMAP.md#priority-queue) | Row 6 remainder — osmosis membrane response: replace the authored `integrateMembrane` pressure/area/bending law with membrane-node operators |

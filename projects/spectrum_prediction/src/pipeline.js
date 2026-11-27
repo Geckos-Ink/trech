@@ -11,8 +11,10 @@
 //      are reported next to, never instead of, the ranking CV.
 //   4. The final model is refitted on the full training split; exported dense models carry the
 //      test-split metrics as their engine-visible `holdout` block.
-// The atomic -> molecular cascade uses the exported atomic model (fit on the atomic training
-// split only) to predict a line-strength profile for every element, pooled per molecule.
+// The atomic -> molecular cascade uses an atomic model (fit on the atomic training split only)
+// to predict a line-strength profile for every element, pooled per molecule. There is one
+// cascade per atomic source: 'pubchem' (PubChem facts) and 'geant4' (plus the Geant4 atomic
+// response); a molecular entry names the source it pools.
 const crypto = require('node:crypto');
 const S = require('../lib/index.js');
 
@@ -142,8 +144,10 @@ function runMolecular(spec, env) {
   const elementFeatures = {};
   for (const symbol of Object.keys(env.dataset.element_facts))
     elementFeatures[symbol] = S.features.vector(env.dataset.element_facts[symbol].features, S.features.ATOMIC_FEATURES);
-  const base = {elementFeatures, elementSummaries: env.summaries || {}};
-  const split = S.validate.holdout(molecularSamples(env.dataset, env.summaries), 0.2, SALTS.molecular);
+  const source = S.architectures.cascadeOf(spec) || 'pubchem';
+  const summaries = env.summaries ? env.summaries[source] || null : null;
+  const base = {elementFeatures, elementSummaries: summaries || {}};
+  const split = S.validate.holdout(molecularSamples(env.dataset, summaries), 0.2, SALTS.molecular);
   const t0 = Date.now();
   const oof = spec.export ? collector() : null, familyOof = spec.export ? collector() : null;
   const cv = crossValidate(spec, split.train, env.k, SALTS.molecular, base, grid, oof);
@@ -161,12 +165,14 @@ function runMolecular(spec, env) {
       outputNames, scale: 'nano', predictionInterval: interval,
       trainRows: split.train.map(s => S.features.vector(s.x, ctx.inputs)), testMetrics: test.metrics,
       trainedFrom: {script: 'projects/spectrum_prediction/bin/spectra.cjs', architecture: spec, seed: archSeed(spec.name),
-        dataset_sha256: env.datasetSha, cascade_source: env.cascadeSource,
+        dataset_sha256: env.datasetSha, cascade_source: env.cascadeSources[source] || null,
         train_ids: split.train.map(s => s.id), test_ids: split.test.map(s => s.id)},
       note: {geant4_trained: false, measured_labels: true, mc_sampled: false,
         label_source: 'PubChem UV/Vis absorption maxima (lambda_max, log epsilon), mostly HSDB',
         inputs: 'SMILES graph counts, measured solvent class' + (spec.inputs === 'descriptors_cascade' ?
-          ', and count-weighted pooled predictions of the atomic line-strength model (cascade)' : ''),
+          ', and count-weighted pooled predictions of the atomic line-strength model (cascade)' +
+          (source === 'geant4' ? ', whose inputs include the Geant4 atomic response' : '') : ''),
+        particle_derived_inputs: source === 'geant4' && spec.inputs === 'descriptors_cascade',
         scope: 'Absorption envelope on 180-500 nm (32 bins) from listed maxima with a fixed 1500 cm^-1 Gaussian width; band widths and vibronic structure are not measured inputs.',
         grid}});
     out.predictions = split.test.map((s, i) => ({id: s.id, name: s.name, truth: s.y, prediction: test.pred[i]}));
@@ -205,13 +211,49 @@ async function runAll(specs, env, jobs, log) {
   return done;
 }
 
+// `exports` ({spectrum_atomic: name, spectrum_molecular: name}) moves an export to another
+// catalogue entry for this run. The exported molecular cascade must pool the exported atomic
+// model, because TRECH recomputes the pooled inputs with the atomic model it loads.
+function withExports(list, exports) {
+  if (!exports) return list;
+  const out = list.map(a => Object.assign({}, a));
+  for (const target of Object.keys(exports)) {
+    if (['spectrum_atomic', 'spectrum_molecular'].indexOf(target) < 0) throw new Error('unknown export ' + target);
+    const entry = out.find(a => a.name === exports[target]);
+    if (!entry) throw new Error('export ' + target + ': architecture ' + exports[target] + ' is not in this run');
+    if (entry.task !== (target === 'spectrum_atomic' ? 'atomic' : 'molecular')) throw new Error('export ' + target + ': ' + entry.name + ' is a ' + entry.task + ' entry');
+    for (const a of out) if (a.export === target) delete a.export;
+    entry.export = target;
+  }
+  return out;
+}
+function checkExportChain(catalog) {
+  const atomic = catalog.find(a => a.export === 'spectrum_atomic'), molecular = catalog.find(a => a.export === 'spectrum_molecular');
+  const source = molecular ? S.architectures.cascadeOf(molecular) : null;
+  if (!atomic || !source) return;
+  if (atomic.cascadeSource !== source)
+    throw new Error('spectrum_molecular (' + molecular.name + ') pools the ' + source + ' atomic model, but spectrum_atomic is ' + atomic.name +
+      '; TRECH would pool a different model than the one trained on');
+}
+
 async function train(dataset, options) {
   options = options || {};
   const log = options.log || (() => {});
   const k = options.folds || 5;
   const repeats = options.repeats === undefined ? 5 : options.repeats;
   const groupCv = options.groupCv !== false;
-  const catalog = S.architectures.catalog(options.architectures).map(S.architectures.validate);
+  const requested = withExports(S.architectures.catalog(options.architectures), options.exports).map(S.architectures.validate);
+  // Geant4 entries need a dataset built with catalog/geant4_atomic.json. Without one they are
+  // skipped and reported; naming one explicitly is an error.
+  const hasGeant4 = !!dataset.geant4_atomic, skipped = [];
+  const catalog = requested.filter(spec => {
+    if (hasGeant4 || !S.architectures.usesGeant4(spec)) return true;
+    if (options.architectures && options.architectures.indexOf(spec.name) >= 0)
+      throw new Error(spec.name + ' needs Geant4 atomic inputs: build the dataset with catalog/geant4_atomic.json');
+    skipped.push({name: spec.name, reason: 'dataset has no Geant4 atomic catalogue'});
+    return false;
+  });
+  checkExportChain(catalog);
   const datasetSha = sha256(JSON.stringify(dataset));
   const grids = {atomic: S.grid.ATOMIC_GRID, molecular: S.grid.MOLECULAR_GRID};
   const results = [], exports = {}, testPredictions = {}, splits = {};
@@ -220,10 +262,13 @@ async function train(dataset, options) {
   const atomSamples = atomicSamples(dataset);
   const atomSplit = S.validate.holdout(atomSamples, 0.2, SALTS.atomic);
   splits.atomic = {train: atomSplit.train.map(s => s.id), test: atomSplit.test.map(s => s.id)};
-  let cascadeModel = null, cascadeSpec = null;
+  const cascadeModels = {}, cascadeSpecs = {};
   const atomicArchs = catalog.filter(a => a.task === 'atomic');
-  const needsCascade = catalog.some(a => a.task === 'molecular' && (a.inputs === 'descriptors_cascade' || a.cascadeNodeFeatures));
-  if (needsCascade && !atomicArchs.some(a => a.cascadeSource)) atomicArchs.push(S.architectures.catalog().find(a => a.cascadeSource));
+  for (const source of S.architectures.CASCADE_SOURCES) {
+    const needed = catalog.some(a => S.architectures.cascadeOf(a) === source);
+    if (needed && !atomicArchs.some(a => a.cascadeSource === source))
+      atomicArchs.push(S.architectures.catalog().find(a => a.cascadeSource === source));
+  }
   for (const spec of atomicArchs) {
     log({event: 'architecture_start', task: 'atomic', name: spec.name});
     const t0 = Date.now();
@@ -238,7 +283,7 @@ async function train(dataset, options) {
     results.push(entry);
     log({event: 'architecture', task: 'atomic', name: spec.name, cv_rmse: cv.rmse && cv.rmse.mean, test_rmse: test.metrics.rmse,
       seconds: (Date.now() - t0) / 1000});
-    if (spec.cascadeSource) { cascadeModel = model; cascadeSpec = spec; }
+    if (spec.cascadeSource) { cascadeModels[spec.cascadeSource] = model; cascadeSpecs[spec.cascadeSource] = spec; }
     if (spec.export) {
       const ctx = contextFor(spec, {}), outputNames = S.grid.outputNames('atomic_line', grids.atomic);
       const interval = predictionInterval(outputNames, oof, {truth: atomSplit.test.map(s => s.y), pred: test.pred},
@@ -250,30 +295,36 @@ async function train(dataset, options) {
         trainedFrom: {script: 'projects/spectrum_prediction/bin/spectra.cjs', architecture: spec, seed: archSeed(spec.name),
           dataset_sha256: datasetSha, train_ids: splits.atomic.train, test_ids: splits.atomic.test},
         note: {geant4_trained: false, measured_labels: true, mc_sampled: false,
+          particle_derived_inputs: S.architectures.usesGeant4(spec),
           label_source: 'NIST ASD neutral-atom lines (g_k*A_ki weighted) reached via PubChem element records',
-          inputs: 'PubChem periodic-table facts and NIST ground level as reported by PubChem',
+          inputs: S.architectures.usesGeant4(spec) ?
+            'PubChem periodic-table facts, NIST ground level as reported by PubChem, and the Geant4 atomic response ' +
+            '(mean excitation energy, per-atom photo-absorption cross sections; read from a live Geant4 material probe in TRECH)' :
+            'PubChem periodic-table facts and NIST ground level as reported by PubChem',
           scope: 'Line-strength shape on 200-1000 nm (40 bins); not a plasma emission spectrum, no level populations or instrument response.',
           grid: grids.atomic}});
       testPredictions[spec.export] = atomSplit.test.map((s, i) => ({id: s.id, truth: s.y, prediction: test.pred[i]}));
     }
   }
 
-  // ---- atomic -> molecular cascade summaries -----------------------------------------------
+  // ---- atomic -> molecular cascade summaries, one set per atomic source --------------------
   let summaries = null;
-  if (cascadeModel) {
-    summaries = {};
+  for (const source of Object.keys(cascadeModels)) {
+    summaries = summaries || {};
+    summaries[source] = {};
     for (const symbol of Object.keys(dataset.element_facts)) {
-      const profile = cascadeModel.predict({x: dataset.element_facts[symbol].features});
-      summaries[symbol] = S.features.profileSummary(profile, grids.atomic);
+      const profile = cascadeModels[source].predict({x: dataset.element_facts[symbol].features});
+      summaries[source][symbol] = S.features.profileSummary(profile, grids.atomic);
     }
   }
+  const cascadeSources = {};
+  for (const source of Object.keys(cascadeSpecs)) cascadeSources[source] = cascadeSpecs[source].name;
 
   // ---- molecular task ----------------------------------------------------------------------
   const molArchs = catalog.filter(a => a.task === 'molecular');
   if (molArchs.length) {
-    const env = {dataset, summaries, k, familyCv: options.familyCv !== false, datasetSha,
-      cascadeSource: cascadeSpec ? cascadeSpec.name : null};
-    const molSplit = S.validate.holdout(molecularSamples(dataset, summaries), 0.2, SALTS.molecular);
+    const env = {dataset, summaries, k, familyCv: options.familyCv !== false, datasetSha, cascadeSources};
+    const molSplit = S.validate.holdout(molecularSamples(dataset, summaries && summaries.pubchem), 0.2, SALTS.molecular);
     splits.molecular = {train: molSplit.train.map(s => s.id), test: molSplit.test.map(s => s.id)};
     const outcomes = await runAll(molArchs, env, options.jobs || 1, log);
     for (const o of outcomes) {
@@ -282,16 +333,34 @@ async function train(dataset, options) {
     }
   }
 
-  // ---- ablations: same family/hyper-parameters with vs. without the atomic cascade ---------
+  // ---- ablations: same family/hyper-parameters with vs. without one addition ---------------
+  //   cascade          molecular model with vs. without pooled PubChem-fed atomic predictions
+  //   geant4_atomic    atomic model with vs. without the Geant4 atomic response as inputs
+  //   cascade_geant4   molecular cascade pooling the Geant4-fed vs. the PubChem-fed atomic model
+  //   geant4_cascade   molecular model with vs. without pooled Geant4-fed atomic predictions
   const byName = {};
   for (const r of results) byName[r.name] = r;
-  const ablation = [['molecular_ridge', 'molecular_ridge_cascade'], ['molecular_mlp', 'molecular_mlp_cascade'],
-    ['molecular_mpnn', 'molecular_mpnn_cascade']].filter(([a, b]) => byName[a] && byName[b]).map(([a, b]) => ({
-    without: a, with: b,
-    cv_rmse_delta: byName[b].cv.rmse.mean - byName[a].cv.rmse.mean,
-    test_rmse_delta: byName[b].test.rmse - byName[a].test.rmse,
-    family_cv_rmse_delta: byName[a].family_cv && byName[b].family_cv ? byName[b].family_cv.summary.rmse.mean - byName[a].family_cv.summary.rmse.mean : null
-  }));
+  const PAIRS = [
+    ['cascade', 'molecular_ridge', 'molecular_ridge_cascade'], ['cascade', 'molecular_mlp', 'molecular_mlp_cascade'],
+    ['cascade', 'molecular_mpnn', 'molecular_mpnn_cascade'],
+    ['geant4_atomic', 'atomic_knn3', 'atomic_knn3_geant4'], ['geant4_atomic', 'atomic_ridge', 'atomic_ridge_geant4'],
+    ['geant4_atomic', 'atomic_mlp_tanh', 'atomic_mlp_tanh_geant4'], ['geant4_atomic', 'atomic_mlp_silu_wide', 'atomic_mlp_silu_wide_geant4'],
+    ['cascade_geant4', 'molecular_ridge_cascade', 'molecular_ridge_cascade_geant4'],
+    ['cascade_geant4', 'molecular_mlp_cascade', 'molecular_mlp_cascade_geant4'],
+    ['cascade_geant4', 'molecular_mpnn_cascade', 'molecular_mpnn_cascade_geant4'],
+    ['geant4_cascade', 'molecular_ridge', 'molecular_ridge_cascade_geant4'], ['geant4_cascade', 'molecular_mlp', 'molecular_mlp_cascade_geant4'],
+    ['geant4_cascade', 'molecular_mpnn', 'molecular_mpnn_cascade_geant4']];
+  const groupRmse = r => r.family_cv ? r.family_cv.summary.rmse.mean : r.group_cv && r.group_cv.summary.rmse ? r.group_cv.summary.rmse.mean : null;
+  const ablation = PAIRS.filter(([, a, b]) => byName[a] && byName[b]).map(([kind, a, b]) => {
+    const ga = groupRmse(byName[a]), gb = groupRmse(byName[b]);
+    const row = {kind, task: byName[a].task, without: a, with: b,
+      cv_rmse_delta: byName[b].cv.rmse.mean - byName[a].cv.rmse.mean,
+      test_rmse_delta: byName[b].test.rmse - byName[a].test.rmse};
+    // Out-of-group generalisation: leave-one-family-out (molecules), leave-one-group-out (atoms).
+    if (row.task === 'molecular') row.family_cv_rmse_delta = ga !== null && gb !== null ? gb - ga : null;
+    else row.group_cv_rmse_delta = ga !== null && gb !== null ? gb - ga : null;
+    return row;
+  });
   const ranking = {};
   for (const task of ['atomic', 'molecular'])
     ranking[task] = results.filter(r => r.task === task).sort((a, b) => a.cv.rmse.mean - b.cv.rmse.mean || (a.name < b.name ? -1 : 1)).map(r => r.name);
@@ -306,12 +375,17 @@ async function train(dataset, options) {
       atomic_train: splits.atomic.train.length, atomic_test: splits.atomic.test.length,
       molecular_train: splits.molecular ? splits.molecular.train.length : 0, molecular_test: splits.molecular ? splits.molecular.test.length : 0},
     grids, splits, ranking, architectures: results, ablation,
-    cascade: cascadeSpec ? {source: cascadeSpec.name, element_summaries: summaries} : null,
+    cascade: cascadeSpecs.pubchem ? {source: cascadeSpecs.pubchem.name, element_summaries: summaries.pubchem} : null,
+    cascades: Object.keys(cascadeSpecs).reduce((o, src) => (o[src] = {source: cascadeSpecs[src].name, element_summaries: summaries[src]}, o), {}),
+    geant4_atomic: dataset.geant4_atomic || null,
+    skipped,
     exports: Object.keys(exports).reduce((o, name) => (o[name] = {architecture: exports[name].trained_from.architecture.name,
       holdout_r2_min: exports[name].holdout.r2_min === undefined ? null : exports[name].holdout.r2_min}, o), {}),
     test_predictions: testPredictions,
     honesty: {geant4_trained: false, measured_labels: true,
-      statement: 'Models learn measured spectra from PubChem/NIST facts and graph topology. They are learned predictions for comparison, not Geant4 results, and the atomic rung is not particle-trained.'}
+      particle_derived_inputs: Object.keys(exports).filter(name => exports[name].note.particle_derived_inputs),
+      statement: 'Models learn measured spectra from PubChem/NIST facts, graph topology and, for *_geant4 entries, the Geant4 atomic response ' +
+        '(mean excitation energy, photo-absorption cross sections) as inputs. Labels are measurements: these are learned predictions for comparison, not Geant4 results.'}
   }, 8);
   return {report, models: round(exports, 12)};
 }
@@ -366,12 +440,24 @@ function markdown(report) {
     }
     lines.push('');
   }
-  if (report.ablation.length) {
-    lines.push('## Atomic → molecular cascade ablation', '', 'Negative deltas mean the pooled atomic-model features helped.', '',
-      '| Without | With cascade | ΔCV RMSE | ΔFamily-CV RMSE | ΔTest RMSE |', '| --- | --- | --- | --- | --- |');
-    for (const a of report.ablation) lines.push(`| ${a.without} | ${a.with} | ${fmt(a.cv_rmse_delta, 4)} | ${fmt(a.family_cv_rmse_delta, 4)} | ${fmt(a.test_rmse_delta, 4)} |`);
+  const KINDS = {cascade: 'Atomic → molecular cascade ablation', geant4_atomic: 'Geant4 atomic-input ablation',
+    cascade_geant4: 'Cascade source ablation (Geant4-fed vs PubChem-fed atomic model)',
+    geant4_cascade: 'Geant4-fed cascade ablation (with vs without pooled Geant4-fed atomic predictions)'};
+  const INTRO = {cascade: 'Negative deltas mean the pooled atomic-model features helped.',
+    geant4_atomic: 'Same atomic architecture with and without the Geant4 atomic response (mean excitation energy, photo-absorption 10 eV–10 keV) as inputs. Negative deltas mean the Geant4 inputs helped; the group column is leave-one-chemical-group-out CV.',
+    cascade_geant4: 'Same molecular architecture pooling the Geant4-fed instead of the PubChem-fed atomic model. Negative deltas favour the Geant4-fed rung.',
+    geant4_cascade: 'Negative deltas mean the pooled Geant4-fed atomic predictions helped.'};
+  for (const kind of Object.keys(KINDS)) {
+    const rows = report.ablation.filter(a => (a.kind || 'cascade') === kind);
+    if (!rows.length) continue;
+    const atomic = kind === 'geant4_atomic';
+    lines.push('## ' + KINDS[kind], '', INTRO[kind], '',
+      `| Without | With | ΔCV RMSE | ${atomic ? 'ΔGroup-CV RMSE' : 'ΔFamily-CV RMSE'} | ΔTest RMSE |`, '| --- | --- | --- | --- | --- |');
+    for (const a of rows) lines.push(`| ${a.without} | ${a.with} | ${fmt(a.cv_rmse_delta, 4)} | ${fmt(atomic ? a.group_cv_rmse_delta : a.family_cv_rmse_delta, 4)} | ${fmt(a.test_rmse_delta, 4)} |`);
     lines.push('');
   }
+  if (report.skipped && report.skipped.length)
+    lines.push('Skipped: ' + report.skipped.map(x => x.name + ' (' + x.reason + ')').join(', ') + '.', '');
   return lines.join('\n') + '\n';
 }
 

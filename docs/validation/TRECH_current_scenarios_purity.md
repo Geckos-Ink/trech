@@ -1473,8 +1473,8 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `no_active_material_law`, companion `no_active_material_law`.
 - Declared limitations: Labels are measured spectra represented on fixed grids; models are learned comparisons with small held-out sets, not Geant4 results.
 - Inference sites: 2 (`cascade` 2) · law-shaped math: 0 · inference share: 100%
-- Embedded coefficients: 0 in 214 code lines (0.0/100) · top-level literals: 1 · geometry math: 1
-- Geant4 fact reads: 2 · seeded RNG draws: 0 · hooks: yes
+- Embedded coefficients: 0 in 244 code lines (0.0/100) · top-level literals: 1 · geometry math: 1
+- Geant4 fact reads: 4 · seeded RNG draws: 0 · hooks: yes
 - Inherited from modules: `projects/spectrum_prediction/lib/index.js` — 0 inference / 0 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_random.js`
 - Runtime-supplied model paths: 2 (chosen by parameters at run time; not graded)

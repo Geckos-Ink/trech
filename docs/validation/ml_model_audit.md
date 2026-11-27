@@ -82,8 +82,8 @@ Static validation of every committed `generic_surrogate` model under `data/`, `p
 | `data/polyurethane_cascade/meso_mechanics_operator.json` | mlp(64x2,silu) 6→3 | 4803 | yes | yes | yes | 0.9980 (6006) | yes | yes | false | complete | pass |
 | `data/polyurethane_cascade/meso_reaction_operator.json` | mlp(32x2,silu) 27→8 | 2216 | yes | yes | — | 0.9929 (38565) | yes | yes | false | partial | warn |
 | `data/polyurethane_cascade/nano_reagent_descriptors.json` | linear 11→6 | 72 | — | — | — | — | — | — | — | none | warn |
-| `data/spectrum_prediction/models/spectrum_atomic.json` | mlp(32x2,tanh) 19→40 | 3016 | yes | yes | yes | -7.9680 (6) | yes | yes | — | complete | warn |
-| `data/spectrum_prediction/models/spectrum_molecular.json` | mlp(32x1,tanh) 33→32 | 2144 | yes | yes | yes | -0.4816 (33) | yes | yes | — | complete | warn |
+| `data/spectrum_prediction/models/spectrum_atomic.json` | mlp(32x2,tanh) 30→40 | 3368 | yes | yes | yes | -9.1320 (6) | yes | yes | — | complete | warn |
+| `data/spectrum_prediction/models/spectrum_molecular.json` | mlp(32x1,tanh) 33→32 | 2144 | yes | yes | yes | -0.4742 (33) | yes | yes | — | complete | warn |
 
 ## Problems
 
@@ -91,5 +91,5 @@ None: every scanned model passes the static gates.
 
 ## Accuracy warnings (from the models' own carried holdout)
 
-- `data/spectrum_prediction/models/spectrum_atomic.json` — its own holdout R2min is -7.968: 22 output(s) predict worse than the holdout mean
-- `data/spectrum_prediction/models/spectrum_molecular.json` — its own holdout R2min is -0.4816: 4 output(s) predict worse than the holdout mean
+- `data/spectrum_prediction/models/spectrum_atomic.json` — its own holdout R2min is -9.132: 22 output(s) predict worse than the holdout mean
+- `data/spectrum_prediction/models/spectrum_molecular.json` — its own holdout R2min is -0.4742: 4 output(s) predict worse than the holdout mean

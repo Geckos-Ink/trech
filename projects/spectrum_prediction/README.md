@@ -6,10 +6,12 @@ representations, protocol and current results are in [`docs/research/spectrum_pr
 
 ```
 catalog/molecules.json   candidate compounds (curation families for leave-one-family-out CV)
+catalog/geant4_atomic.json  Geant4 atomic response per element (mean excitation energy, photo-absorption)
+geant4/atomic_probe.js   TRECH run that harvests it (spectra.cjs geant4 --run DIR converts the run)
 lib/                     host-neutral library (Node.js and TRECH QuickJS): grids, NIST/PubChem parsers,
                          SMILES graphs, features, autodiff, model families, architectures, validation, export
 src/                     Node-only: collect.js (network + hashed cache), dataset.js, pipeline.js (+ workers)
-bin/spectra.cjs          CLI: collect | build | train | all | publish  [--studio]
+bin/spectra.cjs          CLI: collect | build | train | all | publish | geant4  [--studio]
 test/                    node --test suites (offline)
 ```
 
@@ -35,4 +37,11 @@ it `export: "spectrum_molecular"` (dense families only) to make it the model TRE
 `studio_manifest.json`. The Studio **Spectra** dock uses it to run training and then point the
 `spectrum_prediction` scenario's `data_dir` at the new run.
 
-Labels are measured spectra; the models are learned comparisons, not Geant4 results.
+Labels are measured spectra; the models are learned comparisons, not Geant4 results. The
+exported atomic rung takes the Geant4 atomic response as inputs, which the TRECH scenario reads
+from a live Geant4 material probe in the same run:
+
+```bash
+build/rel/trech run projects/spectrum_prediction/geant4/atomic_probe.js --output build/spectrum_geant4/probe
+node projects/spectrum_prediction/bin/spectra.cjs geant4 --run build/spectrum_geant4/probe
+```

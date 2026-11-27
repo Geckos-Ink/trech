@@ -1751,7 +1751,7 @@
     },
     {
       "accuracy_warnings": [
-        "its own holdout R2min is -7.968: 22 output(s) predict worse than the holdout mean"
+        "its own holdout R2min is -9.132: 22 output(s) predict worse than the holdout mean"
       ],
       "gates": {
         "carried_accuracy": "warn",
@@ -1761,12 +1761,12 @@
         "trust_profile": "pass"
       },
       "holdout_n": 6,
-      "holdout_r2_min": -7.968,
-      "inputs": 19,
+      "holdout_r2_min": -9.132,
+      "inputs": 30,
       "kind": "generic_surrogate_v1",
       "measured": null,
       "outputs": 40,
-      "parameter_count": 3016,
+      "parameter_count": 3368,
       "path": "data/spectrum_prediction/models/spectrum_atomic.json",
       "problems": [],
       "profile": {
@@ -1779,14 +1779,14 @@
         "prediction_interval": true,
         "scale_bands": true
       },
-      "sha256": "c58a26c4b975fd845f536bb18c34a4dd75284e0b0c7b2a6603aa53d5c172d51c",
+      "sha256": "f3ed449b770b477a534da7bfd5f9cf2e27e8a55ee7cc04ad12e82c5c567db848",
       "status": "warn",
       "structure": "mlp(32x2,tanh)",
       "trust": "complete"
     },
     {
       "accuracy_warnings": [
-        "its own holdout R2min is -0.4816: 4 output(s) predict worse than the holdout mean"
+        "its own holdout R2min is -0.4742: 4 output(s) predict worse than the holdout mean"
       ],
       "gates": {
         "carried_accuracy": "warn",
@@ -1796,7 +1796,7 @@
         "trust_profile": "pass"
       },
       "holdout_n": 33,
-      "holdout_r2_min": -0.4816,
+      "holdout_r2_min": -0.4742,
       "inputs": 33,
       "kind": "generic_surrogate_v1",
       "measured": null,
@@ -1814,7 +1814,7 @@
         "prediction_interval": true,
         "scale_bands": true
       },
-      "sha256": "edd4dc50e0dd993888e7a43606def4402f87ef4cf6d5a5fb212dd975bf0f1c15",
+      "sha256": "3021bc62b2249e229ff716ed455dc6f2e953c69e0202a8deb32b2dc06cc0b084",
       "status": "warn",
       "structure": "mlp(32x1,tanh)",
       "trust": "complete"

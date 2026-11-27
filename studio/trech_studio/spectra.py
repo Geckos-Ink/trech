@@ -119,6 +119,28 @@ class SpectrumRecord:
         return f"{self.label} · {split} · RMSE {m.get('rmse', float('nan')):.3f} · cos {m.get('cosine', float('nan')):.3f}"
 
 
+def geant4_input_lines(payload: Dict[str, Any]) -> List[str]:
+    """Describe the live Geant4 atomic inputs a record's atomic rung read, as emitted.
+
+    Atom records carry one check (``geant4_atomic_inputs``), molecule records one per pooled
+    element. Absent when the exported atomic model takes no Geant4 inputs.
+    """
+    inputs = payload.get("geant4_atomic_inputs")
+    if not inputs:
+        return []
+    checks = {payload.get("label", "atom").split(" ")[0]: inputs} if "source" in inputs else inputs
+    lines = []
+    for element, check in checks.items():
+        if not check:
+            continue
+        diff = check.get("max_rel_diff_vs_training_catalog")
+        lines.append(f"{element}: I = {check.get('mean_excitation_energy_ev', float('nan')):.1f} eV, "
+                     f"{len(check.get('photoabs_barn') or ())} photo-absorption cross sections "
+                     f"({check.get('source', 'live Geant4 probe')})"
+                     + ("" if diff is None else f"; max relative difference from the training catalogue {diff:.1e}"))
+    return lines
+
+
 @dataclass(frozen=True)
 class SplitNoise:
     """Trainer-reported atomic split-noise checks; shown, never used for ranking or recomputed."""

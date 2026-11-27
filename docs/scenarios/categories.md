@@ -125,7 +125,7 @@ independent Monte Carlo error gates.
 | --- | --- | --- | --- | --- | --- |
 | 1 | [`particle_observer_cascade`](../../examples/scenarios/particle_observer_cascade/particle_observer_cascade.js) | A | [`validate_particle_observer.py`](../../scripts/validate_particle_observer.py) | The full Geant4-trained ladder to a meso estimate, checked against independent histories. | Core |
 | 2 | [`surrogate_generic_demo`](../../examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js) | B | 1 suite case; JS engine parity | The minimal `ctx.predict` path on live material facts. | Core |
-| 3 | [`spectrum_prediction`](../../examples/scenarios/spectrum_prediction/spectrum_prediction.js) | M | [`validate_spectrum_prediction.py`](../../scripts/validate_spectrum_prediction.py); CTest | Entry point of the spectra JS subproject (bucket slot 2). | Keep |
+| 3 | [`spectrum_prediction`](../../examples/scenarios/spectrum_prediction/spectrum_prediction.js) | M | [`validate_spectrum_prediction.py`](../../scripts/validate_spectrum_prediction.py); CTest | Entry point of the spectra JS subproject. Since 2026-11-27 the atomic rung reads the Geant4 atomic response (mean excitation energy, photo-absorption) from the run's own material probe; the validator recomputes those inputs from the probe records. Labels stay measured. | Keep |
 | 4 | [`cascade_multiscale_demo`](../../examples/scenarios/cascade_multiscale_demo/cascade_multiscale_demo.js) | M | JS engine parity in CTest | Automatic scale ordering in `ctx.cascade`, with hand-authored maps. | Keep |
 
 ## 4. Molecular and atomic response

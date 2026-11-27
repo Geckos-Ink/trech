@@ -10,7 +10,10 @@
 //   molecular rung  ctx.cascade(graph descriptors + pooled atomic predictions, ["spectrum_molecular"])
 // The same JS library computes the SMILES descriptors and pooling as the trainer did.
 // Labels are measurements, the models are learned comparisons: nothing here is a Geant4 result.
-// The Geant4 run only provides a composition-only material probe as context (single target).
+// When the atomic model takes Geant4 inputs (g4_* names), the run probes G4_<symbol> for every
+// element it needs and the atomic rung reads its mean excitation energy and photo-absorption
+// cross sections from that live Geant4 probe, never from the committed catalogue. A single
+// target also gets a composition-only material probe as context.
 TRECH_INCLUDE("../../../projects/spectrum_prediction/lib/index.js");
 const SP = globalThis.TRECH_SPECTRA;
 
@@ -59,13 +62,26 @@ function composition(target) {
 const probeMaterial = selection === "single" ?
   {name: "spectrum_probe", densityGcm3: density, components: composition(targets[0])} : null;
 
+// Elements whose atomic prediction the selected targets need (atoms, and every element a
+// molecule pools over), probed as G4_<symbol> when the atomic model reads Geant4 inputs.
+const geant4Inputs = data.atomicModel.input_features.some(n => n.indexOf("g4_") === 0);
+const neededElements = [];
+for (const t of targets) {
+  const symbols = t.kind === "atom" ? [t.record.symbol] : composition(t).map(c => c.element);
+  for (const e of symbols) if (neededElements.indexOf(e) < 0) neededElements.push(e);
+}
+const G4P = SP.features.GEANT4_PROBE;
+const probeNames = (probeMaterial ? ["spectrum_probe"] : []).concat(geant4Inputs ? neededElements.map(e => "G4_" + e) : []);
+const materialProbe = probeNames.length ? {enable: true, materials: probeNames} : {enable: false};
+if (geant4Inputs) materialProbe.interactions = {particle: "gamma", processes: [G4P.process], energiesMeV: G4P.energiesEv.map(e => e / 1e6)};
+
 globalThis.TRECH_CONFIG = {
   environment: {worldSizeMm: 20, worldMaterial: probeMaterial ? "spectrum_probe" : "G4_Galactic"},
   beam: {particle: "e-", energyMeV: 0.1, direction: [0, 0, 1]},
   run: {nEvents: 1, seed: 20261107, threads: 1},
   determinism: {mode},
   materials: probeMaterial ? [probeMaterial] : [],
-  materialProbe: probeMaterial ? {enable: true, materials: ["spectrum_probe"]} : {enable: false},
+  materialProbe,
   models: [
     {name: "spectrum_atomic", scale: "atomic", path: dataPath("models/spectrum_atomic.json")},
     {name: "spectrum_molecular", scale: "nano", path: dataPath("models/spectrum_molecular.json")}
@@ -77,6 +93,8 @@ globalThis.TRECH_CONFIG = {
       dataset_counts: data.dataset.counts, report_dataset_sha256: data.report.dataset_sha256} : undefined}
 };
 if (!studioMode) delete globalThis.TRECH_CONFIG.hooks.inputs;
+// The Geant4 inputs were harvested under this physics list; cross sections depend on it.
+if (geant4Inputs) globalThis.TRECH_CONFIG.physics = {list: G4P.physicsList};
 
 const ATOMIC_OUT = data.atomicModel.output_features, MOLECULAR_OUT = data.molecularModel.output_features;
 const GRIDS = {atom: data.dataset.grids.atomic, molecule: data.dataset.grids.molecular};
@@ -110,13 +128,30 @@ function intervalFrom(result, names, predicted) {
 function intervalCoverage(measured, predicted, interval) {
   return interval ? SP.uncertainty.coverage([measured], [predicted], interval.half_width).cells : null;
 }
+// The live Geant4 atomic inputs for one element, and how far they sit from the catalogue the
+// model was trained on (the same Geant4 build and physics list reproduce it exactly).
+function liveGeant4(ctx, symbol, facts) {
+  const probe = ctx.materials && ctx.materials["G4_" + symbol];
+  if (!probe || !probe.available) throw new Error("Missing live Geant4 material probe G4_" + symbol);
+  const row = SP.features.geant4AtomicRow(probe), trained = facts.geant4;
+  let maxRel = null;
+  if (trained) {
+    const pairs = [[row.mean_excitation_energy_ev, trained.mean_excitation_energy_ev]].concat(row.photoabs_barn.map((v, i) => [v, trained.photoabs_barn[i]]));
+    maxRel = pairs.reduce((m, [a, b]) => Math.max(m, Math.abs(a - b) / Math.max(Math.abs(b), 1e-300)), 0);
+  }
+  return {features: SP.features.geant4Features(row), check: {source: "live Geant4 material probe G4_" + symbol + " (" + G4P.physicsList + ")",
+    mean_excitation_energy_ev: row.mean_excitation_energy_ev, photoabs_barn: row.photoabs_barn, energies_ev: G4P.energiesEv,
+    max_rel_diff_vs_training_catalog: maxRel}};
+}
 function atomicPrediction(ctx, symbol, cache) {
   if (cache[symbol]) return cache[symbol];
   const facts = data.dataset.element_facts[symbol];
   if (!facts) throw new Error("No PubChem element facts for " + symbol);
-  const result = ctx.cascade(Object.assign({}, facts.features), ["spectrum_atomic"]);
+  const live = geant4Inputs ? liveGeant4(ctx, symbol, facts) : null;
+  const inputs = Object.assign({}, facts.features, live ? live.features : {});
+  const result = ctx.cascade(inputs, ["spectrum_atomic"]);
   const profile = vectorFrom(result, ATOMIC_OUT);
-  cache[symbol] = {profile, result, interval: intervalFrom(result, ATOMIC_OUT, profile)};
+  cache[symbol] = {profile, result, inputs, geant4: live ? live.check : null, interval: intervalFrom(result, ATOMIC_OUT, profile)};
   return cache[symbol];
 }
 function compare(measured, predicted, grid) {
@@ -139,7 +174,7 @@ function predictTarget(ctx, target, cache) {
     return Object.assign(base, {label: r.symbol + " I", z: r.z, lines: r.lines, sources: r.sources,
       predicted: a.profile, interval: a.interval, interval_covered_fraction: intervalCoverage(r.target, a.profile, a.interval),
       metrics: compare(r.target, a.profile, grid), stages: [stageTrust(a.result)].filter(Boolean),
-      model: "spectrum_atomic", model_inputs: data.dataset.element_facts[r.symbol].features});
+      model: "spectrum_atomic", model_inputs: a.inputs, geant4_atomic_inputs: a.geant4});
   }
   const elements = Object.keys(SP.smiles.analyze(SP.smiles.parse(r.smiles)).element_counts);
   const summaries = {}, atomicStages = [];
@@ -150,6 +185,7 @@ function predictTarget(ctx, target, cache) {
     summaries[e] = SP.features.profileSummary(a.profile, GRIDS.atom);
     atomicStages.push(Object.assign({element: e}, stageTrust(a.result)));
   }
+  const geant4Atomic = geant4Inputs ? elements.reduce((o, e) => ((o[e] = cache[e] ? cache[e].geant4 : null), o), {}) : null;
   let predicted = null, molecularStage = null, inputs = null, interval = null;
   if (available) {
     inputs = SP.features.moleculeInputs(r.smiles, r.solvent_class, summaries).x;
@@ -164,11 +200,14 @@ function predictTarget(ctx, target, cache) {
     predicted, interval, interval_covered_fraction: intervalCoverage(r.target, predicted, interval),
     metrics: compare(r.target, predicted, grid), model: "spectrum_molecular", model_inputs: inputs,
     atomic_pool: inputs ? SP.features.ATOMIC_POOL.reduce((o, k) => ((o[k] = inputs[k]), o), {}) : null,
+    geant4_atomic_inputs: geant4Atomic,
     stages: atomicStages.concat(molecularStage ? [molecularStage] : [])});
 }
 
-const HONESTY = {geant4_trained: false, measured_labels: true,
-  statement: "Learned prediction from measured spectra (comparison only); not a Geant4 result. Strict mode disables it."};
+const HONESTY = {geant4_trained: false, measured_labels: true, particle_derived_inputs: geant4Inputs,
+  statement: "Learned prediction from measured spectra (comparison only); not a Geant4 result." +
+    (geant4Inputs ? " The atomic rung reads the Geant4 atomic response (mean excitation energy, photo-absorption) from this run's live probe." : "") +
+    " Strict mode disables it."};
 
 // Trainer-reported split-noise checks (atomic only): repeated re-salted k-fold CV and
 // leave-one-chemical-group-out CV on the training split. Copied for display; they
@@ -226,7 +265,7 @@ globalThis.TRECH_HOOKS = {
         density_g_per_cm3: probe ? probe.density_g_per_cm3 : null,
         electron_density_per_cm3: probe ? probe.electron_density_per_cm3 : null,
         mean_excitation_energy_ev: probe ? probe.mean_excitation_energy_ev : null,
-        note: "Geant4 facts for the same composition at a declared proxy density. Context for future particle-trained lifts; not a spectrum model input."});
+        note: "Geant4 facts for the same composition at a declared proxy density. Context only; the atomic rung's Geant4 inputs come from the per-element G4_<symbol> probes."});
     }
   }
 };

@@ -15,7 +15,8 @@ from PySide6.QtWidgets import (QCheckBox, QHBoxLayout, QLabel, QListWidget, QLis
                                QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget, QTextEdit,
                                QVBoxLayout, QWidget)
 
-from ..spectra import SpectrumRecord, SpectrumWorkspace, build_spectrum_workspace, format_stage, plot_bounds
+from ..spectra import (SpectrumRecord, SpectrumWorkspace, build_spectrum_workspace, format_stage, geant4_input_lines,
+                       plot_bounds)
 
 _MEASURED = QColor.fromRgbF(0.20, 0.55, 0.95, 1.0)
 _PREDICTED = QColor.fromRgbF(0.95, 0.45, 0.15, 1.0)
@@ -27,6 +28,30 @@ def _color(values, fallback: QColor) -> QColor:
     except (TypeError, ValueError):
         return fallback
 
+
+
+# Trainer ablation kinds (report.ablation[].kind; rows without one predate the Geant4 inputs).
+ABLATION_TITLES = {
+    "cascade": "Atomic → molecular cascade ablation (negative = pooled atomic predictions helped)",
+    "geant4_atomic": "Geant4 atomic-input ablation (negative = the Geant4 atomic response helped)",
+    "cascade_geant4": "Cascade source ablation (negative = pooling the Geant4-fed atomic model helped)",
+    "geant4_cascade": "Geant4-fed cascade ablation (negative = pooled Geant4-fed atomic predictions helped)",
+}
+
+
+def ablation_text(rows) -> str:
+    """The trainer's ablation rows, grouped by kind in a fixed order; Studio recomputes nothing."""
+    groups = {}
+    for row in rows:
+        groups.setdefault(row.get("kind") or "cascade", []).append(row)
+    blocks = []
+    for kind in list(ABLATION_TITLES) + sorted(k for k in groups if k not in ABLATION_TITLES):
+        if kind not in groups:
+            continue
+        lines = [f"{a['with']} vs {a['without']}: ΔCV RMSE {a['cv_rmse_delta']:+.4f}, ΔTest RMSE {a['test_rmse_delta']:+.4f}"
+                 for a in groups[kind]]
+        blocks.append(ABLATION_TITLES.get(kind, kind) + ":\n" + "\n".join(lines))
+    return "\n".join(blocks)
 
 class SpectrumPlot(QWidget):
     """Measured vs predicted curves on the record's own grid (bin centres, emitted units)."""
@@ -228,10 +253,7 @@ class SpectraPanel(QWidget):
         noise_note = ("\nRepeated-CV and group-CV columns are the trainer's split-noise checks on the atomic training "
                       "split (reported, not used for ranking)." if noisy else "")
         if self.workspace.ablation:
-            parts = [f"{a['with']} vs {a['without']}: ΔCV RMSE {a['cv_rmse_delta']:+.4f}, ΔTest RMSE {a['test_rmse_delta']:+.4f}"
-                     for a in self.workspace.ablation]
-            self.ablation.setText("Atomic → molecular cascade ablation (negative = pooled atomic predictions helped):\n"
-                                  + "\n".join(parts) + noise_note)
+            self.ablation.setText(ablation_text(self.workspace.ablation) + noise_note)
         elif self.workspace.records:
             self.ablation.setText("Leaderboard is emitted only in Studio mode (studio_mode=true).")
         else:
@@ -260,10 +282,13 @@ class SpectraPanel(QWidget):
             lines += ["", "PubChem statement: " + str(src["uv_text"]), "Source: " + str(src.get("uv_url", ""))]
         elif src.get("nist_lines"):
             lines += ["", "NIST ASD lines: " + str(src["nist_lines"].get("url", ""))]
+        live = geant4_input_lines(record.payload)
+        if live:
+            lines += ["", "Atomic rung Geant4 inputs, read from this run's live Geant4 probe:"] + ["• " + l for l in live]
         ctx = self.workspace.geant4_context
         if ctx and ctx.get("available"):
             lines += ["", f"Geant4 context (same composition, declared density {ctx.get('density_g_per_cm3')} g/cm³): "
-                          f"mean excitation energy {ctx.get('mean_excitation_energy_ev'):.2f} eV — not a model input."]
+                          f"mean excitation energy {ctx.get('mean_excitation_energy_ev'):.2f} eV — context, not a model input."]
         self.details.setPlainText("\n".join(lines))
 
     # --- training job -----------------------------------------------------------------

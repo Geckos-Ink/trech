@@ -27,6 +27,11 @@ Spectra dock is its optional UI extension mode. Contract and current numbers:
   `dataset.js` (pure rebuild from cached bytes; every rejection keeps a reason) and
   `pipeline.js` (protocol, worker-thread lanes, report/markdown). `bin/spectra.cjs` is the CLI;
   `--studio` emits JSON lines plus `studio_manifest.json`.
+- `geant4/atomic_probe.js` is a TRECH run (QBBC_LIV) that probes `G4_<symbol>` for Z 1–56;
+  `src/geant4.js` (`spectra.cjs geant4 --run DIR`) turns its `material_probes` into
+  `catalog/geant4_atomic.json`, which `build` folds into every element's features as `g4_*`.
+  `features.GEANT4_PROBE` is the single definition of symbols, physics list, process and
+  energies; `geant4AtomicRow`/`geant4Features` are shared by the converter and the scenario.
 - Committed fixture: `data/spectrum_prediction/{dataset,report}.json`, `report.md`,
   `models/spectrum_{atomic,molecular}.json`. The raw cache stays in `build/spectrum_prediction/cache/`.
 
@@ -36,6 +41,16 @@ Spectra dock is its optional UI extension mode. Contract and current numbers:
   element records) and PubChem/HSDB UV maxima; exports carry `geant4_trained:false`,
   `measured_labels:true`. Never describe a spectrum prediction as Geant4 output. The
   `spectrum_geant4_context` emit is composition context only, not an input.
+- **The exported atomic rung is Geant4-fed** (`atomic_mlp_tanh_geant4`, `particle_derived_inputs:true`
+  since 2026-11-27). When the atomic model's `input_features` hold `g4_*` names, the scenario
+  probes `G4_<symbol>` for every element its targets need, switches the run to the catalogue's
+  physics list and reads the inputs from `ctx.materials`, never from the committed catalogue.
+  `geant4_atomic_inputs` in each record reports the live row and its relative difference from the
+  training catalogue (0 on the same Geant4 build). A missing probe throws.
+- **Export chain:** the exported molecular cascade must pool the exported atomic model
+  (`cascadeSource` = the molecular entry's `cascade`), because the scenario recomputes the pooled
+  inputs with the atomic model it loads. The trainer refuses other pairings, including
+  `--export` overrides. Datasets without the Geant4 catalogue skip `*_geant4` entries.
 - **Parsers reject rather than reinterpret.** Sadtler catalogue numbers, E(1 %, 1 cm), ranges and
   prose stay out; malformed text drops bands. Extend parsers only with a test for the exact
   source form.
@@ -61,7 +76,11 @@ Spectra dock is its optional UI extension mode. Contract and current numbers:
 
 `node --test projects/spectrum_prediction/test/*.test.js` (CTest `trech_spectrum_prediction_js`):
 parsers, SMILES, grids, gradient check, families, export layout, splits, offline cache →
-dataset → training determinism (in-thread = workers) → CLI/`--studio`.
+dataset → training determinism (in-thread = workers) → CLI/`--studio`; `test/geant4.test.js`
+covers probe rows, the run converter's refusals, the committed catalogue, Geant4 ablations and
+export-chain refusals.
 `scripts/validate_spectrum_prediction.py` (CTest `trech_spectrum_prediction_scenario`) runs the
-engine and checks four things: Python dense forward equals engine output, engine held-out metrics
-equal the report, strict gating, and the Studio declaration. Studio: `studio/tests/test_spectra.py`.
+engine and checks: Python dense forward equals engine output, engine held-out metrics equal the
+report, the atomic `g4_*` inputs equal values it recomputes from the run's own `material_probes`
+(and the training catalogue), strict gating, and the Studio declaration.
+Studio: `studio/tests/test_spectra.py`.

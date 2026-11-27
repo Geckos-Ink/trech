@@ -11,6 +11,7 @@ const DEFAULTS = {
   cacheDir: path.join(ROOT, 'build/spectrum_prediction/cache'),
   out: path.join(ROOT, 'build/spectrum_prediction/run'),
   catalog: path.join(PROJECT, 'catalog/molecules.json'),
+  geant4Catalog: path.join(PROJECT, 'catalog/geant4_atomic.json'),
   publish: path.join(ROOT, 'data/spectrum_prediction'),
   elements: [1, 56]
 };
@@ -22,6 +23,7 @@ Commands
   train     Cross-validate, test and export every architecture in lib/architectures.js
   all       collect + build + train
   publish   Copy <out>/{dataset,report,models} into data/spectrum_prediction (committed fixture)
+  geant4    Convert a TRECH run of geant4/atomic_probe.js (--run DIR) into catalog/geant4_atomic.json
 
 Options
   --cache-dir DIR     raw response cache          (default build/spectrum_prediction/cache)
@@ -29,7 +31,11 @@ Options
   --dataset FILE      dataset for train           (default <out>/dataset.json)
   --catalog FILE      molecule name catalogue     (default projects/spectrum_prediction/catalog/molecules.json)
   --elements A-B      atomic-number range         (default 1-56)
+  --geant4 FILE       Geant4 atomic catalogue for build (default projects/spectrum_prediction/catalog/geant4_atomic.json)
+  --run DIR           output directory of a geant4/atomic_probe.js run (geant4 command)
   --arch a,b          train only these architectures or tasks (atomic, molecular)
+  --export t=a,...    export entry a as TRECH model t (spectrum_atomic, spectrum_molecular) for this run;
+                      the exported molecular cascade must pool the exported atomic model
   --folds K           cross-validation folds      (default 5)
   --no-family-cv      skip leave-one-family-out molecular CV
   --repeats R         atomic repeated k-fold CV repetitions (default 5; 0 disables)
@@ -41,7 +47,7 @@ Options
   -h, --help          show this help
 
 Labels are measured spectra (NIST ASD, PubChem/HSDB). Trained models are learned comparisons,
-not Geant4 results. See docs/research/spectrum_prediction.md.
+not Geant4 results; the *_geant4 architectures take Geant4 atomic responses as inputs. See docs/research/spectrum_prediction.md.
 `;
 
 function parseArgs(argv) {
@@ -53,12 +59,21 @@ function parseArgs(argv) {
     else if (a === '--out') opts.out = path.resolve(value(i++, a));
     else if (a === '--dataset') opts.dataset = path.resolve(value(i++, a));
     else if (a === '--catalog') opts.catalog = path.resolve(value(i++, a));
+    else if (a === '--geant4') opts.geant4Catalog = path.resolve(value(i++, a));
+    else if (a === '--run') opts.run = path.resolve(value(i++, a));
     else if (a === '--elements') {
       const m = /^(\d+)-(\d+)$/.exec(value(i++, a));
       if (!m || Number(m[1]) < 1 || Number(m[2]) > 118 || Number(m[1]) > Number(m[2])) throw new Error('--elements expects A-B within 1-118');
       opts.elements = [Number(m[1]), Number(m[2])];
     } else if (a === '--arch') opts.architectures = value(i++, a).split(',').map(s => s.trim()).filter(Boolean);
-    else if (a === '--folds') { opts.folds = Number(value(i++, a)); if (!(opts.folds >= 2 && opts.folds <= 20)) throw new Error('--folds expects 2-20'); }
+    else if (a === '--export') {
+      opts.exports = {};
+      for (const pair of value(i++, a).split(',')) {
+        const m = /^\s*(\w+)\s*=\s*(\w+)\s*$/.exec(pair);
+        if (!m) throw new Error('--export expects target=architecture[,target=architecture]');
+        opts.exports[m[1]] = m[2];
+      }
+    } else if (a === '--folds') { opts.folds = Number(value(i++, a)); if (!(opts.folds >= 2 && opts.folds <= 20)) throw new Error('--folds expects 2-20'); }
     else if (a === '--no-family-cv') opts.familyCv = false;
     else if (a === '--repeats') { opts.repeats = Number(value(i++, a)); if (!(Number.isInteger(opts.repeats) && opts.repeats >= 0 && opts.repeats <= 50)) throw new Error('--repeats expects 0-50'); }
     else if (a === '--no-group-cv') opts.groupCv = false;
@@ -91,7 +106,7 @@ async function main(argv) {
       else if (event.event === 'stage') process.stdout.write(`[${event.stage}] ${event.message || ''}\n`);
       else if (event.event === 'retry') process.stderr.write(`retry ${event.key} ${event.status || event.reason}\n`);
     });
-  const commands = {collect: ['collect'], build: ['build'], train: ['train'], all: ['collect', 'build', 'train'], publish: ['publish']}[opts.command];
+  const commands = {collect: ['collect'], build: ['build'], train: ['train'], all: ['collect', 'build', 'train'], publish: ['publish'], geant4: ['geant4']}[opts.command];
   if (!commands) throw new Error('unknown command ' + opts.command + '\n' + USAGE);
   const manifest = {schema: 'trech_spectrum_studio_v1', out: rel(opts.out), stages: []};
   for (const stage of commands) {
@@ -123,6 +138,11 @@ async function main(argv) {
         manifest.models[name] = {path: rel(path.join(opts.out, 'models', name + '.json')), sha256: writeJson(path.join(opts.out, 'models', name + '.json'), models[name])};
       manifest.ranking = report.ranking;
       emit({event: 'stage', stage, message: 'wrote ' + rel(path.join(opts.out, 'report.md'))});
+    } else if (stage === 'geant4') {
+      if (!opts.run) throw new Error('geant4 needs --run <output dir of a geant4/atomic_probe.js run>');
+      const catalog = require('../src/geant4.js').fromRun(opts.run);
+      const sha = writeJson(opts.geant4Catalog, catalog);
+      emit({event: 'stage', stage, message: `${catalog.elements.length} elements from ${catalog.provenance.geant4_version.replace(/\s+/g, ' ')} -> ${rel(opts.geant4Catalog)} (${sha.slice(0, 12)})`});
     } else if (stage === 'publish') {
       for (const file of ['dataset.json', 'report.json', 'report.md', 'models/spectrum_atomic.json', 'models/spectrum_molecular.json']) {
         const from = path.join(opts.out, file), to = path.join(opts.publish, file);

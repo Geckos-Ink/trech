@@ -118,7 +118,9 @@ test('training ranks, ablates and exports engine-loadable models', async () => {
   const dataset = build({cacheDir: f.cache, catalog: f.catalog, elements: [1, 20], root: f.dir});
   const archs = ['atomic_mean', 'atomic_ridge', 'atomic_mlp_tanh', 'molecular_mean', 'molecular_ridge', 'molecular_ridge_cascade',
     'molecular_mlp', 'molecular_mlp_cascade'];
-  const run = () => train(dataset, {architectures: archs, folds: 2, familyCv: true, repeats: 2, jobs: 1});
+  // The fixture dataset has no Geant4 catalogue, so the PubChem-fed chain is exported explicitly.
+  const exports = {spectrum_atomic: 'atomic_mlp_tanh', spectrum_molecular: 'molecular_mlp_cascade'};
+  const run = () => train(dataset, {architectures: archs, folds: 2, familyCv: true, repeats: 2, jobs: 1, exports});
   const {report, models} = await run();
   assert.equal(report.schema, 'trech_spectrum_report_v1');
   assert.deepEqual(Object.keys(models).sort(), ['spectrum_atomic', 'spectrum_molecular']);
@@ -170,7 +172,7 @@ test('training ranks, ablates and exports engine-loadable models', async () => {
   assert.equal(JSON.stringify(again.models), JSON.stringify(models));
   assert.equal(JSON.stringify(again.report.architectures.map(a => [a.repeated_cv, a.group_cv])),
     JSON.stringify(report.architectures.map(a => [a.repeated_cv, a.group_cv])));
-  const parallel = await train(dataset, {architectures: archs, folds: 2, familyCv: true, jobs: 3});
+  const parallel = await train(dataset, {architectures: archs, folds: 2, familyCv: true, jobs: 3, exports});
   assert.equal(JSON.stringify(parallel.models), JSON.stringify(models));
   assert.match(markdown(report), /cascade ablation/);
 });
@@ -182,7 +184,8 @@ test('CLI help, build/train and the --studio JSON-lines mode', () => {
   const common = ['--cache-dir', f.cache, '--catalog', f.catalog, '--out', out, '--elements', '1-20'];
   execFileSync(process.execPath, [CLI, 'build', ...common], {encoding: 'utf8'});
   const studio = execFileSync(process.execPath, [CLI, 'train', ...common, '--studio', '--folds', '2', '--no-family-cv', '--jobs', '2',
-    '--arch', 'atomic_mlp_tanh,molecular_mean,molecular_mlp_cascade'], {encoding: 'utf8'});
+    '--arch', 'atomic_mlp_tanh,molecular_mean,molecular_mlp_cascade',
+    '--export', 'spectrum_atomic=atomic_mlp_tanh,spectrum_molecular=molecular_mlp_cascade'], {encoding: 'utf8'});
   const events = studio.trim().split('\n').map(line => JSON.parse(line));
   assert.ok(events.some(e => e.event === 'architecture' && e.name === 'molecular_mlp_cascade'));
   const done = events[events.length - 1];

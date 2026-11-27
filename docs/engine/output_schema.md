@@ -1164,8 +1164,12 @@ vectors). `stages[]` holds each `ctx.cascade` trace's model/scale/ran/inDomain/e
 outOfDomainInputs/starvedInputs/jointStarved/jointMeasured/holdoutR2/holdoutSamples, with
 `element` for atomic stages. Molecules add `cid`, `formula`, `smiles`, `family`, `solvent`,
 `solvent_class`, `measured_bands`, `atomic_pool` and `sources` (UV statement, reference, URL).
-Atoms add `z`, `lines` and the PubChem/NIST source refs. Every record also has `display` hints
-(view companion) and `honesty` (`geant4_trained:false`, `measured_labels:true`).
+Atoms add `z`, `lines` and the PubChem/NIST source refs. When the atomic model takes Geant4
+inputs, `geant4_atomic_inputs` reports what the atomic rung read from the run's live
+`G4_<symbol>` probe: for an atom one object (`source`, `mean_excitation_energy_ev`,
+`photoabs_barn` per `energies_ev`, `max_rel_diff_vs_training_catalog`), for a molecule one per
+pooled element. Every record also has `display` hints (view companion) and `honesty`
+(`geant4_trained:false`, `measured_labels:true`, `particle_derived_inputs`).
 `spectrum_summary` pools metrics per exported model with split counts. Studio mode adds
 `spectrum_model_report` (ranking, per-architecture CV/family-CV/test metrics, ablation, protocol).
 Single targets add `spectrum_geant4_context` (material-probe density, electron density and mean

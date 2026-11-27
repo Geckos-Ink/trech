@@ -13,9 +13,11 @@ worker threads) lives in [`src/`](../../projects/spectrum_prediction/src). Studi
 only Python part, and it neither trains nor evaluates models.
 
 > **Honesty labels.** Labels are **measurements** (NIST ASD, PubChem/HSDB). The models are learned
-> **comparisons**: `geant4_trained: false`, `measured_labels: true`. The atomic rung is not
-> particle-trained, so this track does not close the Geant4-linked cascade gap; it prepares the
-> molecular-spectrum rung that a particle-trained atomic response must eventually feed.
+> **comparisons**: `geant4_trained: false`, `measured_labels: true`. Since 2026-11-27 the exported
+> atomic rung also takes the **Geant4 atomic response** as inputs (`particle_derived_inputs: true`):
+> each element's mean excitation energy and photo-absorption cross sections, which TRECH reads
+> from a live Geant4 material probe in the same run. The rung is therefore Geant4-fed, but it is
+> still trained on measured lines, not on Geant4 output, and its predictions are not Geant4 results.
 
 ## Data
 
@@ -23,6 +25,7 @@ only Python part, and it neither trains nor evaluates models.
 | --- | --- | --- |
 | Atoms | PubChem periodic table → PubChem element record *Atomic Spectra* section → the NIST ASD line list it links to (neutral spectrum `X I`, 200–1000 nm CSV); *Ground Level* section | Element facts (Z, mass, configuration, ionization energy, electronegativity, electron affinity, radius, ground term) and lines with A<sub>ki</sub>, g<sub>i</sub>, g<sub>k</sub>, level energies |
 | Molecules | PubChem name → CID → properties (SMILES, formula) → PUG-View *UV Spectra* | Measured absorption-maximum statements (mostly HSDB): λ<sub>max</sub>, log ε or linear molar ε, solvent |
+| Geant4 atomic response | A TRECH run of [`geant4/atomic_probe.js`](../../projects/spectrum_prediction/geant4/atomic_probe.js), converted by `spectra.cjs geant4` into [`catalog/geant4_atomic.json`](../../projects/spectrum_prediction/catalog/geant4_atomic.json) | Per element Z 1–56: mean excitation energy *I* and the per-atom photo-absorption cross section at 10, 20, 30, 50, 100, 200, 500, 1000, 3000 and 10 000 eV |
 
 `spectra.cjs collect` stores every response verbatim under `build/spectrum_prediction/cache/raw/`
 with URL, HTTP status, UTC fetch time and SHA-256 in `manifest.json`. Requests are rate-limited
@@ -42,6 +45,38 @@ It rejects collection catalogue numbers (`UV: 89 (Sadtler …)`), E(1 %, 1 cm) s
 absorbance, wavelength ranges and prose. Malformed statements lose the unreadable band instead of
 gaining an invented one. Wavelength-only maxima are kept in the record but carry no envelope
 weight.
+
+### Geant4 atomic response
+
+The probe run asks Geant4 about the NIST material `G4_<symbol>` of every element from H to Ba,
+under the `QBBC_LIV` physics list (Livermore low-energy electromagnetic models). For each one the
+engine's material probe reports:
+
+- **Mean excitation energy *I*** (`G4IonisParamMat`), in eV. It is a logarithmic average over the
+  atom's dipole oscillator-strength distribution, the same distribution that sets optical line
+  strengths. Example: H 19.2 eV, C 81 eV, Ba 491 eV.
+- **Photo-absorption cross sections**: `G4EmCalculator` cross sections per volume for the
+  `phot` process, divided by the atom number density, in barn per atom. The ten energies from
+  10 eV to 10 keV cross the outer and inner shell edges, so the rows carry each element's shell
+  structure. For example, the 2p (L) edge of sodium near 31 eV appears as a 100-fold jump between
+  the 30 and 50 eV samples, and magnesium's near 50 eV as a 40-fold jump between 50 and 100 eV.
+
+These are tabulated Geant4 responses, not Monte-Carlo tallies. The density cancels in the
+per-atom cross section. Geant4 has no data at optical energies (1–6 eV), so the inputs describe
+the atom's response above 10 eV, not its visible lines directly. The catalogue records the Geant4
+version, physics list, energies and the probe run's config hash, and `dataset.json` records the
+catalogue's SHA-256 under `geant4_atomic`. Re-harvest with:
+
+```bash
+build/rel/trech run projects/spectrum_prediction/geant4/atomic_probe.js --output build/spectrum_geant4/probe
+node projects/spectrum_prediction/bin/spectra.cjs geant4 --run build/spectrum_geant4/probe
+node projects/spectrum_prediction/bin/spectra.cjs build --offline
+```
+
+The run takes about 10 s. `geant4` refuses a run with another physics list, a missing element or
+a missing energy, and `build` refuses a catalogue harvested with a different probe definition.
+
+### Molecule catalogue
 
 The molecule catalogue is [`catalog/molecules.json`](../../projects/spectrum_prediction/catalog/molecules.json)
 (≈400 names in 12 curation families). Committed fixture
@@ -65,14 +100,19 @@ These are declared representation choices (see [`lib/grid.js`](../../projects/sp
 
 - Atomic inputs: 19 PubChem facts (`features.ATOMIC_FEATURES`), with explicit `*_missing` flags.
   A missing value is never imputed silently.
+- Geant4 atomic inputs (`features.GEANT4_ATOMIC_FEATURES`, 11 names): `g4_ln_mean_excitation_ev`
+  and `g4_ln_photoabs_barn_<E>ev` for the ten probe energies, natural logarithms because both
+  span decades. Input sets: `atomic_geant4` (PubChem facts plus these) and `geant4` (Z plus these,
+  no PubChem facts).
 - Molecular inputs: 27 SMILES graph counts plus the measured solvent class
   (`features.MOLECULAR_DESCRIPTORS`). The graph comes from a minimal SMILES reader (organic-subset
   implicit H only); counts cover pi centres, conjugated components and auxochrome positions. No
   Woodward–Fieser, Hückel or other spectroscopic rule is applied.
-- **Cascade rung:** the exported atomic model predicts a line-strength profile for every element.
+- **Cascade rung:** an atomic model predicts a line-strength profile for every element.
   Six summaries per element (strength, centroid, four band means) are pooled, count-weighted,
   over the molecule's atoms (`features.ATOMIC_POOL`). Graph networks can also attach them per
-  node (`cascadeNodeFeatures`).
+  node (`cascadeNodeFeatures`). There are two cascade sources: `pubchem` (`atomic_mlp_tanh`) and
+  `geant4` (`atomic_mlp_tanh_geant4`). A molecular entry names its source with `cascade`.
 
 ## Architecture catalogue
 
@@ -82,6 +122,15 @@ gradient-checked in tests). Families: `mean`, `knn`, `ridge` (closed form), `mlp
 (atom set, no bonds) and `mpnn` (message passing over bonds). To study a new variant, add an
 entry; the pipeline trains and grades every entry identically. Only dense families (`ridge`,
 `mlp`) can carry `export`, because TRECH's `GenericSurrogate` evaluates dense layers.
+
+The `*_geant4` entries repeat an existing entry with the Geant4 atomic inputs added (atomic) or
+with the Geant4-fed cascade source (molecular); `atomic_mlp_tanh_geant4_only` uses Z and the
+Geant4 inputs alone. A dataset built without the Geant4 catalogue skips them and lists them in
+`report.skipped`; naming one with `--arch` is then an error.
+
+`--export spectrum_atomic=<entry>,spectrum_molecular=<entry>` moves an export for one run. The
+exported molecular cascade must pool the exported atomic model, because TRECH recomputes the
+pooled inputs with the atomic model it loads; the trainer refuses any other pairing.
 
 ## Validation protocol
 
@@ -102,12 +151,41 @@ Committed results (`data/spectrum_prediction/report.md`; RMSE in target units):
 
 | Task | Best by CV | CV RMSE | Mean baseline CV RMSE | Test RMSE / R² / cosine |
 | --- | --- | --- | --- | --- |
-| Atomic (53, 6 test) | `atomic_mlp_silu_wide` | 0.297 | 0.333 | exported `atomic_mlp_tanh`: 0.325 / −0.11 / 0.58 |
-| Molecular (180, 33 test) | `molecular_mlp_cascade` | 0.231 | 0.255 | exported `molecular_mlp_cascade`: 0.228 / 0.35 / 0.75 |
+| Atomic (53, 6 test) | `atomic_knn3_geant4` | 0.295 | 0.333 | exported `atomic_mlp_tanh_geant4`: 0.338 / −0.20 / 0.56 |
+| Molecular (180, 33 test) | `molecular_mlp_cascade_geant4` | 0.231 | 0.255 | exported `molecular_mlp_cascade_geant4`: 0.225 / 0.37 / 0.75 |
+
+**Geant4 atomic inputs (2026-11-27).** The same atomic architectures were trained with and without
+the Geant4 atomic response; each row is "with minus without" (negative helps):
+
+| Atomic entry | ΔCV RMSE | ΔGroup-CV RMSE | ΔTest RMSE (6 atoms) |
+| --- | --- | --- | --- |
+| kNN (k = 3) | −0.0030 | −0.0105 | −0.0129 |
+| ridge | +0.0341 | +0.0241 | +0.0512 |
+| tanh MLP 32×2 | +0.0050 | −0.0137 | +0.0126 |
+| SiLU MLP 64 | +0.0109 | −0.0016 | +0.0241 |
+
+Pooling the Geant4-fed atomic model instead of the PubChem-fed one changes the molecular
+cascades by: ridge −0.0047 CV / −0.0201 family-CV, MLP −0.0009 / −0.0037, MPNN +0.0024 / +0.0028.
+Against no cascade at all, the Geant4-fed MLP cascade gains −0.0021 CV and −0.0026 family-CV.
+
+What this means:
+
+- In distribution, the Geant4 inputs do not help the atomic models: 42 training atoms are too
+  few for 11 more inputs, and ridge overfits most. Leave one chemical group out, they help the
+  kNN and both MLPs. With Z and the Geant4 inputs alone (`atomic_mlp_tanh_geant4_only`) the mean
+  group-CV RMSE is 0.345, the first learned atomic model below the mean baseline's 0.355; its
+  pooled out-of-group R² (−0.30) is still below the baseline's (−0.20).
+- The Geant4-fed chain is the best molecular model by CV, family-CV and test, but every
+  difference is far inside the CV standard deviation (≈ 0.019). It is exported because it is
+  at least as good at the observer (molecular) scale and it makes the atomic rung read Geant4,
+  not because the data prove it better. The exported atomic rung's own atomic accuracy is
+  slightly worse than the PubChem-only one in distribution (CV +0.005) and better out of group.
+- Calibrated intervals of the new exports: atomic test-cell coverage 0.875 (0.887 before),
+  out-of-group 0.864 (0.840); molecular 0.906 (0.902), out-of-family 0.891 (0.892).
 
 Findings at this data size: dense descriptor MLPs beat the mean baseline modestly. The graph
 networks (DeepSets, MPNN) do not beat the mean baseline yet. The pooled atomic-model features
-change CV RMSE by less than 0.003, so the cascade rung adds no measurable information beyond
+change CV RMSE by at most 0.005, so the cascade rung adds no measurable information beyond
 composition at this size. The atomic test split (6 elements) is too small for stable R².
 The repeated CV removes that noise: pooled out-of-fold R² is 0.13–0.14 (± 0.03 over 5
 repetitions) for the MLPs and kNN against −0.05 for the mean baseline, so the learned atomic
@@ -127,8 +205,10 @@ build/dev/trech run examples/scenarios/spectrum_prediction/spectrum_prediction.j
 python3 scripts/validate_spectrum_prediction.py
 ```
 
-Full training takes about 4 minutes on 8 cores (the atomic split-noise checks add ~1 minute); `--jobs` sets the number of worker threads.
-Results are byte-identical across runs and across worker counts.
+Full training takes about 6 minutes on 8 cores (the atomic split-noise checks add ~1 minute); `--jobs` sets the number of worker threads.
+Results are byte-identical across runs and across worker counts. Adding the Geant4 entries left
+every earlier entry's metrics byte-identical (only the `cascadeSource` label of `atomic_mlp_tanh`
+changed from `true` to `"pubchem"`).
 
 ## TRECH scenario contract
 
@@ -139,17 +219,30 @@ Results are byte-identical across runs and across worker counts.
 scenario runs `ctx.cascade(element facts, ["spectrum_atomic"])` for each element, then
 `ctx.cascade(descriptors + pooled atomic predictions, ["spectrum_molecular"])`.
 
+**Live Geant4 inputs.** When the atomic model's inputs include `g4_*` names (the committed one
+does), the scenario adds `G4_<symbol>` for every element its targets need to `materialProbe`,
+with `phot` interaction sampling at the probe energies, and runs under the catalogue's physics
+list (`QBBC_LIV`). The atomic rung's `g4_*` inputs are computed from `ctx.materials` in the hook;
+the committed catalogue is only used to report the difference (`geant4_atomic_inputs`). The
+validator recomputes them from the run's `material_probes` in Python: they agree to 9e-16 with
+the run and with the training catalogue on the same Geant4 build. A different Geant4 version
+would move the inputs, and that difference is reported rather than hidden.
+
 Emits:
 
 - `spectrum_prediction`: kind, id, label, `split` (`test` = held out, `train` = training member),
   grid (unit, start, stop, bins, centers), `measured`, `predicted` (null in strict mode),
   `model_inputs`, engine `stages` trust (inDomain, extrapolation, starved/joint flags, holdout R²),
-  comparison `metrics`, source text/URLs, `display` hints from the view companion, honesty labels.
+  comparison `metrics`, source text/URLs, `display` hints from the view companion, honesty labels
+  (`particle_derived_inputs`), and `geant4_atomic_inputs`: the live Geant4 row each atomic
+  prediction read (one per atom, one per pooled element of a molecule) with its relative
+  difference from the training catalogue.
 - `spectrum_summary`: pooled metrics per model and split counts.
 - `spectrum_model_report` (Studio mode only): the trainer's leaderboard, ablation and protocol.
   Atomic architectures also carry `split_noise` (`repeated_cv`: repeats, folds, per-fold RMSE,
   pooled R²/cosine; `group_cv`: group count, RMSE, pooled R², per-group `{group, n, rmse}`),
-  copied from the trainer report; `null` when the trainer ran neither check.
+  copied from the trainer report; `null` when the trainer ran neither check. Ablation rows carry a
+  `kind`: `cascade`, `geant4_atomic`, `cascade_geant4` or `geant4_cascade`.
 - `spectrum_geant4_context` (single target): Geant4 material-probe facts for the same composition
   at a declared density (mean excitation energy, electron density). This is context, not a model
   input.
@@ -183,4 +276,7 @@ tests in `studio/tests/test_spectra.py`).
 - Solvent is a 3-class feature; pH, concentration and vibronic structure are absent.
 - Atomic profiles ignore ionized spectra (X II …), level populations and instrument response.
 - PubChem UV coverage favours HSDB compounds; families are unevenly represented (pesticides: 5).
-- No Geant4-derived feature enters a model yet; the Geant4 context emit is a placeholder for that lift.
+- The Geant4 inputs describe the atom from 10 eV to 10 keV; Geant4 has no optical-energy atomic
+  response, and the labels remain measured lines, so the rung is Geant4-fed, not Geant4-trained.
+- The Geant4 inputs are not yet shown to improve in-distribution atomic accuracy (see the table
+  above); the gains are out of group and within noise.

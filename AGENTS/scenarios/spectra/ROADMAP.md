@@ -14,11 +14,13 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R2 · Particle-trained atomic rung: feed Geant4 material/atomic response (mean excitation energy, photo-absorption) as atomic inputs and re-grade the cascade ablation. ([detail](#open-work))
-- **P2** · R2 · The cascade adds no measurable information yet (|ΔCV RMSE| < 0.003): per-element embeddings, graph-level attention. ([detail](#open-work))
-- **P2** · R2 · No out-of-group atomic generalisation (every learned atomic model worse than the mean baseline leave-one-group-out). ([detail](#open-work))
+- **P2** · R2 · The cascade adds little measurable information yet: pooling the Geant4-fed atomic model gives the best molecular CV (0.2305), but every cascade delta (≤ 0.005) is far inside the CV standard deviation (≈ 0.019). Try per-element embeddings, graph-level attention, and more molecules before reading the deltas as signal. ([detail](#geant4-fed-atomic-rung-2026-11-27))
+- **P2** · R2 · Out-of-group atomic generalisation is still weak. With Z and the Geant4 atomic response only (`atomic_mlp_tanh_geant4_only`), the mean leave-one-group-out RMSE (0.345) is the first below the mean baseline (0.355), but its pooled out-of-group R² (−0.30) stays below the baseline's (−0.20). ([detail](#geant4-fed-atomic-rung-2026-11-27))
+- **P2** · R2 · The Geant4 atomic inputs worsen in-distribution atomic CV for ridge (+0.034) and the MLPs (+0.005, +0.011) on 42 training atoms, while improving leave-one-group-out CV. Regularise or select them (fewer energies, per-input penalties, monotone priors over the cross sections) and grow the atomic data (ionized spectra) before the exported rung's atomic accuracy is relied on. ([detail](#geant4-fed-atomic-rung-2026-11-27))
 - **P2** · R4 · Conditional/normalized conformal intervals (today marginal and homoscedastic per bin; out-of-group under-covers). ([detail](#open-work))
 - **P2** · R6 · Studio live re-inspection after a data change and a two-run leaderboard comparison. (owned by the [studio/workspace queue](../../studio/workspace/ROADMAP.md#priority-queue))
+- **P3** · R2 · The Geant4 atomic inputs stop at 10 eV: Geant4 tabulates no optical-energy (1–6 eV) atomic response. Add other Geant4 atomic facts that reach the valence shell (subshell binding energies from `G4AtomicShells`, the lowest Livermore energies) and measure which inputs carry the signal. ([detail](#geant4-fed-atomic-rung-2026-11-27))
+- **P3** · R2 · The MPNN cascade gets worse with the Geant4-fed source (ΔCV +0.0024, Δtest +0.018). ([detail](#geant4-fed-atomic-rung-2026-11-27))
 - **P3** · R2 · Graph networks underperform the mean baseline at 144 molecules; grow data (more families, ionized spectra, NIST levels, measured band envelopes). ([detail](#open-work))
 
 ## Foundation (2026-11-07)
@@ -36,12 +38,38 @@ dated record below, and queue its residuals in the same change.
 - [x] Studio extension mode (Spectra dock): plot, trust badges, leaderboard/ablation, and a
   Node training job feeding `data_dir`.
 
+## Geant4-fed atomic rung (2026-11-27)
+
+- [x] Geant4 atomic response harvested by a TRECH run (`geant4/atomic_probe.js`, QBBC_LIV,
+  Geant4 11.4.p02): for `G4_H` … `G4_Ba`, the mean excitation energy and the per-atom `phot`
+  cross section at ten energies from 10 eV to 10 keV (the material probe's existing
+  `G4EmCalculator` interaction sampling; no C++ change). `spectra.cjs geant4` stores it in
+  `catalog/geant4_atomic.json`; `build` folds it into the features as 11 `g4_*` inputs and
+  records the catalogue's SHA-256.
+- [x] Five atomic and three molecular `*_geant4` catalogue entries, a per-source cascade
+  (`pubchem`/`geant4`) and three new ablation kinds. Earlier entries' metrics are byte-identical.
+- [x] Re-graded ablation (full table in the [study](../../../docs/research/spectrum_prediction.md#validation-protocol)):
+  Geant4 inputs hurt in-distribution atomic CV for ridge (+0.034) and the MLPs (+0.005/+0.011),
+  help kNN (−0.003), and help leave-one-group-out CV for kNN and both MLPs (−0.011/−0.014/−0.002).
+  Pooling the Geant4-fed atomic model gives the best molecular CV (0.2305 vs 0.2314), family-CV
+  and test, all within the CV standard deviation.
+- [x] Exports moved to the Geant4-fed chain (`atomic_mlp_tanh_geant4` →
+  `molecular_mlp_cascade_geant4`); the trainer refuses an exported molecular cascade that pools a
+  different atomic model than the exported one (`--export` overrides included).
+- [x] The scenario reads the atomic `g4_*` inputs from its own live `G4_<symbol>` probes. The
+  validator recomputes them from `material_probes`: max |Δ| 8.9e-16 against the run and the
+  catalogue; engine vs Python forward 3.3e-16; held-out metrics equal the report.
+- Verification: `node --test` 22/22 (6 new), `validate_spectrum_prediction.py` passed,
+  Studio `test_spectra.py` 13/13 (ablation grouping, live-input lines), ML model audit
+  regenerated (55 models, 0 failing), purity report regenerated, Release CTest 82/82, Studio
+  pytest 393/393.
+- Residuals (queued above): in-distribution atomic accuracy, out-of-group pooled R², the 10 eV
+  floor of the Geant4 inputs, the MPNN cascade, and deltas within noise.
+
 ## Open work
 
-- [ ] **Particle-trained atomic rung.** No model consumes Geant4 facts yet. Feed Geant4
-  material/atomic response (mean excitation energy, photo-absorption cross sections from
-  `trech_molecular_particle.js` or a new optical-energy probe) as atomic inputs. Then re-grade the
-  cascade ablation. Until then this track does not close the Geant4-linked molecular gap.
+- [x] **Particle-trained atomic rung** (2026-11-27): delivered as the Geant4-fed rung, see
+  [the record](#geant4-fed-atomic-rung-2026-11-27).
 - [ ] **Cascade adds no measurable information yet** (|ΔCV RMSE| < 0.003). Try per-element
   embeddings (hidden-layer activations) instead of profile summaries, and graph-level
   attention over atomic predictions.

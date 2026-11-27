@@ -1,6 +1,6 @@
 {
  "schema": "trech_spectrum_report_v1",
- "dataset_sha256": "d58883cfc4dcd79226b35f23f3566857e4d5a0ee779a8960cb8bca1a2fc0f68c",
+ "dataset_sha256": "553b06c64bf17941c777b535e4b9c83cbdb2e0a4f83e6413cb84c79226f86aa8",
  "protocol": {
   "seed": 20261107,
   "folds": 5,
@@ -292,21 +292,29 @@
  },
  "ranking": {
   "atomic": [
+   "atomic_knn3_geant4",
    "atomic_mlp_silu_wide",
    "atomic_mlp_tanh",
    "atomic_knn3",
+   "atomic_mlp_tanh_geant4",
    "atomic_ridge",
-   "atomic_mean"
+   "atomic_mlp_silu_wide_geant4",
+   "atomic_mlp_tanh_geant4_only",
+   "atomic_mean",
+   "atomic_ridge_geant4"
   ],
   "molecular": [
+   "molecular_mlp_cascade_geant4",
    "molecular_mlp_cascade",
    "molecular_mlp",
+   "molecular_ridge_cascade_geant4",
    "molecular_ridge",
    "molecular_ridge_cascade",
    "molecular_knn3",
    "molecular_mean",
    "molecular_mpnn",
    "molecular_mpnn_cascade",
+   "molecular_mpnn_cascade_geant4",
    "molecular_deepsets"
   ]
  },
@@ -857,14 +865,13 @@
    "name": "atomic_mlp_tanh",
    "task": "atomic",
    "family": "mlp",
-   "note": "Two tanh layers; exported to TRECH as the atomic rung and used to pool atomic features into molecules.",
+   "note": "Two tanh layers on PubChem facts; the PubChem-fed cascade source (exported to TRECH until 2026-11-27).",
    "spec": {
     "name": "atomic_mlp_tanh",
     "task": "atomic",
     "family": "mlp",
     "inputs": "atomic",
-    "export": "spectrum_atomic",
-    "cascadeSource": true,
+    "cascadeSource": "pubchem",
     "layers": [
      {
       "units": 32,
@@ -878,7 +885,7 @@
     "epochs": 1500,
     "lr": 0.003,
     "l2": 0.002,
-    "note": "Two tanh layers; exported to TRECH as the atomic rung and used to pool atomic features into molecules."
+    "note": "Two tanh layers on PubChem facts; the PubChem-fed cascade source (exported to TRECH until 2026-11-27)."
    },
    "cv": {
     "folds": 5,
@@ -911,7 +918,7 @@
     "cosine": 0.58295349,
     "peak_error_nm": 103.33333
    },
-   "exported": "spectrum_atomic",
+   "exported": null,
    "repeated_cv": {
     "repeats": 5,
     "folds": 5,
@@ -1046,26 +1053,6 @@
      "cosine": 0.4752242,
      "peak_error_nm": 246.38298
     }
-   },
-   "interval": {
-    "nominal_coverage": 0.9,
-    "n_calibration": 47,
-    "capped": false,
-    "mean_width": 1.1049291,
-    "test": {
-     "n": 6,
-     "cells": 0.8875,
-     "min_bin": 0.66666667,
-     "samples_all_bins": 0
-    },
-    "out_of_group": {
-     "source": "leave-one-chemical-group-out CV on the training split",
-     "n": 47,
-     "cells": 0.84042553,
-     "min_bin": 0.59574468,
-     "samples_all_bins": 0.085106383
-    },
-    "out_of_group_width_ratio": 1.2451315
    }
   },
   {
@@ -1254,6 +1241,965 @@
      "r2": -0.61442641,
      "cosine": 0.46707246,
      "peak_error_nm": 234.04255
+    }
+   }
+  },
+  {
+   "name": "atomic_knn3_geant4",
+   "task": "atomic",
+   "family": "knn",
+   "note": "Nearest elements in PubChem facts plus the Geant4 atomic response.",
+   "spec": {
+    "name": "atomic_knn3_geant4",
+    "task": "atomic",
+    "family": "knn",
+    "inputs": "atomic_geant4",
+    "k": 3,
+    "note": "Nearest elements in PubChem facts plus the Geant4 atomic response."
+   },
+   "cv": {
+    "folds": 5,
+    "rmse": {
+     "mean": 0.29519794,
+     "std": 0.024824338
+    },
+    "mae": {
+     "mean": 0.21632835,
+     "std": 0.024784997
+    },
+    "r2": {
+     "mean": 0.1359522,
+     "std": 0.14653747
+    },
+    "cosine": {
+     "mean": 0.70892222,
+     "std": 0.056829262
+    },
+    "peak_error_nm": {
+     "mean": 102.62222,
+     "std": 45.743763
+    }
+   },
+   "test": {
+    "n": 6,
+    "rmse": 0.3125498,
+    "mae": 0.22032467,
+    "r2": -0.025291918,
+    "cosine": 0.59157087,
+    "peak_error_nm": 240
+   },
+   "exported": null,
+   "repeated_cv": {
+    "repeats": 5,
+    "folds": 5,
+    "per_fold": {
+     "folds": 25,
+     "rmse": {
+      "mean": 0.29958203,
+      "std": 0.018388363
+     },
+     "mae": {
+      "mean": 0.21850219,
+      "std": 0.01557318
+     },
+     "r2": {
+      "mean": 0.079272489,
+      "std": 0.11675451
+     },
+     "cosine": {
+      "mean": 0.70583561,
+      "std": 0.055625528
+     },
+     "peak_error_nm": {
+      "mean": 104.48889,
+      "std": 52.313396
+     }
+    },
+    "pooled": {
+     "folds": 5,
+     "rmse": {
+      "mean": 0.30016797,
+      "std": 0.0015063374
+     },
+     "mae": {
+      "mean": 0.21848017,
+      "std": 0.0008858313
+     },
+     "r2": {
+      "mean": 0.16413298,
+      "std": 0.008391655
+     },
+     "cosine": {
+      "mean": 0.70599145,
+      "std": 0.004095168
+     },
+     "peak_error_nm": {
+      "mean": 104.25532,
+      "std": 7.3310146
+     }
+    }
+   },
+   "group_cv": {
+    "summary": {
+     "folds": 8,
+     "rmse": {
+      "mean": 0.36384608,
+      "std": 0.054987681
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.54168481,
+      "std": 0.13683745
+     },
+     "peak_error_nm": {
+      "mean": 224.5625,
+      "std": 115.01555
+     }
+    },
+    "per_group": [
+     {
+      "group": "Alkali metal",
+      "n": 4,
+      "rmse": 0.39860768,
+      "cosine": 0.40638019,
+      "peak_error_nm": 270
+     },
+     {
+      "group": "Alkaline earth metal",
+      "n": 5,
+      "rmse": 0.3361431,
+      "cosine": 0.68571011,
+      "peak_error_nm": 56
+     },
+     {
+      "group": "Halogen",
+      "n": 4,
+      "rmse": 0.44877868,
+      "cosine": 0.37789376,
+      "peak_error_nm": 365
+     },
+     {
+      "group": "Metalloid",
+      "n": 6,
+      "rmse": 0.32061936,
+      "cosine": 0.50437471,
+      "peak_error_nm": 273.33333
+     },
+     {
+      "group": "Noble gas",
+      "n": 5,
+      "rmse": 0.36579202,
+      "cosine": 0.69829649,
+      "peak_error_nm": 368
+     },
+     {
+      "group": "Nonmetal",
+      "n": 4,
+      "rmse": 0.36912627,
+      "cosine": 0.62987878,
+      "peak_error_nm": 225
+     },
+     {
+      "group": "Post-transition metal",
+      "n": 3,
+      "rmse": 0.25991625,
+      "cosine": 0.67175103,
+      "peak_error_nm": 46.666667
+     },
+     {
+      "group": "Transition metal",
+      "n": 16,
+      "rmse": 0.41178525,
+      "cosine": 0.35919342,
+      "peak_error_nm": 192.5
+     }
+    ],
+    "pooled": {
+     "n": 47,
+     "rmse": 0.37904364,
+     "mae": 0.28480336,
+     "r2": -0.33283379,
+     "cosine": 0.49713276,
+     "peak_error_nm": 221.70213
+    }
+   }
+  },
+  {
+   "name": "atomic_ridge_geant4",
+   "task": "atomic",
+   "family": "ridge",
+   "note": "Ridge on PubChem facts plus the Geant4 atomic response (I, photo-absorption 10 eV-10 keV).",
+   "spec": {
+    "name": "atomic_ridge_geant4",
+    "task": "atomic",
+    "family": "ridge",
+    "inputs": "atomic_geant4",
+    "lambda": 3,
+    "note": "Ridge on PubChem facts plus the Geant4 atomic response (I, photo-absorption 10 eV-10 keV)."
+   },
+   "cv": {
+    "folds": 5,
+    "rmse": {
+     "mean": 0.33714168,
+     "std": 0.036435856
+    },
+    "mae": {
+     "mean": 0.25808192,
+     "std": 0.029294575
+    },
+    "r2": {
+     "mean": -0.13937397,
+     "std": 0.28574792
+    },
+    "cosine": {
+     "mean": 0.63896463,
+     "std": 0.06356699
+    },
+    "peak_error_nm": {
+     "mean": 116.8,
+     "std": 55.237954
+    }
+   },
+   "test": {
+    "n": 6,
+    "rmse": 0.35372159,
+    "mae": 0.2614489,
+    "r2": -0.31320405,
+    "cosine": 0.54570001,
+    "peak_error_nm": 126.66667
+   },
+   "exported": null,
+   "repeated_cv": {
+    "repeats": 5,
+    "folds": 5,
+    "per_fold": {
+     "folds": 25,
+     "rmse": {
+      "mean": 0.33949239,
+      "std": 0.024220766
+     },
+     "mae": {
+      "mean": 0.26453228,
+      "std": 0.017650769
+     },
+     "r2": {
+      "mean": -0.19122235,
+      "std": 0.23013909
+     },
+     "cosine": {
+      "mean": 0.63921574,
+      "std": 0.069353017
+     },
+     "peak_error_nm": {
+      "mean": 120.90667,
+      "std": 45.077751
+     }
+    },
+    "pooled": {
+     "folds": 5,
+     "rmse": {
+      "mean": 0.34008448,
+      "std": 0.0052490445
+     },
+     "mae": {
+      "mean": 0.26435003,
+      "std": 0.0031498265
+     },
+     "r2": {
+      "mean": -0.073185117,
+      "std": 0.033188729
+     },
+     "cosine": {
+      "mean": 0.63948444,
+      "std": 0.0095320965
+     },
+     "peak_error_nm": {
+      "mean": 120.85106,
+      "std": 14.195173
+     }
+    }
+   },
+   "group_cv": {
+    "summary": {
+     "folds": 8,
+     "rmse": {
+      "mean": 0.41796751,
+      "std": 0.10185854
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.48701663,
+      "std": 0.16250602
+     },
+     "peak_error_nm": {
+      "mean": 246.47917,
+      "std": 164.36172
+     }
+    },
+    "per_group": [
+     {
+      "group": "Alkali metal",
+      "n": 4,
+      "rmse": 0.52486871,
+      "cosine": 0.25011519,
+      "peak_error_nm": 300
+     },
+     {
+      "group": "Alkaline earth metal",
+      "n": 5,
+      "rmse": 0.38338123,
+      "cosine": 0.58173462,
+      "peak_error_nm": 112
+     },
+     {
+      "group": "Halogen",
+      "n": 4,
+      "rmse": 0.59369316,
+      "cosine": 0.28437071,
+      "peak_error_nm": 625
+     },
+     {
+      "group": "Metalloid",
+      "n": 6,
+      "rmse": 0.29195789,
+      "cosine": 0.50166692,
+      "peak_error_nm": 253.33333
+     },
+     {
+      "group": "Noble gas",
+      "n": 5,
+      "rmse": 0.42488912,
+      "cosine": 0.65096031,
+      "peak_error_nm": 184
+     },
+     {
+      "group": "Nonmetal",
+      "n": 4,
+      "rmse": 0.34402906,
+      "cosine": 0.70149641,
+      "peak_error_nm": 295
+     },
+     {
+      "group": "Post-transition metal",
+      "n": 3,
+      "rmse": 0.29938023,
+      "cosine": 0.58708985,
+      "peak_error_nm": 60
+     },
+     {
+      "group": "Transition metal",
+      "n": 16,
+      "rmse": 0.4815407,
+      "cosine": 0.33869901,
+      "peak_error_nm": 142.5
+     }
+    ],
+    "pooled": {
+     "n": 47,
+     "rmse": 0.44033942,
+     "mae": 0.34829387,
+     "r2": -0.79875781,
+     "cosine": 0.45314594,
+     "peak_error_nm": 220
+    }
+   }
+  },
+  {
+   "name": "atomic_mlp_tanh_geant4",
+   "task": "atomic",
+   "family": "mlp",
+   "note": "The tanh stack with the Geant4 atomic response added; exported to TRECH as the atomic rung (inputs read from a live Geant4 probe) and the Geant4-fed cascade source.",
+   "spec": {
+    "name": "atomic_mlp_tanh_geant4",
+    "task": "atomic",
+    "family": "mlp",
+    "inputs": "atomic_geant4",
+    "cascadeSource": "geant4",
+    "export": "spectrum_atomic",
+    "layers": [
+     {
+      "units": 32,
+      "activation": "tanh"
+     },
+     {
+      "units": 32,
+      "activation": "tanh"
+     }
+    ],
+    "epochs": 1500,
+    "lr": 0.003,
+    "l2": 0.002,
+    "note": "The tanh stack with the Geant4 atomic response added; exported to TRECH as the atomic rung (inputs read from a live Geant4 probe) and the Geant4-fed cascade source."
+   },
+   "cv": {
+    "folds": 5,
+    "rmse": {
+     "mean": 0.30226737,
+     "std": 0.019467658
+    },
+    "mae": {
+     "mean": 0.23104902,
+     "std": 0.01962748
+    },
+    "r2": {
+     "mean": 0.095073517,
+     "std": 0.13156016
+    },
+    "cosine": {
+     "mean": 0.68876996,
+     "std": 0.041207898
+    },
+    "peak_error_nm": {
+     "mean": 114.04444,
+     "std": 21.973003
+    }
+   },
+   "test": {
+    "n": 6,
+    "rmse": 0.33783492,
+    "mae": 0.24754933,
+    "r2": -0.19789336,
+    "cosine": 0.55526935,
+    "peak_error_nm": 183.33333
+   },
+   "exported": "spectrum_atomic",
+   "repeated_cv": {
+    "repeats": 5,
+    "folds": 5,
+    "per_fold": {
+     "folds": 25,
+     "rmse": {
+      "mean": 0.31047988,
+      "std": 0.01767288
+     },
+     "mae": {
+      "mean": 0.23676322,
+      "std": 0.01354058
+     },
+     "r2": {
+      "mean": 0.0068007559,
+      "std": 0.15834904
+     },
+     "cosine": {
+      "mean": 0.683402,
+      "std": 0.061812277
+     },
+     "peak_error_nm": {
+      "mean": 100.88889,
+      "std": 32.995024
+     }
+    },
+    "pooled": {
+     "folds": 5,
+     "rmse": {
+      "mean": 0.31084761,
+      "std": 0.0031819706
+     },
+     "mae": {
+      "mean": 0.23675913,
+      "std": 0.0034351517
+     },
+     "r2": {
+      "mean": 0.10352509,
+      "std": 0.018376683
+     },
+     "cosine": {
+      "mean": 0.68337227,
+      "std": 0.0049252127
+     },
+     "peak_error_nm": {
+      "mean": 100.76596,
+      "std": 12.58136
+     }
+    }
+   },
+   "group_cv": {
+    "summary": {
+     "folds": 8,
+     "rmse": {
+      "mean": 0.35781128,
+      "std": 0.057671354
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.57071794,
+      "std": 0.12410466
+     },
+     "peak_error_nm": {
+      "mean": 208.63542,
+      "std": 131.50557
+     }
+    },
+    "per_group": [
+     {
+      "group": "Alkali metal",
+      "n": 4,
+      "rmse": 0.40011798,
+      "cosine": 0.4156689,
+      "peak_error_nm": 310
+     },
+     {
+      "group": "Alkaline earth metal",
+      "n": 5,
+      "rmse": 0.35816746,
+      "cosine": 0.66919514,
+      "peak_error_nm": 224
+     },
+     {
+      "group": "Halogen",
+      "n": 4,
+      "rmse": 0.45008309,
+      "cosine": 0.40668325,
+      "peak_error_nm": 500
+     },
+     {
+      "group": "Metalloid",
+      "n": 6,
+      "rmse": 0.28044089,
+      "cosine": 0.55457765,
+      "peak_error_nm": 136.66667
+     },
+     {
+      "group": "Noble gas",
+      "n": 5,
+      "rmse": 0.34666696,
+      "cosine": 0.74446336,
+      "peak_error_nm": 128
+     },
+     {
+      "group": "Nonmetal",
+      "n": 4,
+      "rmse": 0.36058592,
+      "cosine": 0.66649058,
+      "peak_error_nm": 180
+     },
+     {
+      "group": "Post-transition metal",
+      "n": 3,
+      "rmse": 0.26622261,
+      "cosine": 0.66019318,
+      "peak_error_nm": 46.666667
+     },
+     {
+      "group": "Transition metal",
+      "n": 16,
+      "rmse": 0.4002053,
+      "cosine": 0.44847149,
+      "peak_error_nm": 143.75
+     }
+    ],
+    "pooled": {
+     "n": 47,
+     "rmse": 0.37074421,
+     "mae": 0.29865475,
+     "r2": -0.27510609,
+     "cosine": 0.5427075,
+     "peak_error_nm": 191.06383
+    }
+   },
+   "interval": {
+    "nominal_coverage": 0.9,
+    "n_calibration": 47,
+    "capped": false,
+    "mean_width": 1.1017287,
+    "test": {
+     "n": 6,
+     "cells": 0.875,
+     "min_bin": 0.5,
+     "samples_all_bins": 0
+    },
+    "out_of_group": {
+     "source": "leave-one-chemical-group-out CV on the training split",
+     "n": 47,
+     "cells": 0.8643617,
+     "min_bin": 0.65957447,
+     "samples_all_bins": 0.085106383
+    },
+    "out_of_group_width_ratio": 1.1677424
+   }
+  },
+  {
+   "name": "atomic_mlp_silu_wide_geant4",
+   "task": "atomic",
+   "family": "mlp",
+   "note": "The wide SiLU layer with the Geant4 atomic response added.",
+   "spec": {
+    "name": "atomic_mlp_silu_wide_geant4",
+    "task": "atomic",
+    "family": "mlp",
+    "inputs": "atomic_geant4",
+    "layers": [
+     {
+      "units": 64,
+      "activation": "silu"
+     }
+    ],
+    "epochs": 1500,
+    "lr": 0.002,
+    "l2": 0.005,
+    "note": "The wide SiLU layer with the Geant4 atomic response added."
+   },
+   "cv": {
+    "folds": 5,
+    "rmse": {
+     "mean": 0.30743071,
+     "std": 0.028206816
+    },
+    "mae": {
+     "mean": 0.23202481,
+     "std": 0.025492899
+    },
+    "r2": {
+     "mean": 0.055373846,
+     "std": 0.21325559
+    },
+    "cosine": {
+     "mean": 0.68993531,
+     "std": 0.039568023
+    },
+    "peak_error_nm": {
+     "mean": 94,
+     "std": 25.37229
+    }
+   },
+   "test": {
+    "n": 6,
+    "rmse": 0.33881268,
+    "mae": 0.25397736,
+    "r2": -0.20483725,
+    "cosine": 0.5747037,
+    "peak_error_nm": 220
+   },
+   "exported": null,
+   "repeated_cv": {
+    "repeats": 5,
+    "folds": 5,
+    "per_fold": {
+     "folds": 25,
+     "rmse": {
+      "mean": 0.30817998,
+      "std": 0.022111197
+     },
+     "mae": {
+      "mean": 0.23408248,
+      "std": 0.017512586
+     },
+     "r2": {
+      "mean": 0.021161844,
+      "std": 0.17203605
+     },
+     "cosine": {
+      "mean": 0.6890605,
+      "std": 0.061330305
+     },
+     "peak_error_nm": {
+      "mean": 91.644444,
+      "std": 33.5793
+     }
+    },
+    "pooled": {
+     "folds": 5,
+     "rmse": {
+      "mean": 0.30880779,
+      "std": 0.0038978838
+     },
+     "mae": {
+      "mean": 0.23406501,
+      "std": 0.002414961
+     },
+     "r2": {
+      "mean": 0.11520379,
+      "std": 0.022494704
+     },
+     "cosine": {
+      "mean": 0.68902715,
+      "std": 0.0077547604
+     },
+     "peak_error_nm": {
+      "mean": 91.319149,
+      "std": 12.457551
+     }
+    }
+   },
+   "group_cv": {
+    "summary": {
+     "folds": 8,
+     "rmse": {
+      "mean": 0.37761545,
+      "std": 0.083146684
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.54598426,
+      "std": 0.15502188
+     },
+     "peak_error_nm": {
+      "mean": 221.66667,
+      "std": 133.20452
+     }
+    },
+    "per_group": [
+     {
+      "group": "Alkali metal",
+      "n": 4,
+      "rmse": 0.46617768,
+      "cosine": 0.36121883,
+      "peak_error_nm": 290
+     },
+     {
+      "group": "Alkaline earth metal",
+      "n": 5,
+      "rmse": 0.33957189,
+      "cosine": 0.6727713,
+      "peak_error_nm": 164
+     },
+     {
+      "group": "Halogen",
+      "n": 4,
+      "rmse": 0.51328197,
+      "cosine": 0.35841745,
+      "peak_error_nm": 500
+     },
+     {
+      "group": "Metalloid",
+      "n": 6,
+      "rmse": 0.27332968,
+      "cosine": 0.57399005,
+      "peak_error_nm": 143.33333
+     },
+     {
+      "group": "Noble gas",
+      "n": 5,
+      "rmse": 0.3580019,
+      "cosine": 0.74404279,
+      "peak_error_nm": 236
+     },
+     {
+      "group": "Nonmetal",
+      "n": 4,
+      "rmse": 0.35310088,
+      "cosine": 0.67359719,
+      "peak_error_nm": 290
+     },
+     {
+      "group": "Post-transition metal",
+      "n": 3,
+      "rmse": 0.27202204,
+      "cosine": 0.64144567,
+      "peak_error_nm": 40
+     },
+     {
+      "group": "Transition metal",
+      "n": 16,
+      "rmse": 0.44543754,
+      "cosine": 0.34239078,
+      "peak_error_nm": 110
+     }
+    ],
+    "pooled": {
+     "n": 47,
+     "rmse": 0.39904379,
+     "mae": 0.31979122,
+     "r2": -0.47719786,
+     "cosine": 0.50007519,
+     "peak_error_nm": 192.76596
+    }
+   }
+  },
+  {
+   "name": "atomic_mlp_tanh_geant4_only",
+   "task": "atomic",
+   "family": "mlp",
+   "note": "The tanh stack on Z and the Geant4 atomic response only: no PubChem facts.",
+   "spec": {
+    "name": "atomic_mlp_tanh_geant4_only",
+    "task": "atomic",
+    "family": "mlp",
+    "inputs": "geant4",
+    "layers": [
+     {
+      "units": 32,
+      "activation": "tanh"
+     },
+     {
+      "units": 32,
+      "activation": "tanh"
+     }
+    ],
+    "epochs": 1500,
+    "lr": 0.003,
+    "l2": 0.002,
+    "note": "The tanh stack on Z and the Geant4 atomic response only: no PubChem facts."
+   },
+   "cv": {
+    "folds": 5,
+    "rmse": {
+     "mean": 0.31138701,
+     "std": 0.04224884
+    },
+    "mae": {
+     "mean": 0.23353411,
+     "std": 0.03564836
+    },
+    "r2": {
+     "mean": 0.024266662,
+     "std": 0.27821293
+    },
+    "cosine": {
+     "mean": 0.69289834,
+     "std": 0.066268927
+    },
+    "peak_error_nm": {
+     "mean": 83.155556,
+     "std": 20.897587
+    }
+   },
+   "test": {
+    "n": 6,
+    "rmse": 0.34948519,
+    "mae": 0.26050064,
+    "r2": -0.28193684,
+    "cosine": 0.60560635,
+    "peak_error_nm": 200
+   },
+   "exported": null,
+   "repeated_cv": {
+    "repeats": 5,
+    "folds": 5,
+    "per_fold": {
+     "folds": 25,
+     "rmse": {
+      "mean": 0.31827347,
+      "std": 0.025344448
+     },
+     "mae": {
+      "mean": 0.23908821,
+      "std": 0.023412777
+     },
+     "r2": {
+      "mean": -0.042156775,
+      "std": 0.16212966
+     },
+     "cosine": {
+      "mean": 0.68947432,
+      "std": 0.052680751
+     },
+     "peak_error_nm": {
+      "mean": 101.95556,
+      "std": 41.413208
+     }
+    },
+    "pooled": {
+     "folds": 5,
+     "rmse": {
+      "mean": 0.31886912,
+      "std": 0.0052303475
+     },
+     "mae": {
+      "mean": 0.23880234,
+      "std": 0.0037644933
+     },
+     "r2": {
+      "mean": 0.056505609,
+      "std": 0.031007895
+     },
+     "cosine": {
+      "mean": 0.68936286,
+      "std": 0.0099351134
+     },
+     "peak_error_nm": {
+      "mean": 102.38298,
+      "std": 23.147685
+     }
+    }
+   },
+   "group_cv": {
+    "summary": {
+     "folds": 8,
+     "rmse": {
+      "mean": 0.34506977,
+      "std": 0.057843962
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.63077035,
+      "std": 0.13636082
+     },
+     "peak_error_nm": {
+      "mean": 116.09375,
+      "std": 99.489316
+     }
+    },
+    "per_group": [
+     {
+      "group": "Alkali metal",
+      "n": 4,
+      "rmse": 0.43856886,
+      "cosine": 0.4211197,
+      "peak_error_nm": 280
+     },
+     {
+      "group": "Alkaline earth metal",
+      "n": 5,
+      "rmse": 0.3384507,
+      "cosine": 0.69207947,
+      "peak_error_nm": 88
+     },
+     {
+      "group": "Halogen",
+      "n": 4,
+      "rmse": 0.32348294,
+      "cosine": 0.7806292,
+      "peak_error_nm": 60
+     },
+     {
+      "group": "Metalloid",
+      "n": 6,
+      "rmse": 0.28732473,
+      "cosine": 0.54308033,
+      "peak_error_nm": 30
+     },
+     {
+      "group": "Noble gas",
+      "n": 5,
+      "rmse": 0.31371357,
+      "cosine": 0.79402866,
+      "peak_error_nm": 32
+     },
+     {
+      "group": "Nonmetal",
+      "n": 4,
+      "rmse": 0.32542288,
+      "cosine": 0.74688134,
+      "peak_error_nm": 115
+     },
+     {
+      "group": "Post-transition metal",
+      "n": 3,
+      "rmse": 0.28976594,
+      "cosine": 0.61194501,
+      "peak_error_nm": 40
+     },
+     {
+      "group": "Transition metal",
+      "n": 16,
+      "rmse": 0.44382854,
+      "cosine": 0.4563991,
+      "peak_error_nm": 283.75
+     }
+    ],
+    "pooled": {
+     "n": 47,
+     "rmse": 0.37403286,
+     "mae": 0.30232846,
+     "r2": -0.29782783,
+     "cosine": 0.58769711,
+     "peak_error_nm": 154.46809
     }
    }
   },
@@ -2023,13 +2969,12 @@
    "name": "molecular_mlp_cascade",
    "task": "molecular",
    "family": "mlp",
-   "note": "Same network plus pooled atomic-model predictions: the atomic -> molecular cascade rung exported to TRECH.",
+   "note": "Same network plus pooled PubChem-fed atomic-model predictions (the cascade rung exported to TRECH until 2026-11-27).",
    "spec": {
     "name": "molecular_mlp_cascade",
     "task": "molecular",
     "family": "mlp",
     "inputs": "descriptors_cascade",
-    "export": "spectrum_molecular",
     "layers": [
      {
       "units": 32,
@@ -2039,7 +2984,7 @@
     "epochs": 1200,
     "lr": 0.003,
     "l2": 0.003,
-    "note": "Same network plus pooled atomic-model predictions: the atomic -> molecular cascade rung exported to TRECH."
+    "note": "Same network plus pooled PubChem-fed atomic-model predictions (the cascade rung exported to TRECH until 2026-11-27)."
    },
    "cv": {
     "folds": 5,
@@ -2177,26 +3122,339 @@
     "cosine": 0.74906184,
     "peak_error_nm": 39.69697
    },
+   "exported": null
+  },
+  {
+   "name": "molecular_ridge_cascade_geant4",
+   "task": "molecular",
+   "family": "ridge",
+   "note": "Ridge cascade pooling the Geant4-fed atomic model instead of the PubChem-only one.",
+   "spec": {
+    "name": "molecular_ridge_cascade_geant4",
+    "task": "molecular",
+    "family": "ridge",
+    "inputs": "descriptors_cascade",
+    "cascade": "geant4",
+    "lambda": 3,
+    "note": "Ridge cascade pooling the Geant4-fed atomic model instead of the PubChem-only one."
+   },
+   "cv": {
+    "folds": 5,
+    "rmse": {
+     "mean": 0.24256801,
+     "std": 0.017193495
+    },
+    "mae": {
+     "mean": 0.17362107,
+     "std": 0.0092049418
+    },
+    "r2": {
+     "mean": 0.050503871,
+     "std": 0.15224343
+    },
+    "cosine": {
+     "mean": 0.77014474,
+     "std": 0.019821467
+    },
+    "peak_error_nm": {
+     "mean": 33.232184,
+     "std": 4.6441015
+    }
+   },
+   "family_cv": {
+    "summary": {
+     "folds": 12,
+     "rmse": {
+      "mean": 0.28319359,
+      "std": 0.07776281
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.71781659,
+      "std": 0.14839407
+     },
+     "peak_error_nm": {
+      "mean": 40.714322,
+      "std": 22.314443
+     }
+    },
+    "per_family": [
+     {
+      "family": "aromatic_hydrocarbon",
+      "n": 11,
+      "rmse": 0.21478076,
+      "cosine": 0.78876221,
+      "peak_error_nm": 22.727273
+     },
+     {
+      "family": "carbonyl",
+      "n": 16,
+      "rmse": 0.23125715,
+      "cosine": 0.67871288,
+      "peak_error_nm": 32.5
+     },
+     {
+      "family": "heteroaromatic",
+      "n": 15,
+      "rmse": 0.20544231,
+      "cosine": 0.83726693,
+      "peak_error_nm": 21.333333
+     },
+     {
+      "family": "nitro",
+      "n": 16,
+      "rmse": 0.39782739,
+      "cosine": 0.60436374,
+      "peak_error_nm": 30
+     },
+     {
+      "family": "pesticide",
+      "n": 4,
+      "rmse": 0.24686896,
+      "cosine": 0.70285026,
+      "peak_error_nm": 45
+     },
+     {
+      "family": "pharmaceutical",
+      "n": 18,
+      "rmse": 0.31483716,
+      "cosine": 0.74607276,
+      "peak_error_nm": 38.888889
+     },
+     {
+      "family": "phenol_aniline",
+      "n": 23,
+      "rmse": 0.18615591,
+      "cosine": 0.87306574,
+      "peak_error_nm": 30.434783
+     },
+     {
+      "family": "polycyclic_aromatic",
+      "n": 9,
+      "rmse": 0.24354797,
+      "cosine": 0.90202905,
+      "peak_error_nm": 42.222222
+     },
+     {
+      "family": "polyene_dye",
+      "n": 7,
+      "rmse": 0.4339077,
+      "cosine": 0.64014007,
+      "peak_error_nm": 108.57143
+     },
+     {
+      "family": "quinone",
+      "n": 5,
+      "rmse": 0.34372379,
+      "cosine": 0.77139625,
+      "peak_error_nm": 30
+     },
+     {
+      "family": "saturated_reference",
+      "n": 12,
+      "rmse": 0.34575858,
+      "cosine": 0.31613769,
+      "peak_error_nm": 54.166667
+     },
+     {
+      "family": "substituted_benzene",
+      "n": 11,
+      "rmse": 0.23421535,
+      "cosine": 0.75300156,
+      "peak_error_nm": 32.727273
+     }
+    ]
+   },
+   "test": {
+    "n": 33,
+    "rmse": 0.24306926,
+    "mae": 0.17586232,
+    "r2": 0.26423106,
+    "cosine": 0.74451886,
+    "peak_error_nm": 45.757576
+   },
+   "exported": null
+  },
+  {
+   "name": "molecular_mlp_cascade_geant4",
+   "task": "molecular",
+   "family": "mlp",
+   "note": "MLP cascade pooling the Geant4-fed atomic model: the atomic -> molecular cascade rung exported to TRECH.",
+   "spec": {
+    "name": "molecular_mlp_cascade_geant4",
+    "task": "molecular",
+    "family": "mlp",
+    "inputs": "descriptors_cascade",
+    "cascade": "geant4",
+    "export": "spectrum_molecular",
+    "layers": [
+     {
+      "units": 32,
+      "activation": "tanh"
+     }
+    ],
+    "epochs": 1200,
+    "lr": 0.003,
+    "l2": 0.003,
+    "note": "MLP cascade pooling the Geant4-fed atomic model: the atomic -> molecular cascade rung exported to TRECH."
+   },
+   "cv": {
+    "folds": 5,
+    "rmse": {
+     "mean": 0.23045429,
+     "std": 0.01914721
+    },
+    "mae": {
+     "mean": 0.15505974,
+     "std": 0.013859396
+    },
+    "r2": {
+     "mean": 0.14169707,
+     "std": 0.15665584
+    },
+    "cosine": {
+     "mean": 0.78361875,
+     "std": 0.019048747
+    },
+    "peak_error_nm": {
+     "mean": 31.871264,
+     "std": 3.8828832
+    }
+   },
+   "family_cv": {
+    "summary": {
+     "folds": 12,
+     "rmse": {
+      "mean": 0.25204957,
+      "std": 0.060750141
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.7535,
+      "std": 0.12963347
+     },
+     "peak_error_nm": {
+      "mean": 41.280426,
+      "std": 19.962657
+     }
+    },
+    "per_family": [
+     {
+      "family": "aromatic_hydrocarbon",
+      "n": 11,
+      "rmse": 0.21091248,
+      "cosine": 0.80256527,
+      "peak_error_nm": 18.181818
+     },
+     {
+      "family": "carbonyl",
+      "n": 16,
+      "rmse": 0.2340744,
+      "cosine": 0.66062035,
+      "peak_error_nm": 36.25
+     },
+     {
+      "family": "heteroaromatic",
+      "n": 15,
+      "rmse": 0.19125436,
+      "cosine": 0.84784264,
+      "peak_error_nm": 28
+     },
+     {
+      "family": "nitro",
+      "n": 16,
+      "rmse": 0.24715666,
+      "cosine": 0.79514285,
+      "peak_error_nm": 31.25
+     },
+     {
+      "family": "pesticide",
+      "n": 4,
+      "rmse": 0.2389359,
+      "cosine": 0.76076261,
+      "peak_error_nm": 47.5
+     },
+     {
+      "family": "pharmaceutical",
+      "n": 18,
+      "rmse": 0.27638804,
+      "cosine": 0.78890826,
+      "peak_error_nm": 33.888889
+     },
+     {
+      "family": "phenol_aniline",
+      "n": 23,
+      "rmse": 0.19179242,
+      "cosine": 0.86697407,
+      "peak_error_nm": 32.173913
+     },
+     {
+      "family": "polycyclic_aromatic",
+      "n": 9,
+      "rmse": 0.24320413,
+      "cosine": 0.91909014,
+      "peak_error_nm": 42.222222
+     },
+     {
+      "family": "polyene_dye",
+      "n": 7,
+      "rmse": 0.39520038,
+      "cosine": 0.73060376,
+      "peak_error_nm": 101.42857
+     },
+     {
+      "family": "quinone",
+      "n": 5,
+      "rmse": 0.35846658,
+      "cosine": 0.76687826,
+      "peak_error_nm": 40
+     },
+     {
+      "family": "saturated_reference",
+      "n": 12,
+      "rmse": 0.2151227,
+      "cosine": 0.38409605,
+      "peak_error_nm": 50.833333
+     },
+     {
+      "family": "substituted_benzene",
+      "n": 11,
+      "rmse": 0.22208678,
+      "cosine": 0.71851577,
+      "peak_error_nm": 33.636364
+     }
+    ]
+   },
+   "test": {
+    "n": 33,
+    "rmse": 0.22537088,
+    "mae": 0.15369417,
+    "r2": 0.36747609,
+    "cosine": 0.75186915,
+    "peak_error_nm": 41.818182
+   },
    "exported": "spectrum_molecular",
    "interval": {
     "nominal_coverage": 0.9,
     "n_calibration": 147,
     "capped": false,
-    "mean_width": 0.73668685,
+    "mean_width": 0.73377598,
     "test": {
      "n": 33,
-     "cells": 0.90246212,
-     "min_bin": 0.81818182,
-     "samples_all_bins": 0.54545455
+     "cells": 0.90625,
+     "min_bin": 0.84848485,
+     "samples_all_bins": 0.51515152
     },
     "out_of_group": {
      "source": "leave-one-family-out CV on the training split",
      "n": 147,
-     "cells": 0.89158163,
-     "min_bin": 0.79591837,
-     "samples_all_bins": 0.42857143
+     "cells": 0.89051871,
+     "min_bin": 0.82993197,
+     "samples_all_bins": 0.40816327
     },
-    "out_of_group_width_ratio": 1.0763415
+    "out_of_group_width_ratio": 1.0510084
    }
   },
   {
@@ -2694,10 +3952,179 @@
     "peak_error_nm": 42.424242
    },
    "exported": null
+  },
+  {
+   "name": "molecular_mpnn_cascade_geant4",
+   "task": "molecular",
+   "family": "mpnn",
+   "note": "Message passing whose node summaries come from the Geant4-fed atomic model.",
+   "spec": {
+    "name": "molecular_mpnn_cascade_geant4",
+    "task": "molecular",
+    "family": "mpnn",
+    "inputs": "solvent",
+    "globalInputs": true,
+    "atomicNodeFeatures": true,
+    "cascadeNodeFeatures": true,
+    "cascade": "geant4",
+    "units": 16,
+    "steps": 3,
+    "readout": "sum+mean",
+    "activation": "tanh",
+    "head": [
+     {
+      "units": 32,
+      "activation": "tanh"
+     }
+    ],
+    "epochs": 500,
+    "lr": 0.003,
+    "l2": 0.001,
+    "note": "Message passing whose node summaries come from the Geant4-fed atomic model."
+   },
+   "cv": {
+    "folds": 5,
+    "rmse": {
+     "mean": 0.26815693,
+     "std": 0.02616144
+    },
+    "mae": {
+     "mean": 0.18482191,
+     "std": 0.016943425
+    },
+    "r2": {
+     "mean": -0.14283847,
+     "std": 0.10277881
+    },
+    "cosine": {
+     "mean": 0.72963751,
+     "std": 0.035353316
+    },
+    "peak_error_nm": {
+     "mean": 37.328736,
+     "std": 7.0161756
+    }
+   },
+   "family_cv": {
+    "summary": {
+     "folds": 12,
+     "rmse": {
+      "mean": 0.28620714,
+      "std": 0.069268921
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.70096524,
+      "std": 0.11924926
+     },
+     "peak_error_nm": {
+      "mean": 38.607734,
+      "std": 20.298791
+     }
+    },
+    "per_family": [
+     {
+      "family": "aromatic_hydrocarbon",
+      "n": 11,
+      "rmse": 0.2081157,
+      "cosine": 0.78588011,
+      "peak_error_nm": 20
+     },
+     {
+      "family": "carbonyl",
+      "n": 16,
+      "rmse": 0.28482713,
+      "cosine": 0.51212668,
+      "peak_error_nm": 28.75
+     },
+     {
+      "family": "heteroaromatic",
+      "n": 15,
+      "rmse": 0.28188327,
+      "cosine": 0.77574972,
+      "peak_error_nm": 26.666667
+     },
+     {
+      "family": "nitro",
+      "n": 16,
+      "rmse": 0.30396119,
+      "cosine": 0.68076083,
+      "peak_error_nm": 23.75
+     },
+     {
+      "family": "pesticide",
+      "n": 4,
+      "rmse": 0.27505916,
+      "cosine": 0.71989368,
+      "peak_error_nm": 35
+     },
+     {
+      "family": "pharmaceutical",
+      "n": 18,
+      "rmse": 0.34695877,
+      "cosine": 0.61441072,
+      "peak_error_nm": 43.333333
+     },
+     {
+      "family": "phenol_aniline",
+      "n": 23,
+      "rmse": 0.22991684,
+      "cosine": 0.79596014,
+      "peak_error_nm": 21.304348
+     },
+     {
+      "family": "polycyclic_aromatic",
+      "n": 9,
+      "rmse": 0.24985322,
+      "cosine": 0.88964014,
+      "peak_error_nm": 42.222222
+     },
+     {
+      "family": "polyene_dye",
+      "n": 7,
+      "rmse": 0.46332338,
+      "cosine": 0.59902317,
+      "peak_error_nm": 92.857143
+     },
+     {
+      "family": "quinone",
+      "n": 5,
+      "rmse": 0.34333463,
+      "cosine": 0.78516414,
+      "peak_error_nm": 66
+     },
+     {
+      "family": "saturated_reference",
+      "n": 12,
+      "rmse": 0.23727205,
+      "cosine": 0.48378917,
+      "peak_error_nm": 32.5
+     },
+     {
+      "family": "substituted_benzene",
+      "n": 11,
+      "rmse": 0.20998034,
+      "cosine": 0.76918435,
+      "peak_error_nm": 30.909091
+     }
+    ]
+   },
+   "test": {
+    "n": 33,
+    "rmse": 0.27413209,
+    "mae": 0.18949181,
+    "r2": 0.064161094,
+    "cosine": 0.68875477,
+    "peak_error_nm": 45.757576
+   },
+   "exported": null
   }
  ],
  "ablation": [
   {
+   "kind": "cascade",
+   "task": "molecular",
    "without": "molecular_ridge",
    "with": "molecular_ridge_cascade",
    "cv_rmse_delta": 0.0024150084,
@@ -2705,6 +4132,8 @@
    "family_cv_rmse_delta": 0.023675435
   },
   {
+   "kind": "cascade",
+   "task": "molecular",
    "without": "molecular_mlp",
    "with": "molecular_mlp_cascade",
    "cv_rmse_delta": -0.0011762559,
@@ -2712,11 +4141,103 @@
    "family_cv_rmse_delta": 0.0010344029
   },
   {
+   "kind": "cascade",
+   "task": "molecular",
    "without": "molecular_mpnn",
    "with": "molecular_mpnn_cascade",
    "cv_rmse_delta": 0.0025830186,
    "test_rmse_delta": -0.0064656208,
    "family_cv_rmse_delta": -0.0045934511
+  },
+  {
+   "kind": "geant4_atomic",
+   "task": "atomic",
+   "without": "atomic_knn3",
+   "with": "atomic_knn3_geant4",
+   "cv_rmse_delta": -0.0029692325,
+   "test_rmse_delta": -0.012941733,
+   "group_cv_rmse_delta": -0.010522586
+  },
+  {
+   "kind": "geant4_atomic",
+   "task": "atomic",
+   "without": "atomic_ridge",
+   "with": "atomic_ridge_geant4",
+   "cv_rmse_delta": 0.034051562,
+   "test_rmse_delta": 0.051234656,
+   "group_cv_rmse_delta": 0.024131072
+  },
+  {
+   "kind": "geant4_atomic",
+   "task": "atomic",
+   "without": "atomic_mlp_tanh",
+   "with": "atomic_mlp_tanh_geant4",
+   "cv_rmse_delta": 0.0049712152,
+   "test_rmse_delta": 0.012587234,
+   "group_cv_rmse_delta": -0.013715649
+  },
+  {
+   "kind": "geant4_atomic",
+   "task": "atomic",
+   "without": "atomic_mlp_silu_wide",
+   "with": "atomic_mlp_silu_wide_geant4",
+   "cv_rmse_delta": 0.010930614,
+   "test_rmse_delta": 0.024146651,
+   "group_cv_rmse_delta": -0.0016002524
+  },
+  {
+   "kind": "cascade_geant4",
+   "task": "molecular",
+   "without": "molecular_ridge_cascade",
+   "with": "molecular_ridge_cascade_geant4",
+   "cv_rmse_delta": -0.0047389901,
+   "test_rmse_delta": -0.000713223,
+   "family_cv_rmse_delta": -0.020117359
+  },
+  {
+   "kind": "cascade_geant4",
+   "task": "molecular",
+   "without": "molecular_mlp_cascade",
+   "with": "molecular_mlp_cascade_geant4",
+   "cv_rmse_delta": -0.00090136666,
+   "test_rmse_delta": -0.0028975358,
+   "family_cv_rmse_delta": -0.0036827744
+  },
+  {
+   "kind": "cascade_geant4",
+   "task": "molecular",
+   "without": "molecular_mpnn_cascade",
+   "with": "molecular_mpnn_cascade_geant4",
+   "cv_rmse_delta": 0.0024019129,
+   "test_rmse_delta": 0.018024279,
+   "family_cv_rmse_delta": 0.002786836
+  },
+  {
+   "kind": "geant4_cascade",
+   "task": "molecular",
+   "without": "molecular_ridge",
+   "with": "molecular_ridge_cascade_geant4",
+   "cv_rmse_delta": -0.0023239817,
+   "test_rmse_delta": -0.0031687764,
+   "family_cv_rmse_delta": 0.0035580762
+  },
+  {
+   "kind": "geant4_cascade",
+   "task": "molecular",
+   "without": "molecular_mlp",
+   "with": "molecular_mlp_cascade_geant4",
+   "cv_rmse_delta": -0.0020776225,
+   "test_rmse_delta": 0.00076611758,
+   "family_cv_rmse_delta": -0.0026483715
+  },
+  {
+   "kind": "geant4_cascade",
+   "task": "molecular",
+   "without": "molecular_mpnn",
+   "with": "molecular_mpnn_cascade_geant4",
+   "cv_rmse_delta": 0.0049849316,
+   "test_rmse_delta": 0.011558658,
+   "family_cv_rmse_delta": -0.0018066151
   }
  ],
  "cascade": {
@@ -3172,14 +4693,953 @@
    }
   }
  },
+ "cascades": {
+  "pubchem": {
+   "source": "atomic_mlp_tanh",
+   "element_summaries": {
+    "H": {
+     "atomic_pool_strength": 0.3150048,
+     "atomic_pool_centroid_nm": 654.90319,
+     "atomic_pool_q1": 0.15562667,
+     "atomic_pool_q2": 0.34627939,
+     "atomic_pool_q3": 0.31136871,
+     "atomic_pool_q4": 0.42521628
+    },
+    "He": {
+     "atomic_pool_strength": 0.35542429,
+     "atomic_pool_centroid_nm": 571.90865,
+     "atomic_pool_q1": 0.39364662,
+     "atomic_pool_q2": 0.46125438,
+     "atomic_pool_q3": 0.23726425,
+     "atomic_pool_q4": 0.31982626
+    },
+    "Li": {
+     "atomic_pool_strength": 0.23530784,
+     "atomic_pool_centroid_nm": 537.87242,
+     "atomic_pool_q1": 0.30662506,
+     "atomic_pool_q2": 0.29367804,
+     "atomic_pool_q3": 0.1532609,
+     "atomic_pool_q4": 0.18756443
+    },
+    "Be": {
+     "atomic_pool_strength": 0.25770478,
+     "atomic_pool_centroid_nm": 504.09707,
+     "atomic_pool_q1": 0.52725587,
+     "atomic_pool_q2": 0.10735802,
+     "atomic_pool_q3": 0.18954127,
+     "atomic_pool_q4": 0.20526934
+    },
+    "B": {
+     "atomic_pool_strength": 0.17355065,
+     "atomic_pool_centroid_nm": 508.39446,
+     "atomic_pool_q1": 0.35568231,
+     "atomic_pool_q2": 0.023598356,
+     "atomic_pool_q3": 0.15716426,
+     "atomic_pool_q4": 0.14505136
+    },
+    "C": {
+     "atomic_pool_strength": 0.41057571,
+     "atomic_pool_centroid_nm": 651.24043,
+     "atomic_pool_q1": 0.23352189,
+     "atomic_pool_q2": 0.40817533,
+     "atomic_pool_q3": 0.52380943,
+     "atomic_pool_q4": 0.47679622
+    },
+    "N": {
+     "atomic_pool_strength": 0.45064366,
+     "atomic_pool_centroid_nm": 703.59289,
+     "atomic_pool_q1": 0.10364916,
+     "atomic_pool_q2": 0.45115307,
+     "atomic_pool_q3": 0.56218548,
+     "atomic_pool_q4": 0.68427834
+    },
+    "O": {
+     "atomic_pool_strength": 0.35303599,
+     "atomic_pool_centroid_nm": 665.25896,
+     "atomic_pool_q1": 0.19354947,
+     "atomic_pool_q2": 0.34969441,
+     "atomic_pool_q3": 0.37671728,
+     "atomic_pool_q4": 0.48608239
+    },
+    "F": {
+     "atomic_pool_strength": 0.36921006,
+     "atomic_pool_centroid_nm": 782.84041,
+     "atomic_pool_q1": 0.0024600928,
+     "atomic_pool_q2": 0.088163752,
+     "atomic_pool_q3": 0.61682701,
+     "atomic_pool_q4": 0.73130167
+    },
+    "Ne": {
+     "atomic_pool_strength": 0.48477775,
+     "atomic_pool_centroid_nm": 679.92811,
+     "atomic_pool_q1": 0.16100732,
+     "atomic_pool_q2": 0.48004941,
+     "atomic_pool_q3": 0.69703901,
+     "atomic_pool_q4": 0.60023863
+    },
+    "Na": {
+     "atomic_pool_strength": 0.22096963,
+     "atomic_pool_centroid_nm": 527.07841,
+     "atomic_pool_q1": 0.25118824,
+     "atomic_pool_q2": 0.39633069,
+     "atomic_pool_q3": 0.082135936,
+     "atomic_pool_q4": 0.13470063
+    },
+    "Mg": {
+     "atomic_pool_strength": 0.26484907,
+     "atomic_pool_centroid_nm": 478.96681,
+     "atomic_pool_q1": 0.50275918,
+     "atomic_pool_q2": 0.2867732,
+     "atomic_pool_q3": 0.10856577,
+     "atomic_pool_q4": 0.15906052
+    },
+    "Al": {
+     "atomic_pool_strength": 0.18032059,
+     "atomic_pool_centroid_nm": 462.74232,
+     "atomic_pool_q1": 0.40922711,
+     "atomic_pool_q2": 0.067691137,
+     "atomic_pool_q3": 0.13117283,
+     "atomic_pool_q4": 0.10048793
+    },
+    "Si": {
+     "atomic_pool_strength": 0.28009704,
+     "atomic_pool_centroid_nm": 551.46366,
+     "atomic_pool_q1": 0.38371623,
+     "atomic_pool_q2": 0.22996347,
+     "atomic_pool_q3": 0.2685883,
+     "atomic_pool_q4": 0.22717585
+    },
+    "P": {
+     "atomic_pool_strength": 0.22978489,
+     "atomic_pool_centroid_nm": 628.99823,
+     "atomic_pool_q1": 0.21651439,
+     "atomic_pool_q2": 0.14567348,
+     "atomic_pool_q3": 0.23347874,
+     "atomic_pool_q4": 0.30304028
+    },
+    "S": {
+     "atomic_pool_strength": 0.2918071,
+     "atomic_pool_centroid_nm": 655.88397,
+     "atomic_pool_q1": 0.1871928,
+     "atomic_pool_q2": 0.26440478,
+     "atomic_pool_q3": 0.30505662,
+     "atomic_pool_q4": 0.39929804
+    },
+    "Cl": {
+     "atomic_pool_strength": 0.34526981,
+     "atomic_pool_centroid_nm": 774.77433,
+     "atomic_pool_q1": -0.00019344629,
+     "atomic_pool_q2": 0.20735586,
+     "atomic_pool_q3": 0.38612239,
+     "atomic_pool_q4": 0.75772995
+    },
+    "Ar": {
+     "atomic_pool_strength": 0.46737631,
+     "atomic_pool_centroid_nm": 674.72689,
+     "atomic_pool_q1": 0.093131778,
+     "atomic_pool_q2": 0.55961794,
+     "atomic_pool_q3": 0.65517806,
+     "atomic_pool_q4": 0.5423392
+    },
+    "K": {
+     "atomic_pool_strength": 0.21187446,
+     "atomic_pool_centroid_nm": 532.61609,
+     "atomic_pool_q1": 0.18397429,
+     "atomic_pool_q2": 0.42834988,
+     "atomic_pool_q3": 0.15062588,
+     "atomic_pool_q4": 0.064909316
+    },
+    "Ca": {
+     "atomic_pool_strength": 0.33526318,
+     "atomic_pool_centroid_nm": 464.97508,
+     "atomic_pool_q1": 0.43854287,
+     "atomic_pool_q2": 0.68218906,
+     "atomic_pool_q3": 0.20188596,
+     "atomic_pool_q4": 0.0070387856
+    },
+    "Sc": {
+     "atomic_pool_strength": 0.37421037,
+     "atomic_pool_centroid_nm": 447.965,
+     "atomic_pool_q1": 0.57615092,
+     "atomic_pool_q2": 0.71372733,
+     "atomic_pool_q3": 0.18477026,
+     "atomic_pool_q4": -0.0036053721
+    },
+    "Ti": {
+     "atomic_pool_strength": 0.42986159,
+     "atomic_pool_centroid_nm": 463.04121,
+     "atomic_pool_q1": 0.67322406,
+     "atomic_pool_q2": 0.74128303,
+     "atomic_pool_q3": 0.21753465,
+     "atomic_pool_q4": 0.086649866
+    },
+    "V": {
+     "atomic_pool_strength": 0.44894517,
+     "atomic_pool_centroid_nm": 474.94658,
+     "atomic_pool_q1": 0.69285836,
+     "atomic_pool_q2": 0.74333848,
+     "atomic_pool_q3": 0.22217688,
+     "atomic_pool_q4": 0.13740697
+    },
+    "Cr": {
+     "atomic_pool_strength": 0.38798122,
+     "atomic_pool_centroid_nm": 437.51859,
+     "atomic_pool_q1": 0.71478685,
+     "atomic_pool_q2": 0.64822604,
+     "atomic_pool_q3": 0.14332182,
+     "atomic_pool_q4": 0.034945832
+    },
+    "Mn": {
+     "atomic_pool_strength": 0.3071977,
+     "atomic_pool_centroid_nm": 415.80548,
+     "atomic_pool_q1": 0.6393627,
+     "atomic_pool_q2": 0.48968107,
+     "atomic_pool_q3": 0.055110694,
+     "atomic_pool_q4": 0.017107294
+    },
+    "Fe": {
+     "atomic_pool_strength": 0.3317493,
+     "atomic_pool_centroid_nm": 440.67556,
+     "atomic_pool_q1": 0.65957156,
+     "atomic_pool_q2": 0.44838333,
+     "atomic_pool_q3": 0.14945904,
+     "atomic_pool_q4": 0.06958327
+    },
+    "Co": {
+     "atomic_pool_strength": 0.2357418,
+     "atomic_pool_centroid_nm": 421.57443,
+     "atomic_pool_q1": 0.52558032,
+     "atomic_pool_q2": 0.27188928,
+     "atomic_pool_q3": 0.11254741,
+     "atomic_pool_q4": 0.028321556
+    },
+    "Ni": {
+     "atomic_pool_strength": 0.25543255,
+     "atomic_pool_centroid_nm": 436.19046,
+     "atomic_pool_q1": 0.50473429,
+     "atomic_pool_q2": 0.34515621,
+     "atomic_pool_q3": 0.1321618,
+     "atomic_pool_q4": 0.035176435
+    },
+    "Cu": {
+     "atomic_pool_strength": 0.18909182,
+     "atomic_pool_centroid_nm": 515.97324,
+     "atomic_pool_q1": 0.32502787,
+     "atomic_pool_q2": 0.17009077,
+     "atomic_pool_q3": 0.096035172,
+     "atomic_pool_q4": 0.13271678
+    },
+    "Zn": {
+     "atomic_pool_strength": 0.20746631,
+     "atomic_pool_centroid_nm": 394.25746,
+     "atomic_pool_q1": 0.53207283,
+     "atomic_pool_q2": 0.21061446,
+     "atomic_pool_q3": 0.012558845,
+     "atomic_pool_q4": 0.033548059
+    },
+    "Ga": {
+     "atomic_pool_strength": 0.16216563,
+     "atomic_pool_centroid_nm": 328.10458,
+     "atomic_pool_q1": 0.5319671,
+     "atomic_pool_q2": 0.078632524,
+     "atomic_pool_q3": -0.011719548,
+     "atomic_pool_q4": -0.062006608
+    },
+    "Ge": {
+     "atomic_pool_strength": 0.15648798,
+     "atomic_pool_centroid_nm": 338.61463,
+     "atomic_pool_q1": 0.50036725,
+     "atomic_pool_q2": 0.073877534,
+     "atomic_pool_q3": 0.014167834,
+     "atomic_pool_q4": -0.0023986289
+    },
+    "As": {
+     "atomic_pool_strength": 0.099090693,
+     "atomic_pool_centroid_nm": 348.00908,
+     "atomic_pool_q1": 0.32176808,
+     "atomic_pool_q2": 0.008184797,
+     "atomic_pool_q3": -0.0082984822,
+     "atomic_pool_q4": 0.03880626
+    },
+    "Se": {
+     "atomic_pool_strength": 0.12155649,
+     "atomic_pool_centroid_nm": 564.21084,
+     "atomic_pool_q1": 0.19727885,
+     "atomic_pool_q2": 0.044832675,
+     "atomic_pool_q3": 0.043098614,
+     "atomic_pool_q4": 0.17201858
+    },
+    "Br": {
+     "atomic_pool_strength": 0.25769088,
+     "atomic_pool_centroid_nm": 784.40554,
+     "atomic_pool_q1": 0.02697409,
+     "atomic_pool_q2": 0.083282439,
+     "atomic_pool_q3": 0.28338346,
+     "atomic_pool_q4": 0.61958702
+    },
+    "Kr": {
+     "atomic_pool_strength": 0.40038423,
+     "atomic_pool_centroid_nm": 729.18371,
+     "atomic_pool_q1": 0.084235585,
+     "atomic_pool_q2": 0.23527641,
+     "atomic_pool_q3": 0.63651167,
+     "atomic_pool_q4": 0.6427793
+    },
+    "Rb": {
+     "atomic_pool_strength": 0.18111005,
+     "atomic_pool_centroid_nm": 559.7738,
+     "atomic_pool_q1": 0.12171376,
+     "atomic_pool_q2": 0.33316287,
+     "atomic_pool_q3": 0.20346983,
+     "atomic_pool_q4": 0.03999839
+    },
+    "Sr": {
+     "atomic_pool_strength": 0.33758255,
+     "atomic_pool_centroid_nm": 538.65197,
+     "atomic_pool_q1": 0.27393183,
+     "atomic_pool_q2": 0.57255842,
+     "atomic_pool_q3": 0.45532374,
+     "atomic_pool_q4": 0.044810819
+    },
+    "Y": {
+     "atomic_pool_strength": 0.35051122,
+     "atomic_pool_centroid_nm": 487.90191,
+     "atomic_pool_q1": 0.3893457,
+     "atomic_pool_q2": 0.72164058,
+     "atomic_pool_q3": 0.26518603,
+     "atomic_pool_q4": 0.0068561595
+    },
+    "Zr": {
+     "atomic_pool_strength": 0.36937376,
+     "atomic_pool_centroid_nm": 493.34195,
+     "atomic_pool_q1": 0.4299178,
+     "atomic_pool_q2": 0.69396629,
+     "atomic_pool_q3": 0.2529163,
+     "atomic_pool_q4": 0.072632543
+    },
+    "Nb": {
+     "atomic_pool_strength": 0.37451671,
+     "atomic_pool_centroid_nm": 449.33987,
+     "atomic_pool_q1": 0.58427664,
+     "atomic_pool_q2": 0.67661445,
+     "atomic_pool_q3": 0.11492753,
+     "atomic_pool_q4": 0.037775928
+    },
+    "Mo": {
+     "atomic_pool_strength": 0.34155356,
+     "atomic_pool_centroid_nm": 441.89279,
+     "atomic_pool_q1": 0.60226409,
+     "atomic_pool_q2": 0.60017809,
+     "atomic_pool_q3": 0.1488854,
+     "atomic_pool_q4": 0.0086291511
+    },
+    "Tc": {
+     "atomic_pool_strength": 0.18011208,
+     "atomic_pool_centroid_nm": 402.83844,
+     "atomic_pool_q1": 0.39593111,
+     "atomic_pool_q2": 0.29723124,
+     "atomic_pool_q3": 0.005708671,
+     "atomic_pool_q4": -0.016416209
+    },
+    "Ru": {
+     "atomic_pool_strength": 0.12686529,
+     "atomic_pool_centroid_nm": 404.12608,
+     "atomic_pool_q1": 0.32027805,
+     "atomic_pool_q2": 0.16058121,
+     "atomic_pool_q3": 0.0072983585,
+     "atomic_pool_q4": 0.0064183892
+    },
+    "Rh": {
+     "atomic_pool_strength": 0.1462961,
+     "atomic_pool_centroid_nm": 414.55637,
+     "atomic_pool_q1": 0.32577091,
+     "atomic_pool_q2": 0.22306166,
+     "atomic_pool_q3": 0.015592282,
+     "atomic_pool_q4": -0.0036710997
+    },
+    "Pd": {
+     "atomic_pool_strength": 0.10133177,
+     "atomic_pool_centroid_nm": 403.19968,
+     "atomic_pool_q1": 0.3033752,
+     "atomic_pool_q2": 0.024334012,
+     "atomic_pool_q3": 0.0229055,
+     "atomic_pool_q4": 0.017513669
+    },
+    "Ag": {
+     "atomic_pool_strength": 0.11246826,
+     "atomic_pool_centroid_nm": 408.32737,
+     "atomic_pool_q1": 0.24054762,
+     "atomic_pool_q2": 0.166502,
+     "atomic_pool_q3": 0.022389551,
+     "atomic_pool_q4": -0.017874762
+    },
+    "Cd": {
+     "atomic_pool_strength": 0.16774961,
+     "atomic_pool_centroid_nm": 432.16973,
+     "atomic_pool_q1": 0.35518576,
+     "atomic_pool_q2": 0.18756107,
+     "atomic_pool_q3": 0.094800615,
+     "atomic_pool_q4": 0.014939689
+    },
+    "In": {
+     "atomic_pool_strength": 0.16190178,
+     "atomic_pool_centroid_nm": 337.67885,
+     "atomic_pool_q1": 0.48910425,
+     "atomic_pool_q2": 0.12874318,
+     "atomic_pool_q3": -0.0019787521,
+     "atomic_pool_q4": -0.011765811
+    },
+    "Sn": {
+     "atomic_pool_strength": 0.16630794,
+     "atomic_pool_centroid_nm": 359.94354,
+     "atomic_pool_q1": 0.47731074,
+     "atomic_pool_q2": 0.1234308,
+     "atomic_pool_q3": 0.046126617,
+     "atomic_pool_q4": -0.0045981961
+    },
+    "Sb": {
+     "atomic_pool_strength": 0.091959412,
+     "atomic_pool_centroid_nm": 344.28116,
+     "atomic_pool_q1": 0.30392717,
+     "atomic_pool_q2": -0.011089132,
+     "atomic_pool_q3": 0.0096589281,
+     "atomic_pool_q4": 0.032417482
+    },
+    "Te": {
+     "atomic_pool_strength": 0.10090219,
+     "atomic_pool_centroid_nm": 420.92514,
+     "atomic_pool_q1": 0.26512763,
+     "atomic_pool_q2": 0.0093060395,
+     "atomic_pool_q3": 0.0473232,
+     "atomic_pool_q4": 0.059284991
+    },
+    "I": {
+     "atomic_pool_strength": 0.35659847,
+     "atomic_pool_centroid_nm": 779.52403,
+     "atomic_pool_q1": 0.012223287,
+     "atomic_pool_q2": 0.072316061,
+     "atomic_pool_q3": 0.53845881,
+     "atomic_pool_q4": 0.74996768
+    },
+    "Xe": {
+     "atomic_pool_strength": 0.37665955,
+     "atomic_pool_centroid_nm": 721.22065,
+     "atomic_pool_q1": 0.08619739,
+     "atomic_pool_q2": 0.27093048,
+     "atomic_pool_q3": 0.55256482,
+     "atomic_pool_q4": 0.59004001
+    },
+    "Cs": {
+     "atomic_pool_strength": 0.10613127,
+     "atomic_pool_centroid_nm": 611.19239,
+     "atomic_pool_q1": 0.1166949,
+     "atomic_pool_q2": 0.083953486,
+     "atomic_pool_q3": 0.066928825,
+     "atomic_pool_q4": 0.13326204
+    },
+    "Ba": {
+     "atomic_pool_strength": 0.40103061,
+     "atomic_pool_centroid_nm": 592.35568,
+     "atomic_pool_q1": 0.26448365,
+     "atomic_pool_q2": 0.55596177,
+     "atomic_pool_q3": 0.56914205,
+     "atomic_pool_q4": 0.21453498
+    }
+   }
+  },
+  "geant4": {
+   "source": "atomic_mlp_tanh_geant4",
+   "element_summaries": {
+    "H": {
+     "atomic_pool_strength": 0.25472559,
+     "atomic_pool_centroid_nm": 679.12714,
+     "atomic_pool_q1": 0.096325778,
+     "atomic_pool_q2": 0.17756971,
+     "atomic_pool_q3": 0.3264894,
+     "atomic_pool_q4": 0.36183021
+    },
+    "He": {
+     "atomic_pool_strength": 0.35683617,
+     "atomic_pool_centroid_nm": 569.72249,
+     "atomic_pool_q1": 0.40262824,
+     "atomic_pool_q2": 0.46185388,
+     "atomic_pool_q3": 0.24304178,
+     "atomic_pool_q4": 0.31779233
+    },
+    "Li": {
+     "atomic_pool_strength": 0.22994467,
+     "atomic_pool_centroid_nm": 539.48045,
+     "atomic_pool_q1": 0.29864878,
+     "atomic_pool_q2": 0.26564135,
+     "atomic_pool_q3": 0.17399121,
+     "atomic_pool_q4": 0.17674732
+    },
+    "Be": {
+     "atomic_pool_strength": 0.2609399,
+     "atomic_pool_centroid_nm": 492.99228,
+     "atomic_pool_q1": 0.53848448,
+     "atomic_pool_q2": 0.11395235,
+     "atomic_pool_q3": 0.21368151,
+     "atomic_pool_q4": 0.17754281
+    },
+    "B": {
+     "atomic_pool_strength": 0.15154659,
+     "atomic_pool_centroid_nm": 497.28243,
+     "atomic_pool_q1": 0.30377322,
+     "atomic_pool_q2": 0.040601538,
+     "atomic_pool_q3": 0.13870098,
+     "atomic_pool_q4": 0.1116982
+    },
+    "C": {
+     "atomic_pool_strength": 0.4231982,
+     "atomic_pool_centroid_nm": 655.75388,
+     "atomic_pool_q1": 0.19801176,
+     "atomic_pool_q2": 0.46669254,
+     "atomic_pool_q3": 0.53331625,
+     "atomic_pool_q4": 0.48832136
+    },
+    "N": {
+     "atomic_pool_strength": 0.45433967,
+     "atomic_pool_centroid_nm": 700.52092,
+     "atomic_pool_q1": 0.10617367,
+     "atomic_pool_q2": 0.46736826,
+     "atomic_pool_q3": 0.54919668,
+     "atomic_pool_q4": 0.68852665
+    },
+    "O": {
+     "atomic_pool_strength": 0.34639549,
+     "atomic_pool_centroid_nm": 654.39487,
+     "atomic_pool_q1": 0.22334643,
+     "atomic_pool_q2": 0.33657125,
+     "atomic_pool_q3": 0.3656871,
+     "atomic_pool_q4": 0.45990133
+    },
+    "F": {
+     "atomic_pool_strength": 0.37257308,
+     "atomic_pool_centroid_nm": 788.09664,
+     "atomic_pool_q1": 0.026297422,
+     "atomic_pool_q2": 0.04909256,
+     "atomic_pool_q3": 0.6478149,
+     "atomic_pool_q4": 0.74606181
+    },
+    "Ne": {
+     "atomic_pool_strength": 0.48306072,
+     "atomic_pool_centroid_nm": 680.13126,
+     "atomic_pool_q1": 0.17017696,
+     "atomic_pool_q2": 0.46764256,
+     "atomic_pool_q3": 0.67074351,
+     "atomic_pool_q4": 0.61738854
+    },
+    "Na": {
+     "atomic_pool_strength": 0.22748772,
+     "atomic_pool_centroid_nm": 517.32078,
+     "atomic_pool_q1": 0.28889472,
+     "atomic_pool_q2": 0.40867566,
+     "atomic_pool_q3": 0.058120337,
+     "atomic_pool_q4": 0.14219049
+    },
+    "Mg": {
+     "atomic_pool_strength": 0.24058942,
+     "atomic_pool_centroid_nm": 504.79413,
+     "atomic_pool_q1": 0.43192098,
+     "atomic_pool_q2": 0.24666056,
+     "atomic_pool_q3": 0.097859863,
+     "atomic_pool_q4": 0.18459963
+    },
+    "Al": {
+     "atomic_pool_strength": 0.19657619,
+     "atomic_pool_centroid_nm": 474.72947,
+     "atomic_pool_q1": 0.43782394,
+     "atomic_pool_q2": 0.049325803,
+     "atomic_pool_q3": 0.15174115,
+     "atomic_pool_q4": 0.12886049
+    },
+    "Si": {
+     "atomic_pool_strength": 0.27826934,
+     "atomic_pool_centroid_nm": 538.07087,
+     "atomic_pool_q1": 0.43805521,
+     "atomic_pool_q2": 0.19353105,
+     "atomic_pool_q3": 0.25557151,
+     "atomic_pool_q4": 0.22503153
+    },
+    "P": {
+     "atomic_pool_strength": 0.2322429,
+     "atomic_pool_centroid_nm": 633.76563,
+     "atomic_pool_q1": 0.20208452,
+     "atomic_pool_q2": 0.15985492,
+     "atomic_pool_q3": 0.24434627,
+     "atomic_pool_q4": 0.30168503
+    },
+    "S": {
+     "atomic_pool_strength": 0.27199101,
+     "atomic_pool_centroid_nm": 643.24019,
+     "atomic_pool_q1": 0.21674417,
+     "atomic_pool_q2": 0.24677935,
+     "atomic_pool_q3": 0.23754023,
+     "atomic_pool_q4": 0.3843439
+    },
+    "Cl": {
+     "atomic_pool_strength": 0.34601271,
+     "atomic_pool_centroid_nm": 773.28431,
+     "atomic_pool_q1": -0.010696578,
+     "atomic_pool_q2": 0.24651038,
+     "atomic_pool_q3": 0.35966186,
+     "atomic_pool_q4": 0.7611087
+    },
+    "Ar": {
+     "atomic_pool_strength": 0.46800182,
+     "atomic_pool_centroid_nm": 679.35742,
+     "atomic_pool_q1": 0.070460534,
+     "atomic_pool_q2": 0.57393547,
+     "atomic_pool_q3": 0.65899493,
+     "atomic_pool_q4": 0.54922874
+    },
+    "K": {
+     "atomic_pool_strength": 0.22369229,
+     "atomic_pool_centroid_nm": 549.24814,
+     "atomic_pool_q1": 0.13774317,
+     "atomic_pool_q2": 0.45976119,
+     "atomic_pool_q3": 0.17158011,
+     "atomic_pool_q4": 0.080283126
+    },
+    "Ca": {
+     "atomic_pool_strength": 0.34686935,
+     "atomic_pool_centroid_nm": 464.05439,
+     "atomic_pool_q1": 0.45131578,
+     "atomic_pool_q2": 0.71665268,
+     "atomic_pool_q3": 0.20803478,
+     "atomic_pool_q4": -0.01278219
+    },
+    "Sc": {
+     "atomic_pool_strength": 0.37361728,
+     "atomic_pool_centroid_nm": 442.10557,
+     "atomic_pool_q1": 0.593732,
+     "atomic_pool_q2": 0.71613918,
+     "atomic_pool_q3": 0.15782044,
+     "atomic_pool_q4": 0.0075310098
+    },
+    "Ti": {
+     "atomic_pool_strength": 0.42678215,
+     "atomic_pool_centroid_nm": 462.65502,
+     "atomic_pool_q1": 0.65424528,
+     "atomic_pool_q2": 0.76731771,
+     "atomic_pool_q3": 0.20151269,
+     "atomic_pool_q4": 0.083636101
+    },
+    "V": {
+     "atomic_pool_strength": 0.4594034,
+     "atomic_pool_centroid_nm": 479.87827,
+     "atomic_pool_q1": 0.70497301,
+     "atomic_pool_q2": 0.7392337,
+     "atomic_pool_q3": 0.24330295,
+     "atomic_pool_q4": 0.15010394
+    },
+    "Cr": {
+     "atomic_pool_strength": 0.38801138,
+     "atomic_pool_centroid_nm": 433.04023,
+     "atomic_pool_q1": 0.72508345,
+     "atomic_pool_q2": 0.65326997,
+     "atomic_pool_q3": 0.1358618,
+     "atomic_pool_q4": 0.019082887
+    },
+    "Mn": {
+     "atomic_pool_strength": 0.30856141,
+     "atomic_pool_centroid_nm": 415.25489,
+     "atomic_pool_q1": 0.6425027,
+     "atomic_pool_q2": 0.4811612,
+     "atomic_pool_q3": 0.057771968,
+     "atomic_pool_q4": 0.015702028
+    },
+    "Fe": {
+     "atomic_pool_strength": 0.32403259,
+     "atomic_pool_centroid_nm": 432.58104,
+     "atomic_pool_q1": 0.66760526,
+     "atomic_pool_q2": 0.42895784,
+     "atomic_pool_q3": 0.14688608,
+     "atomic_pool_q4": 0.049312084
+    },
+    "Co": {
+     "atomic_pool_strength": 0.2530643,
+     "atomic_pool_centroid_nm": 430.60324,
+     "atomic_pool_q1": 0.55235122,
+     "atomic_pool_q2": 0.28139845,
+     "atomic_pool_q3": 0.12877759,
+     "atomic_pool_q4": 0.048950214
+    },
+    "Ni": {
+     "atomic_pool_strength": 0.2456621,
+     "atomic_pool_centroid_nm": 430.25572,
+     "atomic_pool_q1": 0.50436793,
+     "atomic_pool_q2": 0.31894601,
+     "atomic_pool_q3": 0.1295149,
+     "atomic_pool_q4": 0.025808924
+    },
+    "Cu": {
+     "atomic_pool_strength": 0.17051085,
+     "atomic_pool_centroid_nm": 397.50253,
+     "atomic_pool_q1": 0.42200172,
+     "atomic_pool_q2": 0.19512873,
+     "atomic_pool_q3": 0.03015676,
+     "atomic_pool_q4": 0.0083655961
+    },
+    "Zn": {
+     "atomic_pool_strength": 0.22637227,
+     "atomic_pool_centroid_nm": 397.21575,
+     "atomic_pool_q1": 0.52484772,
+     "atomic_pool_q2": 0.29630579,
+     "atomic_pool_q3": 0.025446337,
+     "atomic_pool_q4": -0.056459938
+    },
+    "Ga": {
+     "atomic_pool_strength": 0.17794851,
+     "atomic_pool_centroid_nm": 343.01077,
+     "atomic_pool_q1": 0.54512383,
+     "atomic_pool_q2": 0.10922082,
+     "atomic_pool_q3": 0.013866557,
+     "atomic_pool_q4": -0.024899863
+    },
+    "Ge": {
+     "atomic_pool_strength": 0.15839285,
+     "atomic_pool_centroid_nm": 333.1141,
+     "atomic_pool_q1": 0.50955198,
+     "atomic_pool_q2": 0.074367919,
+     "atomic_pool_q3": 0.0029050471,
+     "atomic_pool_q4": -0.013914952
+    },
+    "As": {
+     "atomic_pool_strength": 0.096836262,
+     "atomic_pool_centroid_nm": 357.05941,
+     "atomic_pool_q1": 0.30302973,
+     "atomic_pool_q2": -0.00037157021,
+     "atomic_pool_q3": -0.000091848926,
+     "atomic_pool_q4": 0.03726811
+    },
+    "Se": {
+     "atomic_pool_strength": 0.14263753,
+     "atomic_pool_centroid_nm": 576.20691,
+     "atomic_pool_q1": 0.2148206,
+     "atomic_pool_q2": 0.066893353,
+     "atomic_pool_q3": 0.075103405,
+     "atomic_pool_q4": 0.19683122
+    },
+    "Br": {
+     "atomic_pool_strength": 0.25113201,
+     "atomic_pool_centroid_nm": 783.59377,
+     "atomic_pool_q1": 0.01141382,
+     "atomic_pool_q2": 0.075005972,
+     "atomic_pool_q3": 0.303335,
+     "atomic_pool_q4": 0.58839516
+    },
+    "Kr": {
+     "atomic_pool_strength": 0.38842831,
+     "atomic_pool_centroid_nm": 730.80698,
+     "atomic_pool_q1": 0.060241821,
+     "atomic_pool_q2": 0.23204495,
+     "atomic_pool_q3": 0.63967363,
+     "atomic_pool_q4": 0.61226098
+    },
+    "Rb": {
+     "atomic_pool_strength": 0.17718927,
+     "atomic_pool_centroid_nm": 574.19629,
+     "atomic_pool_q1": 0.065767166,
+     "atomic_pool_q2": 0.32690625,
+     "atomic_pool_q3": 0.25025863,
+     "atomic_pool_q4": 0.028315748
+    },
+    "Sr": {
+     "atomic_pool_strength": 0.32361191,
+     "atomic_pool_centroid_nm": 534.0138,
+     "atomic_pool_q1": 0.25204071,
+     "atomic_pool_q2": 0.56441754,
+     "atomic_pool_q3": 0.43956956,
+     "atomic_pool_q4": 0.034185409
+    },
+    "Y": {
+     "atomic_pool_strength": 0.34704055,
+     "atomic_pool_centroid_nm": 486.77418,
+     "atomic_pool_q1": 0.38413358,
+     "atomic_pool_q2": 0.71608789,
+     "atomic_pool_q3": 0.27454607,
+     "atomic_pool_q4": -0.0010599104
+    },
+    "Zr": {
+     "atomic_pool_strength": 0.35572712,
+     "atomic_pool_centroid_nm": 494.24812,
+     "atomic_pool_q1": 0.4166537,
+     "atomic_pool_q2": 0.70101197,
+     "atomic_pool_q3": 0.23801804,
+     "atomic_pool_q4": 0.066295608
+    },
+    "Nb": {
+     "atomic_pool_strength": 0.39389923,
+     "atomic_pool_centroid_nm": 471.98528,
+     "atomic_pool_q1": 0.58756047,
+     "atomic_pool_q2": 0.6774615,
+     "atomic_pool_q3": 0.1884803,
+     "atomic_pool_q4": 0.097057317
+    },
+    "Mo": {
+     "atomic_pool_strength": 0.32950488,
+     "atomic_pool_centroid_nm": 448.25651,
+     "atomic_pool_q1": 0.56476129,
+     "atomic_pool_q2": 0.57425194,
+     "atomic_pool_q3": 0.14092521,
+     "atomic_pool_q4": 0.031585387
+    },
+    "Tc": {
+     "atomic_pool_strength": 0.17962525,
+     "atomic_pool_centroid_nm": 414.65104,
+     "atomic_pool_q1": 0.37054007,
+     "atomic_pool_q2": 0.30554694,
+     "atomic_pool_q3": 0.026318556,
+     "atomic_pool_q4": -0.0072104424
+    },
+    "Ru": {
+     "atomic_pool_strength": 0.1231317,
+     "atomic_pool_centroid_nm": 411.51566,
+     "atomic_pool_q1": 0.29918706,
+     "atomic_pool_q2": 0.1638063,
+     "atomic_pool_q3": 0.00051903996,
+     "atomic_pool_q4": 0.010235174
+    },
+    "Rh": {
+     "atomic_pool_strength": 0.15331934,
+     "atomic_pool_centroid_nm": 421.627,
+     "atomic_pool_q1": 0.34471994,
+     "atomic_pool_q2": 0.22823441,
+     "atomic_pool_q3": 0.010959808,
+     "atomic_pool_q4": 0.01780409
+    },
+    "Pd": {
+     "atomic_pool_strength": 0.10865267,
+     "atomic_pool_centroid_nm": 383.39269,
+     "atomic_pool_q1": 0.34414048,
+     "atomic_pool_q2": 0.031520043,
+     "atomic_pool_q3": 0.0059807375,
+     "atomic_pool_q4": 0.0031229045
+    },
+    "Ag": {
+     "atomic_pool_strength": 0.11367929,
+     "atomic_pool_centroid_nm": 437.76872,
+     "atomic_pool_q1": 0.21164612,
+     "atomic_pool_q2": 0.17082026,
+     "atomic_pool_q3": 0.047353753,
+     "atomic_pool_q4": -0.0037902851
+    },
+    "Cd": {
+     "atomic_pool_strength": 0.17437076,
+     "atomic_pool_centroid_nm": 430.24704,
+     "atomic_pool_q1": 0.368559,
+     "atomic_pool_q2": 0.20309181,
+     "atomic_pool_q3": 0.10266663,
+     "atomic_pool_q4": 0.0046172082
+    },
+    "In": {
+     "atomic_pool_strength": 0.17250912,
+     "atomic_pool_centroid_nm": 346.67338,
+     "atomic_pool_q1": 0.50414927,
+     "atomic_pool_q2": 0.15936938,
+     "atomic_pool_q3": -0.015797549,
+     "atomic_pool_q4": -0.0046962225
+    },
+    "Sn": {
+     "atomic_pool_strength": 0.18140429,
+     "atomic_pool_centroid_nm": 351.51621,
+     "atomic_pool_q1": 0.54281407,
+     "atomic_pool_q2": 0.1283211,
+     "atomic_pool_q3": 0.035297435,
+     "atomic_pool_q4": 0.0020932429
+    },
+    "Sb": {
+     "atomic_pool_strength": 0.092567119,
+     "atomic_pool_centroid_nm": 326.54383,
+     "atomic_pool_q1": 0.31598443,
+     "atomic_pool_q2": -0.013225192,
+     "atomic_pool_q3": -0.0025413843,
+     "atomic_pool_q4": 0.025244065
+    },
+    "Te": {
+     "atomic_pool_strength": 0.093628393,
+     "atomic_pool_centroid_nm": 425.11168,
+     "atomic_pool_q1": 0.24259849,
+     "atomic_pool_q2": 0.0033537358,
+     "atomic_pool_q3": 0.033236816,
+     "atomic_pool_q4": 0.060675778
+    },
+    "I": {
+     "atomic_pool_strength": 0.35406026,
+     "atomic_pool_centroid_nm": 786.4401,
+     "atomic_pool_q1": 0.011748225,
+     "atomic_pool_q2": 0.046079583,
+     "atomic_pool_q3": 0.54088492,
+     "atomic_pool_q4": 0.7595647
+    },
+    "Xe": {
+     "atomic_pool_strength": 0.38521849,
+     "atomic_pool_centroid_nm": 717.91819,
+     "atomic_pool_q1": 0.096925273,
+     "atomic_pool_q2": 0.28464405,
+     "atomic_pool_q3": 0.55450546,
+     "atomic_pool_q4": 0.59988655
+    },
+    "Cs": {
+     "atomic_pool_strength": 0.1094008,
+     "atomic_pool_centroid_nm": 612.71356,
+     "atomic_pool_q1": 0.12577372,
+     "atomic_pool_q2": 0.08649026,
+     "atomic_pool_q3": 0.034329527,
+     "atomic_pool_q4": 0.15852644
+    },
+    "Ba": {
+     "atomic_pool_strength": 0.41463697,
+     "atomic_pool_centroid_nm": 595.76376,
+     "atomic_pool_q1": 0.2833916,
+     "atomic_pool_q2": 0.54987389,
+     "atomic_pool_q3": 0.59737356,
+     "atomic_pool_q4": 0.22790883
+    }
+   }
+  }
+ },
+ "geant4_atomic": {
+  "path": "projects/spectrum_prediction/catalog/geant4_atomic.json",
+  "sha256": "3cd701431fc66f0dc8bb2a1ace8dfd879852bf3c03c16481a7a957058e9fdc79",
+  "probe": {
+   "scenario": "projects/spectrum_prediction/geant4/atomic_probe.js",
+   "physics_list": "QBBC_LIV",
+   "particle": "gamma",
+   "process": "phot",
+   "energies_ev": [
+    10,
+    20,
+    30,
+    50,
+    100,
+    200,
+    500,
+    1000,
+    3000,
+    10000
+   ],
+   "cross_section_unit": "barn/atom",
+   "mean_excitation_unit": "eV"
+  },
+  "provenance": {
+   "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
+   "config_hash": "3ce6aa09a970c2a9",
+   "determinism_mode": "strict",
+   "seed": 20261127
+  }
+ },
+ "skipped": [],
  "exports": {
   "spectrum_atomic": {
-   "architecture": "atomic_mlp_tanh",
-   "holdout_r2_min": -7.9681997
+   "architecture": "atomic_mlp_tanh_geant4",
+   "holdout_r2_min": -9.1319525
   },
   "spectrum_molecular": {
-   "architecture": "molecular_mlp_cascade",
-   "holdout_r2_min": -0.4815925
+   "architecture": "molecular_mlp_cascade_geant4",
+   "holdout_r2_min": -0.4741779
   }
  },
  "test_predictions": {
@@ -3229,46 +5689,46 @@
      0
     ],
     "prediction": [
-     -0.020610587,
-     0.071669264,
-     0.26598582,
-     0.1000675,
-     0.25144129,
-     -0.19467099,
-     0.24547012,
-     0.18028725,
-     0.32338955,
-     0.33323754,
-     0.44404442,
-     0.36355036,
-     0.11721226,
-     0.59597688,
-     0.47595822,
-     0.34808076,
-     0.38891174,
-     0.2515396,
-     0.20662236,
-     0.27089735,
-     0.59652443,
-     0.095104536,
-     0.35022319,
-     0.56533412,
-     0.17062396,
-     0.43555187,
-     0.25955081,
-     0.23319986,
-     0.24315244,
-     0.16442183,
-     0.51729786,
-     0.55559087,
-     0.2162603,
-     0.22043457,
-     0.38241736,
-     0.49500721,
-     0.51121893,
-     0.49306516,
-     0.50667461,
-     0.35419597
+     0.25659965,
+     0.049678162,
+     0.35534505,
+     -0.055352523,
+     -0.23053593,
+     -0.26384071,
+     0.10335711,
+     0.21687724,
+     0.13797791,
+     0.39315182,
+     0.30859086,
+     0.2521915,
+     0.0088651547,
+     0.30446425,
+     0.30323279,
+     0.10871198,
+     0.13384462,
+     0.099975155,
+     -0.017143582,
+     0.2729644,
+     0.49299446,
+     0.043155641,
+     0.18668416,
+     0.68705786,
+     0.24577489,
+     0.46685044,
+     0.33518469,
+     0.3135157,
+     0.31647657,
+     0.17719959,
+     0.45941874,
+     0.27986101,
+     0.13547319,
+     0.10015365,
+     0.26010192,
+     0.47543034,
+     0.41278036,
+     0.49990896,
+     0.54700601,
+     0.44816797
     ]
    },
    {
@@ -3316,46 +5776,46 @@
      0.511413
     ],
     "prediction": [
-     0.50381827,
-     0.31578253,
-     0.43576922,
-     0.12414744,
-     0.25307529,
-     -0.040504268,
-     -0.012888073,
-     0.0082461714,
-     0.016270963,
-     0.26821042,
-     0.072714245,
-     0.34379803,
-     -0.05936933,
-     0.37646701,
-     0.39774231,
-     0.38240946,
-     0.41779427,
-     0.39393627,
-     0.13305315,
-     0.18550244,
-     0.39310937,
-     0.084426187,
-     0.29419955,
-     0.078611559,
-     0.081824751,
-     0.56045083,
-     0.38644009,
-     0.1588998,
-     0.67037888,
-     0.34222518,
-     0.29170857,
-     0.55938751,
-     0.4217957,
-     0.16011898,
-     0.54651114,
-     0.24265828,
-     0.50217303,
-     0.5408768,
-     0.30282985,
-     0.42492051
+     0.5228684,
+     0.34848936,
+     0.45621659,
+     0.24491376,
+     0.25347428,
+     0.12175871,
+     0.0087438536,
+     -0.022468322,
+     -0.0030954486,
+     0.23654051,
+     0.10647586,
+     0.33245251,
+     0.10251861,
+     0.27869275,
+     0.34051102,
+     0.43064109,
+     0.30521752,
+     0.26981279,
+     0.14388844,
+     0.15758294,
+     0.10688757,
+     0.11368616,
+     0.040637858,
+     0.0076326466,
+     0.07229328,
+     0.4207184,
+     0.42575144,
+     0.188011,
+     0.48962126,
+     0.51016267,
+     0.40911901,
+     0.49591303,
+     0.37599688,
+     0.35237328,
+     0.43560468,
+     0.38561159,
+     0.37555616,
+     0.40867983,
+     0.31263122,
+     0.29195333
     ]
    },
    {
@@ -3403,46 +5863,46 @@
      0.208099
     ],
     "prediction": [
-     0.015470092,
-     0.044771832,
-     0.01315113,
-     0.0082877289,
-     0.16905158,
-     0.14375728,
-     0.28632074,
-     0.4648986,
-     0.19557115,
-     0.49846282,
-     0.46351945,
-     0.61995511,
-     0.2209925,
-     0.22740403,
-     0.26205169,
-     0.67324505,
-     0.49156692,
-     0.37837333,
-     0.34216842,
-     0.60422227,
-     0.59671317,
-     0.39357155,
-     0.025415844,
-     0.028795827,
-     0.05798953,
-     -0.088957438,
-     -0.043603866,
-     0.0043856221,
-     0.019294009,
-     0.51265451,
-     0.31346319,
-     -0.00079921885,
-     0.088712044,
-     0.097648418,
-     0.05251388,
-     0.051645155,
-     -0.057269974,
-     0.10862178,
-     -0.0057544101,
-     0.00031230125
+     -0.061268286,
+     -0.093324709,
+     0.016172583,
+     0.093292404,
+     0.13354548,
+     0.18415818,
+     0.31400773,
+     0.25137257,
+     0.14425497,
+     0.39522074,
+     0.38279477,
+     0.72299577,
+     0.30584863,
+     0.24770897,
+     0.21921526,
+     0.59830591,
+     0.5213236,
+     0.51135738,
+     0.3632061,
+     0.72485556,
+     0.81357016,
+     0.45094655,
+     -0.018702887,
+     0.0051714942,
+     -0.038509662,
+     -0.084560834,
+     -0.054146799,
+     -0.0064525386,
+     0.048423231,
+     0.6000624,
+     0.23571542,
+     0.099712792,
+     0.33887378,
+     0.042201989,
+     0.04346549,
+     0.04971684,
+     0.031593615,
+     0.0058166296,
+     0.052784585,
+     -0.09704988
     ]
    },
    {
@@ -3490,46 +5950,46 @@
      0
     ],
     "prediction": [
-     0.3332033,
-     0.29300501,
-     0.5539062,
-     0.39950219,
-     0.26224839,
-     0.027262244,
-     0.71601215,
-     0.21853457,
-     0.36315875,
-     0.083445854,
-     0.142044,
-     0.062946706,
-     0.0702087,
-     0.31123724,
-     0.20283631,
-     0.15784804,
-     0.44960013,
-     0.36137468,
-     0.011939249,
-     -0.069127327,
-     0.10571413,
-     -0.053767017,
-     0.15116984,
-     0.31531587,
-     0.1253909,
-     0.21655174,
-     0.11232772,
-     0.083448412,
-     0.016318392,
-     -0.11211827,
-     0.14024938,
-     0.15999302,
-     -0.089954196,
-     0.055942123,
-     0.11963173,
-     0.18848131,
-     0.16170209,
-     0.1941167,
-     0.22389629,
-     0.17310932
+     0.39280373,
+     0.35461662,
+     0.41339636,
+     0.54803904,
+     0.45089938,
+     0.47337371,
+     0.85228109,
+     0.27713564,
+     0.1993167,
+     0.25815489,
+     0.17454876,
+     0.18897725,
+     0.16736625,
+     0.16969759,
+     0.065025874,
+     0.33899358,
+     0.43079196,
+     0.34064407,
+     0.065123506,
+     0.010118446,
+     0.035089684,
+     0.16070106,
+     0.044825915,
+     -0.045201605,
+     0.042698624,
+     -0.028163162,
+     0.037089163,
+     0.066566912,
+     -0.020067982,
+     0.008028988,
+     0.022357138,
+     0.0050600421,
+     -0.049494423,
+     0.076136551,
+     0.023155798,
+     -0.050346464,
+     0.031012721,
+     0.096407028,
+     -0.059102846,
+     -0.011529585
     ]
    },
    {
@@ -3577,46 +6037,46 @@
      0
     ],
     "prediction": [
-     0.29513952,
-     0.64453275,
-     0.26855368,
-     0.63862587,
-     0.74151076,
-     0.48748581,
-     0.74159396,
-     0.51795368,
-     0.59449603,
-     0.39083624,
-     0.44319901,
-     0.19291638,
-     0.33051393,
-     0.32475735,
-     0.061256221,
-     0.39075721,
-     0.16169255,
-     0.12249436,
-     -0.0024107862,
-     0.080968338,
-     0.059315633,
-     0.041259947,
-     0.30576255,
-     -0.037847142,
-     -0.061544596,
-     -0.080809705,
-     -0.015102513,
-     -0.041993691,
-     0.0051255144,
-     -0.048577549,
-     0.024724066,
-     0.18360063,
-     0.023566673,
-     0.064129771,
-     0.059190078,
-     0.028788494,
-     0.045588816,
-     0.028316743,
-     -0.11659103,
-     -0.0058336454
+     0.071030086,
+     0.65248556,
+     0.12032839,
+     0.56309872,
+     0.883285,
+     0.5846844,
+     0.6012363,
+     0.59239033,
+     0.74021137,
+     0.43972703,
+     0.55562447,
+     0.30574905,
+     0.43282481,
+     0.51834084,
+     0.23281382,
+     0.43800517,
+     0.103214,
+     0.12326488,
+     0.068278122,
+     0.18494275,
+     0.2341218,
+     0.036679855,
+     0.41250718,
+     0.085386336,
+     -0.069739356,
+     -0.040006788,
+     -0.081313653,
+     -0.086660077,
+     -0.092269845,
+     -0.14424209,
+     -0.019241887,
+     0.010755453,
+     0.02798469,
+     0.032142542,
+     -0.020942533,
+     -0.18799212,
+     0.0037779776,
+     -0.08535698,
+     -0.15378877,
+     -0.17193775
     ]
    },
    {
@@ -3664,46 +6124,46 @@
      0
     ],
     "prediction": [
-     0.53415448,
-     0.72639136,
-     0.81315571,
-     0.83158145,
-     0.51875838,
-     0.65864407,
-     0.69955741,
-     0.16120719,
-     0.19764777,
-     0.17857315,
-     0.18803803,
-     0.052809079,
-     0.27103176,
-     0.043633775,
-     -0.054259182,
-     0.096553234,
-     0.056922584,
-     0.073343042,
-     0.034965053,
-     0.023287866,
-     -0.064201389,
-     0.11059739,
-     -0.047912853,
-     -0.053550205,
-     0.046064756,
-     -0.056164555,
-     0.033286827,
-     -0.041436238,
-     -0.088607213,
-     0.044727999,
-     -0.014441392,
-     -0.04206658,
-     -0.19403164,
-     0.09169301,
-     -0.098684752,
-     -0.065073638,
-     -0.12284571,
-     -0.032051615,
-     -0.089378673,
-     -0.05318509
+     0.40649061,
+     0.73240666,
+     0.78420011,
+     0.91367023,
+     0.62749828,
+     0.80261347,
+     0.69521138,
+     0.0747185,
+     0.1919342,
+     0.22249484,
+     0.22928893,
+     0.16102705,
+     0.49831087,
+     0.13217358,
+     0.045729418,
+     0.024347695,
+     -0.022083796,
+     -0.053040119,
+     0.01388335,
+     0.062571172,
+     0.014410856,
+     0.094550252,
+     -0.0073262555,
+     0.076965801,
+     0.06741825,
+     -0.049336911,
+     0.041745504,
+     -0.020377206,
+     -0.1283605,
+     0.048975782,
+     -0.013553613,
+     -0.02122097,
+     -0.041282451,
+     0.1133439,
+     0.041959641,
+     -0.057309276,
+     -0.055530551,
+     -0.051738132,
+     -0.071834879,
+     -0.091832298
     ]
    }
   ],
@@ -3746,38 +6206,38 @@
      0
     ],
     "prediction": [
-     0.0093783519,
-     0.082401138,
-     0.1815425,
-     0.30020721,
-     0.41904729,
-     0.49756968,
-     0.55251939,
-     0.59834013,
-     0.60781363,
-     0.59796698,
-     0.5588116,
-     0.49369628,
-     0.42317119,
-     0.35181406,
-     0.27697295,
-     0.19999867,
-     0.13305491,
-     0.080254877,
-     0.044036886,
-     0.021985167,
-     0.0069941105,
-     -0.0024478677,
-     -0.0071389225,
-     -0.0090671458,
-     -0.0095174733,
-     -0.0089040677,
-     -0.0082781977,
-     -0.0075372714,
-     -0.0072093905,
-     -0.0065952994,
-     -0.0070190518,
-     -0.0076201543
+     0.014335922,
+     0.093912177,
+     0.18863168,
+     0.29972693,
+     0.40360944,
+     0.4920668,
+     0.55739531,
+     0.60162584,
+     0.61035198,
+     0.5978089,
+     0.5516078,
+     0.48096886,
+     0.40262705,
+     0.33138389,
+     0.26363479,
+     0.19654826,
+     0.13922375,
+     0.093147729,
+     0.059743596,
+     0.036351691,
+     0.02038755,
+     0.010008508,
+     0.0025921468,
+     -0.0049633114,
+     -0.01140582,
+     -0.015439928,
+     -0.017091095,
+     -0.017302019,
+     -0.017104559,
+     -0.01714402,
+     -0.016850289,
+     -0.017311847
     ]
    },
    {
@@ -3818,38 +6278,38 @@
      0
     ],
     "prediction": [
-     0.0033434149,
-     0.074693985,
-     0.1851583,
-     0.32897265,
-     0.47720017,
-     0.57100477,
-     0.62926887,
-     0.66565741,
-     0.66626495,
-     0.65519669,
-     0.61637039,
-     0.56394898,
-     0.50901202,
-     0.45015426,
-     0.3831898,
-     0.30663003,
-     0.23304106,
-     0.17033062,
-     0.12236204,
-     0.088663894,
-     0.062871145,
-     0.043430311,
-     0.029797253,
-     0.020389279,
-     0.014103683,
-     0.010348013,
-     0.0080940847,
-     0.0068196962,
-     0.0053903679,
-     0.0043184355,
-     0.0025420168,
-     0.00071783367
+     0.0035032201,
+     0.076049622,
+     0.17343301,
+     0.30697747,
+     0.44292932,
+     0.54759335,
+     0.61954834,
+     0.65883437,
+     0.66085171,
+     0.65107018,
+     0.61348568,
+     0.56051093,
+     0.50184701,
+     0.44429922,
+     0.38466679,
+     0.31743844,
+     0.25262922,
+     0.19551096,
+     0.14978398,
+     0.11456163,
+     0.087274776,
+     0.065315449,
+     0.046646776,
+     0.029052751,
+     0.014493432,
+     0.0041065786,
+     -0.002392936,
+     -0.0065374,
+     -0.0097889477,
+     -0.012746362,
+     -0.015176,
+     -0.017857165
     ]
    },
    {
@@ -3890,38 +6350,38 @@
      0
     ],
     "prediction": [
-     0.0074196394,
-     0.07508019,
-     0.18480045,
-     0.33095754,
-     0.46757333,
-     0.56091192,
-     0.631902,
-     0.67503486,
-     0.686367,
-     0.69236732,
-     0.67416489,
-     0.65317372,
-     0.62572383,
-     0.5821025,
-     0.51749124,
-     0.4328834,
-     0.34808497,
-     0.27290729,
-     0.21299222,
-     0.16719438,
-     0.12770497,
-     0.093787912,
-     0.065184972,
-     0.04184379,
-     0.024131859,
-     0.011396023,
-     0.0029075095,
-     -0.0023228929,
-     -0.0062988303,
-     -0.0092568432,
-     -0.012031327,
-     -0.014194186
+     0.02111598,
+     0.12707671,
+     0.25751561,
+     0.39283714,
+     0.48493117,
+     0.53693495,
+     0.58308563,
+     0.62070032,
+     0.6419346,
+     0.66065505,
+     0.65350502,
+     0.63336992,
+     0.59374196,
+     0.54402226,
+     0.47775994,
+     0.39746291,
+     0.32138491,
+     0.25626791,
+     0.2027449,
+     0.15976156,
+     0.12391538,
+     0.093545893,
+     0.067253196,
+     0.04299709,
+     0.02230016,
+     0.0068220027,
+     -0.0031674591,
+     -0.0091604294,
+     -0.012895202,
+     -0.015585862,
+     -0.017851971,
+     -0.019395721
     ]
    },
    {
@@ -3962,38 +6422,38 @@
      0.047671
     ],
     "prediction": [
-     0.0018146974,
-     0.03847388,
-     0.10990553,
-     0.24032498,
-     0.40665148,
-     0.57548208,
-     0.73426025,
-     0.80973799,
-     0.82194812,
-     0.82940466,
-     0.83419153,
-     0.85950322,
-     0.87636753,
-     0.86217063,
-     0.82075666,
-     0.75671206,
-     0.68384928,
-     0.60744859,
-     0.53491448,
-     0.47291689,
-     0.4135395,
-     0.3544873,
-     0.29915239,
-     0.25214609,
-     0.21582311,
-     0.1871323,
-     0.16500074,
-     0.14785311,
-     0.1326488,
-     0.11808548,
-     0.10589309,
-     0.094761809
+     -0.0058839454,
+     0.022910205,
+     0.10235452,
+     0.24452251,
+     0.42859511,
+     0.59701484,
+     0.75605217,
+     0.83299683,
+     0.83945193,
+     0.84597253,
+     0.85524969,
+     0.88354775,
+     0.89996362,
+     0.87839297,
+     0.83314151,
+     0.77125089,
+     0.69945793,
+     0.61981846,
+     0.54367585,
+     0.47804993,
+     0.41658868,
+     0.35556792,
+     0.30130204,
+     0.25778329,
+     0.22222967,
+     0.19781869,
+     0.18004687,
+     0.16556439,
+     0.15012096,
+     0.13593135,
+     0.12177394,
+     0.11018269
     ]
    },
    {
@@ -4034,38 +6494,38 @@
      0
     ],
     "prediction": [
-     0.01738491,
-     0.10084612,
-     0.22119879,
-     0.34930762,
-     0.45137221,
-     0.48979263,
-     0.47949758,
-     0.46326031,
-     0.42037128,
-     0.37319006,
-     0.31940611,
-     0.24536796,
-     0.17466559,
-     0.11385106,
-     0.061951282,
-     0.022104151,
-     -0.0087638852,
-     -0.02904898,
-     -0.037609285,
-     -0.038532842,
-     -0.034638875,
-     -0.028508414,
-     -0.021430752,
-     -0.015519244,
-     -0.012151576,
-     -0.0091384973,
-     -0.006508732,
-     -0.0044442955,
-     -0.0026109251,
-     -0.0013804031,
-     -0.0012038863,
-     -0.0016196067
+     0.020571695,
+     0.097014656,
+     0.20672545,
+     0.32444568,
+     0.43557901,
+     0.49882478,
+     0.50187343,
+     0.49038734,
+     0.45937466,
+     0.41752793,
+     0.35410278,
+     0.27084109,
+     0.19181045,
+     0.12709388,
+     0.074598454,
+     0.030490971,
+     -0.0029064485,
+     -0.027860871,
+     -0.040145521,
+     -0.045365381,
+     -0.044608579,
+     -0.039907742,
+     -0.032458494,
+     -0.026237283,
+     -0.021632034,
+     -0.016691304,
+     -0.011474219,
+     -0.0068367816,
+     -0.0036787548,
+     -0.0010666933,
+     0.0012095864,
+     0.0016576482
     ]
    },
    {
@@ -4106,38 +6566,38 @@
      0
     ],
     "prediction": [
-     0.028440035,
-     0.13496598,
-     0.26588167,
-     0.36836047,
-     0.42774247,
-     0.43911224,
-     0.43532235,
-     0.44503515,
-     0.42032936,
-     0.3729748,
-     0.31413035,
-     0.23554981,
-     0.16039227,
-     0.095190138,
-     0.040299439,
-     -0.00077405222,
-     -0.02519901,
-     -0.037902289,
-     -0.042102712,
-     -0.040898956,
-     -0.036624435,
-     -0.030831993,
-     -0.024206749,
-     -0.017991947,
-     -0.013343328,
-     -0.0096532961,
-     -0.0071141764,
-     -0.0054007397,
-     -0.0039934553,
-     -0.0025022247,
-     -0.0025169237,
-     -0.002940033
+     0.029859711,
+     0.14894749,
+     0.2899823,
+     0.38865036,
+     0.43260263,
+     0.44640445,
+     0.44676284,
+     0.45823744,
+     0.4370961,
+     0.39174324,
+     0.32356243,
+     0.23445433,
+     0.14521246,
+     0.073192071,
+     0.015204993,
+     -0.027980085,
+     -0.052902885,
+     -0.065042163,
+     -0.069168567,
+     -0.06744256,
+     -0.061227666,
+     -0.05178482,
+     -0.040544291,
+     -0.030611463,
+     -0.02243664,
+     -0.01574077,
+     -0.010174718,
+     -0.0055453268,
+     -0.0015368124,
+     0.001596296,
+     0.0039926055,
+     0.0051531231
     ]
    },
    {
@@ -4178,38 +6638,38 @@
      0
     ],
     "prediction": [
-     0.0045571041,
-     0.11810886,
-     0.28504433,
-     0.42147573,
-     0.50305005,
-     0.50655487,
-     0.48194766,
-     0.49521791,
-     0.49627601,
-     0.48720366,
-     0.44899627,
-     0.38166161,
-     0.31459991,
-     0.24293157,
-     0.17268489,
-     0.11135739,
-     0.067781023,
-     0.037171776,
-     0.017983997,
-     0.0080902706,
-     0.0053815535,
-     0.0053577629,
-     0.0072315828,
-     0.010236056,
-     0.013485857,
-     0.016351127,
-     0.018050648,
-     0.018303986,
-     0.018348621,
-     0.017722998,
-     0.016415104,
-     0.014720794
+     -0.001842833,
+     0.11916185,
+     0.2936588,
+     0.42151343,
+     0.47927508,
+     0.4818061,
+     0.47414657,
+     0.50923897,
+     0.52079827,
+     0.52030104,
+     0.48308844,
+     0.41284685,
+     0.33601283,
+     0.25124136,
+     0.1656287,
+     0.093573209,
+     0.04809205,
+     0.018179607,
+     0.000061232705,
+     -0.0078974818,
+     -0.0093452793,
+     -0.0080669707,
+     -0.005364068,
+     -0.0023236389,
+     0.0021193737,
+     0.0052600942,
+     0.0072530457,
+     0.0082786021,
+     0.0082920903,
+     0.0075807685,
+     0.0059978715,
+     0.0038814859
     ]
    },
    {
@@ -4250,38 +6710,38 @@
      0
     ],
     "prediction": [
-     0.027935755,
-     0.16020888,
-     0.29854387,
-     0.38889094,
-     0.42400918,
-     0.40458843,
-     0.39138081,
-     0.43425067,
-     0.45378434,
-     0.45811942,
-     0.43518484,
-     0.37893437,
-     0.30672506,
-     0.22874479,
-     0.15139829,
-     0.086738712,
-     0.042529389,
-     0.013033001,
-     -0.0046273205,
-     -0.013985727,
-     -0.018741877,
-     -0.019343541,
-     -0.017131152,
-     -0.014305575,
-     -0.012175362,
-     -0.010141573,
-     -0.0083802685,
-     -0.0069917519,
-     -0.005870693,
-     -0.0047919865,
-     -0.0045236512,
-     -0.0046448517
+     0.022960031,
+     0.16165385,
+     0.30076231,
+     0.38611356,
+     0.41481538,
+     0.411415,
+     0.41032848,
+     0.45269446,
+     0.47489084,
+     0.4755292,
+     0.43902063,
+     0.36952155,
+     0.28471905,
+     0.20100319,
+     0.1230718,
+     0.060156219,
+     0.018807625,
+     -0.0083296594,
+     -0.02431541,
+     -0.032414428,
+     -0.034581156,
+     -0.032033986,
+     -0.026661826,
+     -0.021788016,
+     -0.0175333,
+     -0.01362864,
+     -0.0098192812,
+     -0.0063447106,
+     -0.0033444364,
+     -0.00099944544,
+     0.0009805151,
+     0.0016092164
     ]
    },
    {
@@ -4322,38 +6782,38 @@
      0
     ],
     "prediction": [
-     0.0020303492,
-     0.092861188,
-     0.21263067,
-     0.33868215,
-     0.40449927,
-     0.40652493,
-     0.39161851,
-     0.42311655,
-     0.46067068,
-     0.51261232,
-     0.53627279,
-     0.5241689,
-     0.47909092,
-     0.408746,
-     0.32591778,
-     0.24653175,
-     0.17777082,
-     0.12251137,
-     0.085634475,
-     0.061116622,
-     0.043279491,
-     0.03089808,
-     0.021527573,
-     0.012701648,
-     0.0044907778,
-     -0.0014891221,
-     -0.0047840097,
-     -0.0066512373,
-     -0.0079826963,
-     -0.0092097662,
-     -0.009713395,
-     -0.0099083006
+     0.00078475293,
+     0.099482209,
+     0.20718335,
+     0.28926152,
+     0.32591261,
+     0.32155664,
+     0.32818044,
+     0.38713304,
+     0.45029573,
+     0.50447014,
+     0.5180819,
+     0.49619917,
+     0.44990218,
+     0.38627124,
+     0.31202882,
+     0.23706396,
+     0.17320856,
+     0.12091421,
+     0.084717625,
+     0.059292189,
+     0.041397101,
+     0.028836408,
+     0.021343424,
+     0.01608446,
+     0.011754396,
+     0.0086825612,
+     0.0073667862,
+     0.0075816802,
+     0.0082226288,
+     0.0089359171,
+     0.009711348,
+     0.0097125383
     ]
    },
    {
@@ -4394,38 +6854,38 @@
      0
     ],
     "prediction": [
-     0.024426686,
-     0.087202676,
-     0.15019375,
-     0.22832985,
-     0.27198257,
-     0.3154601,
-     0.36404602,
-     0.4369266,
-     0.49748256,
-     0.56593299,
-     0.61662842,
-     0.62584243,
-     0.57434235,
-     0.47990473,
-     0.37461596,
-     0.28774263,
-     0.22319232,
-     0.16987407,
-     0.13033192,
-     0.099288361,
-     0.073030178,
-     0.051929764,
-     0.033337166,
-     0.016896132,
-     0.004074117,
-     -0.0042327171,
-     -0.0080413577,
-     -0.0095715884,
-     -0.0097950026,
-     -0.0094188056,
-     -0.0088703438,
-     -0.0079597644
+     0.047116892,
+     0.10863919,
+     0.13742788,
+     0.15336354,
+     0.207398,
+     0.27225501,
+     0.34687382,
+     0.44632024,
+     0.51583559,
+     0.57559611,
+     0.59859447,
+     0.58420449,
+     0.53396494,
+     0.45324407,
+     0.35325563,
+     0.25946035,
+     0.18670905,
+     0.12679112,
+     0.083211035,
+     0.050954115,
+     0.027183334,
+     0.010438769,
+     0.0012443734,
+     -0.0021478597,
+     -0.00046287386,
+     0.0030891292,
+     0.0077979913,
+     0.012142705,
+     0.016015163,
+     0.018837652,
+     0.020292658,
+     0.020356175
     ]
    },
    {
@@ -4466,38 +6926,38 @@
      0
     ],
     "prediction": [
-     0.042246458,
-     0.10782563,
-     0.12123325,
-     0.15526656,
-     0.21592264,
-     0.2329799,
-     0.220526,
-     0.25345713,
-     0.32671245,
-     0.40650075,
-     0.44747664,
-     0.45391978,
-     0.43529147,
-     0.38001426,
-     0.30193924,
-     0.22467149,
-     0.15662018,
-     0.097200448,
-     0.05720941,
-     0.033017191,
-     0.017465792,
-     0.0068426299,
-     0.00022110394,
-     -0.0044013253,
-     -0.0076787759,
-     -0.010653801,
-     -0.011799172,
-     -0.011182097,
-     -0.012048692,
-     -0.012471133,
-     -0.0098508028,
-     -0.0058667894
+     0.019423873,
+     0.045098178,
+     0.061599945,
+     0.12379045,
+     0.2280261,
+     0.27734774,
+     0.2661965,
+     0.26113504,
+     0.31160769,
+     0.35764409,
+     0.38841081,
+     0.40129047,
+     0.39612879,
+     0.3716212,
+     0.32319781,
+     0.2773252,
+     0.23463643,
+     0.18820268,
+     0.15349429,
+     0.12722711,
+     0.10573489,
+     0.084615537,
+     0.065754412,
+     0.048003569,
+     0.029375567,
+     0.016783177,
+     0.010783944,
+     0.0094325948,
+     0.0090456412,
+     0.010209933,
+     0.012087428,
+     0.014458217
     ]
    },
    {
@@ -4538,38 +6998,38 @@
      0
     ],
     "prediction": [
-     0.011843341,
-     0.14771851,
-     0.34325765,
-     0.46756115,
-     0.49535736,
-     0.4502415,
-     0.39644714,
-     0.42513188,
-     0.46983494,
-     0.51468271,
-     0.51307719,
-     0.47072955,
-     0.4077713,
-     0.32069967,
-     0.22538523,
-     0.14382481,
-     0.08839669,
-     0.049338981,
-     0.023273195,
-     0.0075171158,
-     -0.0003299351,
-     -0.0035054813,
-     -0.0038420767,
-     -0.002389302,
-     0.000098149464,
-     0.0029943361,
-     0.0052692025,
-     0.0061762403,
-     0.0066522683,
-     0.0066096274,
-     0.0062752727,
-     0.0059394403
+     0.0033494333,
+     0.14731549,
+     0.34819402,
+     0.47313516,
+     0.49098258,
+     0.44308387,
+     0.39901815,
+     0.43769349,
+     0.47907828,
+     0.52235292,
+     0.52532371,
+     0.49114225,
+     0.43369855,
+     0.34712951,
+     0.24789502,
+     0.16129857,
+     0.10250847,
+     0.060539136,
+     0.031955616,
+     0.015157402,
+     0.0057759169,
+     -0.00011839528,
+     -0.0034304868,
+     -0.005521071,
+     -0.0043276617,
+     -0.0035426812,
+     -0.0032841716,
+     -0.0034431507,
+     -0.0040457149,
+     -0.0048881466,
+     -0.0061760341,
+     -0.0074922838
     ]
    },
    {
@@ -4610,38 +7070,38 @@
      0
     ],
     "prediction": [
-     0.018237922,
-     -0.089174721,
-     -0.13707596,
-     -0.069538114,
-     0.12808034,
-     0.33064801,
-     0.44643372,
-     0.45563015,
-     0.40079926,
-     0.28371457,
-     0.20575866,
-     0.19998855,
-     0.25371836,
-     0.34076161,
-     0.4305201,
-     0.5101935,
-     0.55897835,
-     0.57304542,
-     0.55970564,
-     0.53459245,
-     0.50440664,
-     0.46580898,
-     0.42212716,
-     0.3777001,
-     0.33082094,
-     0.28310506,
-     0.23638553,
-     0.19174098,
-     0.15011666,
-     0.11496956,
-     0.085975566,
-     0.064358523
+     -0.01560249,
+     -0.10445157,
+     -0.1452866,
+     -0.048521854,
+     0.12594807,
+     0.32095984,
+     0.43284048,
+     0.47981331,
+     0.48441238,
+     0.43294159,
+     0.3858149,
+     0.37856032,
+     0.38311364,
+     0.39090142,
+     0.40235466,
+     0.43190117,
+     0.45163613,
+     0.45359477,
+     0.44986733,
+     0.44412867,
+     0.43375986,
+     0.41581522,
+     0.39396765,
+     0.36126449,
+     0.32036336,
+     0.27718782,
+     0.23422655,
+     0.18896247,
+     0.14300103,
+     0.10231571,
+     0.072124448,
+     0.051386609
     ]
    },
    {
@@ -4682,38 +7142,38 @@
      0
     ],
     "prediction": [
-     0.010180868,
-     -0.057672917,
-     -0.083968371,
-     0.027538524,
-     0.22053077,
-     0.39494895,
-     0.50322583,
-     0.56544136,
-     0.60270044,
-     0.58050929,
-     0.5545811,
-     0.55581782,
-     0.55777149,
-     0.55441382,
-     0.54739278,
-     0.54270116,
-     0.52356901,
-     0.48532336,
-     0.44057681,
-     0.39595094,
-     0.35436319,
-     0.31267729,
-     0.26990816,
-     0.22858145,
-     0.18867265,
-     0.15098373,
-     0.11922914,
-     0.091059462,
-     0.066199504,
-     0.04665523,
-     0.030705202,
-     0.018873091
+     -0.010016502,
+     -0.073579492,
+     -0.11875113,
+     -0.031988394,
+     0.12719253,
+     0.31082453,
+     0.43598068,
+     0.52244279,
+     0.58095868,
+     0.59032423,
+     0.58643899,
+     0.59287247,
+     0.57683387,
+     0.53598112,
+     0.48702479,
+     0.45097966,
+     0.40838139,
+     0.35691054,
+     0.3112794,
+     0.2772531,
+     0.24841152,
+     0.2213427,
+     0.19550945,
+     0.16685555,
+     0.13774265,
+     0.10963147,
+     0.084001762,
+     0.060204494,
+     0.037202876,
+     0.017934393,
+     0.0052934068,
+     -0.0018505237
     ]
    },
    {
@@ -4754,38 +7214,38 @@
      0.077281
     ],
     "prediction": [
-     -0.018608615,
-     0.0062295618,
-     0.094187616,
-     0.31228681,
-     0.53289336,
-     0.66110523,
-     0.68854028,
-     0.6688039,
-     0.67339317,
-     0.65631007,
-     0.61055388,
-     0.56363386,
-     0.50106763,
-     0.43974067,
-     0.39726731,
-     0.38101435,
-     0.36745513,
-     0.35085664,
-     0.3345911,
-     0.31719472,
-     0.29731888,
-     0.27719353,
-     0.25402365,
-     0.22646071,
-     0.1969612,
-     0.16855426,
-     0.14449808,
-     0.12387094,
-     0.10483278,
-     0.087788754,
-     0.072717642,
-     0.059224448
+     -0.037996996,
+     -0.035150084,
+     0.04771649,
+     0.27725949,
+     0.50308051,
+     0.64565659,
+     0.68613574,
+     0.66963936,
+     0.67365764,
+     0.65547171,
+     0.61266377,
+     0.56498862,
+     0.49108102,
+     0.41980304,
+     0.37426815,
+     0.35992624,
+     0.34776623,
+     0.33264323,
+     0.31740724,
+     0.30112862,
+     0.28278708,
+     0.26438124,
+     0.24379705,
+     0.2201325,
+     0.19417024,
+     0.16768596,
+     0.14534581,
+     0.12662849,
+     0.10983789,
+     0.094854175,
+     0.081302587,
+     0.069025111
     ]
    },
    {
@@ -4826,38 +7286,38 @@
      0
     ],
     "prediction": [
-     0.063595046,
-     0.20698139,
-     0.36359706,
-     0.4531333,
-     0.39944905,
-     0.2754141,
-     0.18369939,
-     0.15019739,
-     0.10329388,
-     0.069431525,
-     0.046850917,
-     0.03807157,
-     0.032880612,
-     0.030663812,
-     0.02798138,
-     0.020438807,
-     0.014044265,
-     0.0096553822,
-     0.0074440655,
-     0.0075081223,
-     0.0064606287,
-     0.004792402,
-     0.0023314611,
-     -0.00091561789,
-     -0.0037687643,
-     -0.0061382104,
-     -0.0085767518,
-     -0.0097772261,
-     -0.010920182,
-     -0.012108894,
-     -0.011113188,
-     -0.0095901429
+     0.080444925,
+     0.20085007,
+     0.32360562,
+     0.38426268,
+     0.33931315,
+     0.24347378,
+     0.17122353,
+     0.14530293,
+     0.10896963,
+     0.0738573,
+     0.050368601,
+     0.033083746,
+     0.024048291,
+     0.02190787,
+     0.024150048,
+     0.024963758,
+     0.022473246,
+     0.019921385,
+     0.016762603,
+     0.01518296,
+     0.01416474,
+     0.010849621,
+     0.0087250701,
+     0.0066713707,
+     0.0048588591,
+     0.0038066672,
+     0.0026422576,
+     0.0019977617,
+     0.0014885914,
+     0.0013053502,
+     0.0019845091,
+     0.0024651606
     ]
    },
    {
@@ -4898,38 +7358,38 @@
      0
     ],
     "prediction": [
-     0.18850542,
-     0.33910267,
-     0.37360401,
-     0.35066687,
-     0.2866045,
-     0.21487834,
-     0.18821235,
-     0.20497123,
-     0.18997424,
-     0.17593923,
-     0.16255006,
-     0.14093071,
-     0.10679596,
-     0.076690612,
-     0.049494545,
-     0.025641447,
-     0.015670629,
-     0.010980864,
-     0.0066135027,
-     0.0058460737,
-     0.0034370167,
-     0.0015017261,
-     0.00029807481,
-     -0.00092653721,
-     -0.000048854667,
-     0.0017254547,
-     0.0034483399,
-     0.0054723587,
-     0.0065002465,
-     0.0065289871,
-     0.00816265,
-     0.0093033384
+     0.20173312,
+     0.33351708,
+     0.35979065,
+     0.34667394,
+     0.28172717,
+     0.20743112,
+     0.17179258,
+     0.1717976,
+     0.15695813,
+     0.15622244,
+     0.16699341,
+     0.16388034,
+     0.14244196,
+     0.11297546,
+     0.076801594,
+     0.048558592,
+     0.036207506,
+     0.031370394,
+     0.027497098,
+     0.025298211,
+     0.022854876,
+     0.017995266,
+     0.012998559,
+     0.0071628583,
+     0.0021849333,
+     0.00016281137,
+     -0.0017151088,
+     -0.0025225415,
+     -0.0032896051,
+     -0.0038477109,
+     -0.0035731687,
+     -0.0028862482
     ]
    },
    {
@@ -4970,38 +7430,38 @@
      0
     ],
     "prediction": [
-     0.047067545,
-     0.12992093,
-     0.19309583,
-     0.25656282,
-     0.34928405,
-     0.42806933,
-     0.49852732,
-     0.55457365,
-     0.545616,
-     0.51924927,
-     0.48954255,
-     0.42907538,
-     0.35688598,
-     0.27843083,
-     0.20055496,
-     0.13386312,
-     0.087143681,
-     0.050174994,
-     0.022040951,
-     0.0058184418,
-     -0.0020901067,
-     -0.0071877365,
-     -0.009254919,
-     -0.0074325522,
-     -0.0017867034,
-     0.0047738806,
-     0.010008557,
-     0.013782287,
-     0.016968774,
-     0.019300535,
-     0.020193334,
-     0.019968388
+     0.012022907,
+     0.067751087,
+     0.12437602,
+     0.21542027,
+     0.34296363,
+     0.4732194,
+     0.58721328,
+     0.66867565,
+     0.67102701,
+     0.63785597,
+     0.58843147,
+     0.51888554,
+     0.44028351,
+     0.35024942,
+     0.25808591,
+     0.18103218,
+     0.12933361,
+     0.088969289,
+     0.057747419,
+     0.0378685,
+     0.024147061,
+     0.01379154,
+     0.0039667496,
+     -0.00060338604,
+     -0.0015671027,
+     -0.00019472403,
+     0.0025485709,
+     0.0048684517,
+     0.0065780597,
+     0.0070291205,
+     0.006264174,
+     0.0057520544
     ]
    },
    {
@@ -5042,38 +7502,38 @@
      0
     ],
     "prediction": [
-     -0.00039387782,
-     0.093143242,
-     0.23267764,
-     0.37042018,
-     0.4866798,
-     0.52767435,
-     0.53092745,
-     0.53588777,
-     0.50716778,
-     0.45988364,
-     0.39888367,
-     0.31677115,
-     0.24852591,
-     0.18939455,
-     0.13837431,
-     0.093439914,
-     0.058670209,
-     0.033515302,
-     0.018896538,
-     0.013981962,
-     0.015600267,
-     0.018404702,
-     0.022339257,
-     0.026851745,
-     0.031251843,
-     0.034270203,
-     0.035572146,
-     0.035404306,
-     0.034645387,
-     0.033405813,
-     0.030754303,
-     0.027550828
+     0.0027462147,
+     0.087946802,
+     0.21466999,
+     0.33462833,
+     0.42930016,
+     0.49251779,
+     0.53295681,
+     0.56710214,
+     0.55249357,
+     0.51521646,
+     0.45033847,
+     0.35855459,
+     0.27331892,
+     0.19674552,
+     0.12989384,
+     0.075202334,
+     0.039469611,
+     0.015454793,
+     0.00091877018,
+     -0.0046891194,
+     -0.0041892671,
+     -0.0014243945,
+     0.0014616961,
+     0.0039452266,
+     0.0069514874,
+     0.0091804417,
+     0.010762274,
+     0.011775145,
+     0.011987934,
+     0.011176346,
+     0.0097261233,
+     0.007503502
     ]
    },
    {
@@ -5114,38 +7574,38 @@
      0
     ],
     "prediction": [
-     0.059492282,
-     0.10574503,
-     0.20485772,
-     0.30999329,
-     0.34468272,
-     0.36068031,
-     0.36584328,
-     0.34987817,
-     0.31701891,
-     0.2791192,
-     0.24326542,
-     0.20496316,
-     0.16698237,
-     0.12820633,
-     0.088955865,
-     0.050311548,
-     0.021959378,
-     0.0038374278,
-     -0.0031140667,
-     -0.0040665389,
-     -0.0053880301,
-     -0.0086329938,
-     -0.014014932,
-     -0.018946888,
-     -0.021983338,
-     -0.023662441,
-     -0.025380307,
-     -0.026571411,
-     -0.027266788,
-     -0.027292688,
-     -0.028250594,
-     -0.028116257
+     0.069175979,
+     0.13108277,
+     0.2670141,
+     0.37708569,
+     0.3767956,
+     0.35592984,
+     0.34483604,
+     0.34153588,
+     0.32628687,
+     0.29312935,
+     0.24447498,
+     0.18904172,
+     0.13212535,
+     0.080568715,
+     0.034782545,
+     -0.0033687611,
+     -0.027550647,
+     -0.037991364,
+     -0.040141739,
+     -0.036730037,
+     -0.033834021,
+     -0.031748349,
+     -0.029748618,
+     -0.027101304,
+     -0.024748399,
+     -0.02205893,
+     -0.020349747,
+     -0.019222407,
+     -0.018492461,
+     -0.01786304,
+     -0.016971915,
+     -0.015179827
     ]
    },
    {
@@ -5186,38 +7646,38 @@
      0
     ],
     "prediction": [
-     0.085188787,
-     0.31619547,
-     0.50307579,
-     0.55686397,
-     0.47007993,
-     0.284643,
-     0.13984173,
-     0.12142189,
-     0.099533617,
-     0.087752529,
-     0.070903777,
-     0.049865737,
-     0.033255157,
-     0.017304845,
-     -0.0028635969,
-     -0.022089998,
-     -0.028503781,
-     -0.027296798,
-     -0.02391165,
-     -0.018441861,
-     -0.012293737,
-     -0.0068731614,
-     -0.0025589089,
-     -0.00081303205,
-     -0.00037656562,
-     -0.0010465818,
-     -0.0023858355,
-     -0.0037352213,
-     -0.0053289058,
-     -0.0078028318,
-     -0.0081723643,
-     -0.0083644876
+     0.066317493,
+     0.30801738,
+     0.50385957,
+     0.55064202,
+     0.4471103,
+     0.26655789,
+     0.14282866,
+     0.14733104,
+     0.15028558,
+     0.15763646,
+     0.15355737,
+     0.12569322,
+     0.085317107,
+     0.038934723,
+     -0.0083809626,
+     -0.036881737,
+     -0.042465574,
+     -0.037917576,
+     -0.033873132,
+     -0.027686027,
+     -0.019048547,
+     -0.011587461,
+     -0.0041649083,
+     0.00060545001,
+     0.0040343257,
+     0.0063823512,
+     0.0073277014,
+     0.007584808,
+     0.0074278826,
+     0.0073572125,
+     0.0072024761,
+     0.0067356661
     ]
    },
    {
@@ -5258,38 +7718,38 @@
      0
     ],
     "prediction": [
-     -0.015325963,
-     0.028028301,
-     0.12273369,
-     0.25495912,
-     0.4653486,
-     0.62624112,
-     0.71223931,
-     0.73148771,
-     0.70306325,
-     0.65205375,
-     0.57864379,
-     0.51631606,
-     0.49416873,
-     0.4765087,
-     0.46014172,
-     0.43516505,
-     0.40163588,
-     0.36146068,
-     0.32246446,
-     0.29002139,
-     0.26289969,
-     0.23549293,
-     0.20965899,
-     0.1883364,
-     0.17274401,
-     0.16050612,
-     0.15064745,
-     0.14177283,
-     0.13274426,
-     0.12201115,
-     0.11064307,
-     0.099119524
+     0.0078437275,
+     0.039568344,
+     0.11061427,
+     0.2195103,
+     0.44793068,
+     0.62092728,
+     0.72322894,
+     0.75856405,
+     0.72131728,
+     0.65395141,
+     0.56634605,
+     0.49362497,
+     0.48185892,
+     0.47573503,
+     0.46209962,
+     0.43260368,
+     0.39800863,
+     0.35917858,
+     0.32288583,
+     0.29557743,
+     0.2705759,
+     0.24424298,
+     0.2181471,
+     0.19933801,
+     0.18717422,
+     0.17774265,
+     0.16874574,
+     0.15922573,
+     0.14835942,
+     0.13568398,
+     0.1213728,
+     0.10593196
     ]
    },
    {
@@ -5330,38 +7790,38 @@
      0.856192
     ],
     "prediction": [
-     0.033992506,
-     0.0035411366,
-     -0.007783917,
-     0.12546544,
-     0.41620669,
-     0.65319767,
-     0.76793063,
-     0.71969906,
-     0.61150308,
-     0.47927663,
-     0.36291993,
-     0.30164851,
-     0.31078217,
-     0.39819799,
-     0.51508344,
-     0.64800179,
-     0.76159737,
-     0.84781558,
-     0.89607702,
-     0.91877951,
-     0.91434913,
-     0.89263821,
-     0.85997163,
-     0.81690136,
-     0.76405475,
-     0.70583474,
-     0.64255187,
-     0.57705566,
-     0.51016068,
-     0.4437682,
-     0.38079891,
-     0.32412417
+     0.035608924,
+     0.015171488,
+     0.023740429,
+     0.11566537,
+     0.39700744,
+     0.6341202,
+     0.75868571,
+     0.73671175,
+     0.64180162,
+     0.52165986,
+     0.40335335,
+     0.33645902,
+     0.34943944,
+     0.44119092,
+     0.56585759,
+     0.70125159,
+     0.81841834,
+     0.90382393,
+     0.94883259,
+     0.96300983,
+     0.95239624,
+     0.92481605,
+     0.89121197,
+     0.84247202,
+     0.78789549,
+     0.73130723,
+     0.67347738,
+     0.61184728,
+     0.54764635,
+     0.48228097,
+     0.42160213,
+     0.36513359
     ]
    },
    {
@@ -5402,38 +7862,38 @@
      0.549575
     ],
     "prediction": [
-     0.020770111,
-     -0.059099649,
-     -0.10461372,
-     0.030114689,
-     0.34692757,
-     0.61913738,
-     0.74555043,
-     0.69060159,
-     0.58357957,
-     0.45225056,
-     0.32250157,
-     0.23395916,
-     0.22538901,
-     0.30881775,
-     0.42932774,
-     0.56913461,
-     0.6856219,
-     0.77606103,
-     0.83150074,
-     0.86114192,
-     0.86536022,
-     0.85211698,
-     0.82742727,
-     0.79065198,
-     0.74200942,
-     0.68732486,
-     0.62679539,
-     0.56298125,
-     0.49740942,
-     0.43116329,
-     0.36822329,
-     0.31129948
+     0.011922511,
+     -0.086073759,
+     -0.11598021,
+     0.0021856145,
+     0.31520569,
+     0.57999118,
+     0.72116414,
+     0.69090861,
+     0.59442607,
+     0.47090771,
+     0.33435382,
+     0.23941193,
+     0.24164434,
+     0.33604871,
+     0.46896743,
+     0.61082199,
+     0.73048198,
+     0.82070243,
+     0.87642394,
+     0.89988201,
+     0.8977012,
+     0.876511,
+     0.84589026,
+     0.79791038,
+     0.74348589,
+     0.68236489,
+     0.62036411,
+     0.55459777,
+     0.48790439,
+     0.42118252,
+     0.35979106,
+     0.30339693
     ]
    },
    {
@@ -5474,38 +7934,38 @@
      0
     ],
     "prediction": [
-     -0.02033205,
-     -0.047406832,
-     -0.020408564,
-     0.10817162,
-     0.29897214,
-     0.51360969,
-     0.69892054,
-     0.77839999,
-     0.80827982,
-     0.78649964,
-     0.7405437,
-     0.70172175,
-     0.65801933,
-     0.58961042,
-     0.50792084,
-     0.43285891,
-     0.36651237,
-     0.30369486,
-     0.2517494,
-     0.20605204,
-     0.1652947,
-     0.1262021,
-     0.09239689,
-     0.067683468,
-     0.05027354,
-     0.036817335,
-     0.02869755,
-     0.023975786,
-     0.020171603,
-     0.017430276,
-     0.014501755,
-     0.012331155
+     -0.010595224,
+     0.015513513,
+     0.08500216,
+     0.22872198,
+     0.3651764,
+     0.50174546,
+     0.6306877,
+     0.69574144,
+     0.74850071,
+     0.77087663,
+     0.76382381,
+     0.73056188,
+     0.65441083,
+     0.54621296,
+     0.43204745,
+     0.34095085,
+     0.26715227,
+     0.20583874,
+     0.16189221,
+     0.12653666,
+     0.095797629,
+     0.070567568,
+     0.053057961,
+     0.042698555,
+     0.036189823,
+     0.031188277,
+     0.028470838,
+     0.029222332,
+     0.032851142,
+     0.037017209,
+     0.039170389,
+     0.04176148
     ]
    },
    {
@@ -5546,38 +8006,38 @@
      0
     ],
     "prediction": [
-     0.032286553,
-     0.17508934,
-     0.42624256,
-     0.59639781,
-     0.71719403,
-     0.75210266,
-     0.72701112,
-     0.65941098,
-     0.58480996,
-     0.49792023,
-     0.40078747,
-     0.33266017,
-     0.3026487,
-     0.26635103,
-     0.22547495,
-     0.19791415,
-     0.1845518,
-     0.17201509,
-     0.15704671,
-     0.14203423,
-     0.12427103,
-     0.10430414,
-     0.08705274,
-     0.077181179,
-     0.072995526,
-     0.072378401,
-     0.072977946,
-     0.074202524,
-     0.075142532,
-     0.074441567,
-     0.071965276,
-     0.068887127
+     0.050411444,
+     0.20397481,
+     0.44984599,
+     0.5817322,
+     0.69904829,
+     0.73194551,
+     0.70750351,
+     0.66846122,
+     0.61032009,
+     0.5351288,
+     0.43956655,
+     0.36252685,
+     0.33465509,
+     0.29737432,
+     0.24212462,
+     0.20101973,
+     0.18358064,
+     0.17017633,
+     0.1578194,
+     0.14648491,
+     0.13334367,
+     0.11816366,
+     0.10390415,
+     0.094964377,
+     0.091526656,
+     0.089066107,
+     0.087154254,
+     0.084819757,
+     0.082451274,
+     0.079077505,
+     0.073845863,
+     0.067367739
     ]
    },
    {
@@ -5618,38 +8078,38 @@
      0.727197
     ],
     "prediction": [
-     -0.01710006,
-     0.026266483,
-     0.14616437,
-     0.18026966,
-     0.23266571,
-     0.27223524,
-     0.26010739,
-     0.23073495,
-     0.22361191,
-     0.21210538,
-     0.18601494,
-     0.1699922,
-     0.20553154,
-     0.26351938,
-     0.3384931,
-     0.43928459,
-     0.54714722,
-     0.63685395,
-     0.69726265,
-     0.73669319,
-     0.75213217,
-     0.75267139,
-     0.7431325,
-     0.72502288,
-     0.69878669,
-     0.66404841,
-     0.6192683,
-     0.56930956,
-     0.51551358,
-     0.46119512,
-     0.40961972,
-     0.3646466
+     0.039897756,
+     0.00078013772,
+     0.028575428,
+     0.075680899,
+     0.20878204,
+     0.34097535,
+     0.38105986,
+     0.36323937,
+     0.33623718,
+     0.3067654,
+     0.26946216,
+     0.26628418,
+     0.32728161,
+     0.40215541,
+     0.48362133,
+     0.57822674,
+     0.67183153,
+     0.74059104,
+     0.77968769,
+     0.79609695,
+     0.78936501,
+     0.76742959,
+     0.73938166,
+     0.70144917,
+     0.65889607,
+     0.61159213,
+     0.55952281,
+     0.50352128,
+     0.44379644,
+     0.38261718,
+     0.32861768,
+     0.2821558
     ]
    },
    {
@@ -5690,38 +8150,38 @@
      0
     ],
     "prediction": [
-     0.021724233,
-     0.15904578,
-     0.37038824,
-     0.50889878,
-     0.55899751,
-     0.54768589,
-     0.52670235,
-     0.51989387,
-     0.53641532,
-     0.56356704,
-     0.55714908,
-     0.5534529,
-     0.54114557,
-     0.50588486,
-     0.45662253,
-     0.42895195,
-     0.42713044,
-     0.42973275,
-     0.42700124,
-     0.41397783,
-     0.38847314,
-     0.35766188,
-     0.3281388,
-     0.29809956,
-     0.26935038,
-     0.24246663,
-     0.21687729,
-     0.19270858,
-     0.16941493,
-     0.14673526,
-     0.12523683,
-     0.10740088
+     0.012594349,
+     0.1496064,
+     0.36534199,
+     0.53227673,
+     0.5979651,
+     0.58820495,
+     0.53582328,
+     0.48412626,
+     0.47449479,
+     0.5021539,
+     0.51605836,
+     0.54113067,
+     0.54799008,
+     0.53369074,
+     0.50985026,
+     0.49918869,
+     0.49742961,
+     0.49297072,
+     0.48001124,
+     0.45695408,
+     0.42403598,
+     0.38437,
+     0.34889514,
+     0.31362256,
+     0.28087396,
+     0.25180106,
+     0.22555694,
+     0.2020524,
+     0.18011487,
+     0.15878681,
+     0.13960247,
+     0.12296584
     ]
    },
    {
@@ -5762,38 +8222,38 @@
      0
     ],
     "prediction": [
-     -0.011360483,
-     0.090840955,
-     0.36378163,
-     0.55238165,
-     0.55242601,
-     0.51322091,
-     0.47739089,
-     0.47034353,
-     0.50124619,
-     0.50402333,
-     0.44977753,
-     0.35768839,
-     0.24450515,
-     0.1109126,
-     -0.01289021,
-     -0.096763909,
-     -0.13758161,
-     -0.15235402,
-     -0.146542,
-     -0.13342184,
-     -0.12012116,
-     -0.10394647,
-     -0.083957438,
-     -0.062073375,
-     -0.041201469,
-     -0.023399074,
-     -0.0095377372,
-     0.0013769599,
-     0.011521125,
-     0.020140678,
-     0.027758441,
-     0.034073312
+     -0.0073515001,
+     0.13136351,
+     0.43382444,
+     0.654143,
+     0.66555161,
+     0.5882286,
+     0.49398811,
+     0.44592996,
+     0.43423514,
+     0.41891352,
+     0.37497143,
+     0.30026695,
+     0.19867116,
+     0.082214834,
+     -0.02781684,
+     -0.096929848,
+     -0.12888921,
+     -0.1348211,
+     -0.12668111,
+     -0.11235278,
+     -0.096702771,
+     -0.081523212,
+     -0.068501772,
+     -0.05696314,
+     -0.047163992,
+     -0.038702258,
+     -0.030910329,
+     -0.024332327,
+     -0.017322563,
+     -0.010437586,
+     -0.0046661882,
+     0.0016099683
     ]
    },
    {
@@ -5834,38 +8294,38 @@
      0
     ],
     "prediction": [
-     0.040246442,
-     0.21415918,
-     0.41568825,
-     0.48058149,
-     0.39926808,
-     0.25507777,
-     0.16292889,
-     0.2495709,
-     0.39712696,
-     0.55717278,
-     0.64140447,
-     0.66168824,
-     0.62043262,
-     0.5188348,
-     0.38834378,
-     0.27684163,
-     0.20227335,
-     0.14614243,
-     0.10479304,
-     0.076435915,
-     0.055599429,
-     0.042432954,
-     0.034057291,
-     0.028923765,
-     0.026578058,
-     0.025154919,
-     0.023926288,
-     0.02177472,
-     0.018571665,
-     0.015227188,
-     0.013473042,
-     0.012924945
+     0.054583957,
+     0.23548875,
+     0.4103492,
+     0.46433984,
+     0.38396932,
+     0.25626977,
+     0.17248185,
+     0.23351086,
+     0.34091738,
+     0.47298558,
+     0.56591616,
+     0.62177844,
+     0.62696373,
+     0.56895165,
+     0.47390949,
+     0.37663965,
+     0.2955005,
+     0.22669114,
+     0.16943879,
+     0.12642209,
+     0.092580298,
+     0.064469412,
+     0.041108953,
+     0.020317063,
+     0.0064790354,
+     -0.0032523118,
+     -0.01062961,
+     -0.015948458,
+     -0.01980709,
+     -0.023063612,
+     -0.024593673,
+     -0.024742836
     ]
    },
    {
@@ -5906,38 +8366,38 @@
      0
     ],
     "prediction": [
-     -0.013648809,
-     0.079109211,
-     0.20248363,
-     0.30249255,
-     0.34653082,
-     0.33667263,
-     0.32283398,
-     0.37370181,
-     0.44013181,
-     0.4965146,
-     0.51369383,
-     0.48878841,
-     0.43205072,
-     0.33765387,
-     0.22635007,
-     0.13357344,
-     0.063706965,
-     0.0089227395,
-     -0.021332979,
-     -0.035447029,
-     -0.041277231,
-     -0.042992423,
-     -0.040745598,
-     -0.035560034,
-     -0.029066776,
-     -0.023102351,
-     -0.017502764,
-     -0.012702835,
-     -0.0093006549,
-     -0.0060122579,
-     -0.0037327303,
-     -0.0011784542
+     -0.044033215,
+     0.044680286,
+     0.1886334,
+     0.27712021,
+     0.30063859,
+     0.28864217,
+     0.29500434,
+     0.37407051,
+     0.4642751,
+     0.53352255,
+     0.54965482,
+     0.52406503,
+     0.47931669,
+     0.39439004,
+     0.28376853,
+     0.18287226,
+     0.10529529,
+     0.043589772,
+     0.0023903884,
+     -0.023391513,
+     -0.039544468,
+     -0.051232277,
+     -0.05974896,
+     -0.064478813,
+     -0.06545422,
+     -0.064664833,
+     -0.06306124,
+     -0.06048978,
+     -0.056839133,
+     -0.053158883,
+     -0.048750148,
+     -0.044200793
     ]
    },
    {
@@ -5978,38 +8438,38 @@
      0
     ],
     "prediction": [
-     0.11323082,
-     0.23040849,
-     0.26540964,
-     0.25429639,
-     0.22843862,
-     0.19129191,
-     0.17594556,
-     0.1827562,
-     0.15657892,
-     0.14204544,
-     0.13180919,
-     0.12191788,
-     0.11230232,
-     0.10751088,
-     0.098935195,
-     0.083104826,
-     0.06907443,
-     0.057381611,
-     0.048002153,
-     0.041897405,
-     0.035893544,
-     0.03118809,
-     0.027397528,
-     0.021878948,
-     0.017567311,
-     0.014451122,
-     0.012739642,
-     0.012237226,
-     0.011041568,
-     0.0091383399,
-     0.0084359066,
-     0.0080638677
+     0.10941529,
+     0.20279391,
+     0.25465499,
+     0.28860224,
+     0.27233502,
+     0.22631897,
+     0.20048895,
+     0.1953613,
+     0.17069354,
+     0.1660871,
+     0.17697088,
+     0.17906384,
+     0.17053409,
+     0.1499127,
+     0.13002332,
+     0.11849848,
+     0.10865572,
+     0.097809967,
+     0.087346492,
+     0.077600621,
+     0.068974109,
+     0.058153722,
+     0.048712554,
+     0.038912088,
+     0.030586272,
+     0.023554045,
+     0.01701148,
+     0.012363444,
+     0.0084951871,
+     0.0051158801,
+     0.0027715532,
+     0.00068240667
     ]
    },
    {
@@ -6050,38 +8510,38 @@
      0
     ],
     "prediction": [
-     0.10852019,
-     0.27941452,
-     0.42977567,
-     0.47267237,
-     0.39118039,
-     0.2550357,
-     0.13128007,
-     0.067576563,
-     0.015826465,
-     -0.015892237,
-     -0.047946097,
-     -0.068433983,
-     -0.078184699,
-     -0.08072339,
-     -0.081409008,
-     -0.079485383,
-     -0.068416658,
-     -0.051617436,
-     -0.035967652,
-     -0.023139162,
-     -0.014428189,
-     -0.0077603671,
-     -0.0042669263,
-     -0.0051610479,
-     -0.0079236971,
-     -0.010707166,
-     -0.0131912,
-     -0.014311099,
-     -0.015695235,
-     -0.01795692,
-     -0.017615384,
-     -0.016412533
+     0.098536977,
+     0.25698187,
+     0.39322038,
+     0.42416752,
+     0.3375324,
+     0.19894151,
+     0.089537657,
+     0.064823283,
+     0.053746774,
+     0.04425652,
+     0.027165196,
+     0.0019075661,
+     -0.017160237,
+     -0.035805182,
+     -0.050452371,
+     -0.054152039,
+     -0.048849433,
+     -0.040407865,
+     -0.031813,
+     -0.022806787,
+     -0.014633379,
+     -0.0089515861,
+     -0.0036757957,
+     -0.00036832696,
+     0.00078840483,
+     0.0018197462,
+     0.0012007634,
+     -0.000094884604,
+     -0.0024804397,
+     -0.0045608914,
+     -0.0056771562,
+     -0.0067168795
     ]
    }
   ]
@@ -6089,6 +8549,10 @@
  "honesty": {
   "geant4_trained": false,
   "measured_labels": true,
-  "statement": "Models learn measured spectra from PubChem/NIST facts and graph topology. They are learned predictions for comparison, not Geant4 results, and the atomic rung is not particle-trained."
+  "particle_derived_inputs": [
+   "spectrum_atomic",
+   "spectrum_molecular"
+  ],
+  "statement": "Models learn measured spectra from PubChem/NIST facts, graph topology and, for *_geant4 entries, the Geant4 atomic response (mean excitation energy, photo-absorption cross sections) as inputs. Labels are measurements: these are learned predictions for comparison, not Geant4 results."
  }
 }
