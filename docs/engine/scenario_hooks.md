@@ -877,8 +877,8 @@ load. Changing either after startup requires a restart.
   capacity, budget, seconds}`. `predictions` are made before this call's learning; `elementDomains`
   is the membership after it. Events are `birth`, `split`, `merge`, `drift`, `reset`, `rescale`
   and `model`. The learner never changes scenario state; a scenario that applies its predictions
-  (the furnace's and the efflux scenario's `learn_domains=deploy`) does so itself and must label
-  the result as learned.
+  (`learn_domains=deploy` in the furnace, the efflux scenario and the lava lamp) does so itself and
+  must label the result as learned.
   Strict mode returns `null`. Set `TRECH_DEBUG_LEARNER=1` to print per-call errors and split and
   merge statistics to stderr. See [output schema](output_schema.md#response-domain-learning-emits).
 

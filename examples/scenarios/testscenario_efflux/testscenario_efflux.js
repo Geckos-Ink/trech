@@ -514,18 +514,27 @@ function deployTransport(ctx, state, fields, aux, shadow) {
   for (let i = 0; i < n; i += 1) {
     radius[i] = Math.sqrt(fields.x[i] * fields.x[i] + fields.y[i] * fields.y[i] + fields.z[i] * fields.z[i]);
   }
+  // Copies: the bath fields are overwritten below, and the samples must keep the inputs.
+  const features = {
+    x: fields.x.slice(), y: fields.y.slice(), z: fields.z.slice(), radius,
+    rvx: fields.rvx.slice(), rvy: fields.rvy.slice(), rvz: fields.rvz.slice(),
+    mass_u: aux.mass_u, permeant: aux.permeant, cleared: aux.cleared,
+    noise_x: aux.noise_x, noise_y: aux.noise_y, noise_z: aux.noise_z
+  };
   const report = ctx.learnDomains({
     name: "efflux_transport_deployed",
     time: state.tick * SCENARIO.dt,
-    features: {
-      x: fields.x, y: fields.y, z: fields.z, radius, rvx: fields.rvx, rvy: fields.rvy, rvz: fields.rvz,
-      mass_u: aux.mass_u, permeant: aux.permeant, cleared: aux.cleared,
-      noise_x: aux.noise_x, noise_y: aux.noise_y, noise_z: aux.noise_z
-    },
+    features,
     options: { warm_start: LEARNER_STATE, frozen: true },
     report: "summary"
   });
   if (!report) throw new Error("learn_domains=deploy requires determinism.mode=predictive");
+  // A few raw rows every 500 ticks, so an offline NumPy replay can check the deployed predictions.
+  if (state.tick % 500 === 0) {
+    ctx.emit("domain_learning", TRECH_DOMAIN_LEARNING.summarize(report,
+      { scenario: "testscenario_efflux", tick: state.tick, mode: "deploy" },
+      { samples: { features, count: 32 } }));
+  }
   const d = state.deploy;
   const third = Math.min(2, Math.floor(3 * (state.tick - 1) / TOTAL_TICKS));
   const phase = d.phases[third];

@@ -122,7 +122,11 @@ Read the root principles and the parent handbook first; then open only the subca
   (`tanh`, `tanh`, linear; six tensors) in lock-step; CTest `trech_domain_learner_numpy` guards it.
   [`study_domain_learning.py`](../../../tools/torch/study_domain_learning.py) runs the campaign
   (train chain with reservoir warm starts → freeze → specialists → held-out evaluate/deploy and
-  observer comparison) for `furnace`, `lamp` and `efflux`.
+  observer comparison) for `furnace`, `lamp` and `efflux`. All three run the deploy pass and
+  compare it with the scenario's own law through per-scenario observers: furnace products and
+  temperatures, the lamp's frame observers (`tools/validation/trech_validation/lamp_observers.py`),
+  efflux clearance against its operator tolerances. NumPy parity is reported with its row count.
+  `--no-specialists --reuse-models` regrades a campaign without PyTorch.
 
 - **Capacity from the computational context:** `trech budget [--features n --targets m]` prints the
   host `ComputeBudget` (threads, memory, measured LibTorch matmul GFLOP/s) and the derived learner

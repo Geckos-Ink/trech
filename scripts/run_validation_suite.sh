@@ -500,6 +500,17 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --param simulation_ticks=100 \
       --output "${RUNS_DIR}/out_lava_lamp_readme_10m" >/dev/null 2>&1
 
+    echo "  - lava_lamp at a held-out 340 K heater: authored, then driven by the frozen learned-domain parcel law"
+    rm -rf "${RUNS_DIR}/out_lava_lamp_heater_340"
+    trech_run examples/scenarios/lava_lamp/lava_lamp.js \
+      --param heater_temperature_k=340 \
+      --output "${RUNS_DIR}/out_lava_lamp_heater_340" >/dev/null 2>&1
+    rm -rf "${RUNS_DIR}/out_lava_lamp_learned_deploy_340"
+    trech_run examples/scenarios/lava_lamp/lava_lamp.js \
+      --param heater_temperature_k=340 --param learn_domains='"deploy"' \
+      --param domain_learner_model='"data/lava_lamp_domain_learner/parcels.json"' \
+      --output "${RUNS_DIR}/out_lava_lamp_learned_deploy_340" >/dev/null 2>&1
+
     echo "  - testscenario_h2o_electrolysis_combustion (PubChem+Geant4 reaction cycle)"
     echo "    PubChem inputs (${PUBCHEM_MODE}) -> ${PUBCHEM_CACHE}"
     prepare_pubchem water hydrogen oxygen >/dev/null

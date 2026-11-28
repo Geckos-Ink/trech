@@ -189,6 +189,49 @@ to the pooled law. Before the joint-support rule, the same campaign was 11× wor
 there. Inside the range, heating improves by 21% while vertical velocity worsens by 13%.
 The lamp is a weak case for frozen domain laws.
 
+**Rebuilt and deployed in closed loop (2026-11-28).** The campaign was rerun on the current engine
+(same heaters, no PyTorch specialists) and published as
+`data/lava_lamp_domain_learner/parcels.json`, with its build record beside it. Open-loop results
+at the held-out heaters are close to the earlier ones: heating 0.00915 / 0.00833 K/s and vertical
+velocity 0.137 / 0.142 mm/s at 318 K (domains / pooled), 0.0186 / 0.0226 K/s and
+0.258 / 0.239 mm/s at 340 K.
+
+With `learn_domains=deploy`, the frozen learner *drives* the lamp. Every 5 s output frame, the
+authored step laws first advance the deployed state; their result is the **shadow**. The learner
+then sets each parcel's temperature, height and vertical velocity from its predicted heating rate
+and mean vertical velocity. Horizontal motion, the carrier column and phase relaxation stay
+authored. The tolerances on the frame observers were fixed before the first run
+([`lamp_observers.py`](../../tools/validation/trech_validation/lamp_observers.py)).
+
+| Heater (600 s) | Shadow RMSE per frame, T / height | T RMSE by third (K) | Final mean wax T, authored → deploy | Time-mean height, authored → deploy | Observers within tolerance |
+| --- | --- | --- | --- | --- | ---: |
+| 318 K (all rows remote) | 6.59 K / 10.5 mm | 0.27 / 4.76 / 10.4 | 307.6 → 395.3 K | 36.5 → 31.1 mm | 2/6 |
+| 340 K (inside) | 10.4 K / 11.2 mm | 1.23 / 6.84 / 16.6 | 309.1 → 407.3 K | 100.1 → 68.9 mm | 0/6 |
+
+**The deployed lamp runs away.** The wax ends 67 K above the 340 K heater, and the error grows
+13× from the first to the last third. As interval rates, the 340 K gaps are 2.08 K/s and
+2.24 mm/s, about 90× and 9× the pooled law's open-loop error. The learned temperatures also add
+heat the carrier never gave up: 40.5 K carrier-equivalent at 340 K (22.5 K at 318 K). The
+failure is not a routing problem. At 318 K every row defers to the pooled law, and the run still
+runs away. The engine keeps each prediction inside the response range it observed, but every
+observed heating rate is positive. A frozen law that keeps predicting heating from a state
+outside its training hull has no term that pulls the wax back to the carrier temperature, so
+each frame's small error is integrated by the next. At 340 K, 12,889 of the 28,800
+parcel-frames were extrapolating. The engine and its NumPy twin agree on 576 deployed sample
+rows to 5.6 × 10⁻¹⁶, so the predictions are the learner's own.
+
+This is the measured answer to "do open-loop gains survive closed loop" for the lamp: no. The
+suite case `lava_lamp_domain_learner_deploy_closed_loop` pairs `out_lava_lamp_learned_deploy_340`
+with the authored `out_lava_lamp_heater_340` and fails 11/21. All nine thermal and vertical-motion
+scenario checks pass; the shadow, compounding and observer gates fail. Reproduce:
+
+```bash
+trech run examples/scenarios/lava_lamp/lava_lamp.js --param heater_temperature_k=340 \
+  --param learn_domains='"deploy"' \
+  --param domain_learner_model='"data/lava_lamp_domain_learner/parcels.json"' \
+  --output build/out_lava_lamp_learned_deploy_340
+```
+
 ### Membrane efflux campaign
 
 <img src="../../studio/previews/testscenario_efflux.gif" width="360" alt="Membrane efflux comparison showing particles inside and outside a spherical cell">
@@ -254,6 +297,14 @@ trech run examples/scenarios/testscenario_efflux/testscenario_efflux.js \
 
 The suite case `efflux_domain_learner_deploy_closed_loop` grades that run against the default
 operator run `out_efflux`.
+
+**Campaign deploy pass (2026-11-28).** `study_domain_learning.py --scenario efflux` now runs the
+deploy pass too. It grades against the scenario's clearance tolerances, and the deploy emits 32
+sample rows every 500 ticks. At seed 201 the published learner reproduced the shadow RMSE above
+(0.0152 / 0.00225) and the per-third positions 0.0166 / 0.0148 / 0.0119. Three of four clearance
+observables are within tolerance (half-life gap 54 ticks). The miss is `retained_inside`
+(29 → 30), the operator run's own failure. NumPy replay of 384 deployed rows agrees to
+3.4 × 10⁻¹⁶.
 
 ## Training and deploying specialists
 

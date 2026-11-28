@@ -179,7 +179,7 @@ also rewrite that row.
 
 | Rank | Scenario | Grade | Evidence | What only it covers | Verdict |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [`lava_lamp`](../../examples/scenarios/lava_lamp/lava_lamp.js) | C | 1 suite case; parity test; gated reference GIF | Field-evolution arbitration: the validation companion grades the engine's field methods per domain. | Core |
+| 1 | [`lava_lamp`](../../examples/scenarios/lava_lamp/lava_lamp.js) | C | 2 suite cases (incl. closed-loop learned-domain deploy at a held-out 340 K heater); parity test; gated reference GIF | Field-evolution arbitration: the validation companion grades the engine's field methods per domain; the only fluid with a closed-loop `learn_domains=deploy` gate. | Core |
 | 2 | [`glass_of_water_shaken`](../../examples/scenarios/glass_of_water_shaken/glass_of_water_shaken.js) | C | 1 suite case; cascade-ladder test; gated reference GIF | The thesis's glass-of-water question: nano MD facts drive a cascade into a particle fluid. | Core |
 | 3 | [`h2o_bulk_water`](../../examples/scenarios/h2o_bulk_water/h2o_bulk_water.js) | E | 1 suite case | Radial structure and self-diffusion of rigid SPC/E water, the best-graded MD reference. | Core |
 | 4 | [`h2o_bulk_freeze_boil`](../../examples/scenarios/h2o_bulk_freeze_boil/h2o_bulk_freeze_boil.js) | E | No suite case | The reference target for bucket slot 3, a Geant4-trained water operator that freezes. | Core, and give it a case |

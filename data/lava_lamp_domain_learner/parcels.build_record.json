@@ -1,0 +1,490 @@
+{
+  "schema": "trech_domain_learner_build_v1",
+  "state": "data/lava_lamp_domain_learner/parcels.json",
+  "state_sha256": "b4c8ce41f423fb189416b881bd833cb213ad7f331313159bf22711fb7e7e6169",
+  "scenario": "lamp",
+  "operating_point": "heater_temperature_k",
+  "train": [
+    325,
+    333.15,
+    345
+  ],
+  "test": [
+    318,
+    340
+  ],
+  "passes": 1,
+  "params": {},
+  "budget": {
+    "budget": {
+      "gflops": 327.99390041250416,
+      "hardware_threads": 8,
+      "memory_bytes": 17179869184.0,
+      "memory_fraction": 0.05,
+      "schema": "trech_compute_budget_v1",
+      "seconds_per_call": 0.05,
+      "source": "probe",
+      "torch_threads": 6
+    },
+    "capacity": {
+      "basis_degree": 2,
+      "buffer_rows": 1597,
+      "max_domains": 18,
+      "residual_hidden": 32,
+      "residual_steps": 24,
+      "specialist_epochs": 3622,
+      "specialist_width": 64,
+      "split_candidates": 48
+    },
+    "features": 7,
+    "targets": 2
+  },
+  "domains": 18,
+  "calls": 360,
+  "lineage_entries": 41,
+  "runs": [
+    {
+      "run": "build/lamp_deploy/campaign/train_p0_325",
+      "cached": true
+    },
+    {
+      "run": "build/lamp_deploy/campaign/train_p0_333",
+      "cached": true
+    },
+    {
+      "run": "build/lamp_deploy/campaign/train_p0_345",
+      "cached": true
+    },
+    {
+      "run": "build/lamp_deploy/campaign/declared_318",
+      "params": {
+        "heater_temperature_k": 318
+      },
+      "seconds": 102.2
+    },
+    {
+      "run": "build/lamp_deploy/campaign/evaluate_learned_318",
+      "cached": true
+    },
+    {
+      "run": "build/lamp_deploy/campaign/deploy_learned_318",
+      "params": {
+        "heater_temperature_k": 318,
+        "learn_domains": "deploy",
+        "domain_learner_model": "build/lamp_deploy/campaign/learned.json"
+      },
+      "seconds": 87.5
+    },
+    {
+      "run": "build/lamp_deploy/campaign/declared_340",
+      "params": {
+        "heater_temperature_k": 340
+      },
+      "seconds": 103.5
+    },
+    {
+      "run": "build/lamp_deploy/campaign/evaluate_learned_340",
+      "cached": true
+    },
+    {
+      "run": "build/lamp_deploy/campaign/deploy_learned_340",
+      "params": {
+        "heater_temperature_k": 340,
+        "learn_domains": "deploy",
+        "domain_learner_model": "build/lamp_deploy/campaign/learned.json"
+      },
+      "seconds": 103.0
+    }
+  ],
+  "held_out": [
+    {
+      "heater_temperature_k": 318,
+      "evaluate": {
+        "agreement": {
+          "ari": 0,
+          "contingency": {
+            "12": {
+              "solid": 247
+            },
+            "14": {
+              "solid": 9867
+            },
+            "22": {
+              "solid": 157
+            },
+            "26": {
+              "solid": 11047
+            },
+            "29": {
+              "solid": 799
+            },
+            "31": {
+              "solid": 2146
+            },
+            "35": {
+              "solid": 1232
+            },
+            "36": {
+              "solid": 446
+            },
+            "38": {
+              "solid": 1113
+            },
+            "7": {
+              "solid": 1746
+            }
+          },
+          "inverse_purity": 0.3835763888888889,
+          "purity": 1
+        },
+        "calls": 120,
+        "events": {},
+        "gain": {
+          "heating_k_per_s": -0.09784268353932113,
+          "mean_vz_mm_s": 0.03510717464255564
+        },
+        "interval_coverage_1_96": {
+          "heating_k_per_s": 0.8491666666666666,
+          "mean_vz_mm_s": 0.8839930555555555
+        },
+        "pooled_rmse": {
+          "heating_k_per_s": 0.008334793630553514,
+          "mean_vz_mm_s": 0.14151789524683003
+        },
+        "routed_rmse": {
+          "heating_k_per_s": 0.009150292206113311,
+          "mean_vz_mm_s": 0.13654960178335268
+        },
+        "scored": 28800,
+        "seconds": 0.21351212299999991,
+        "steady": {
+          "gain": {
+            "heating_k_per_s": -0.1365183874886473,
+            "mean_vz_mm_s": 0.1609555028886953
+          },
+          "pooled_rmse": {
+            "heating_k_per_s": 0.007370133263393055,
+            "mean_vz_mm_s": 0.07201259248382202
+          },
+          "routed_rmse": {
+            "heating_k_per_s": 0.008376291972087916,
+            "mean_vz_mm_s": 0.06042176944626977
+          },
+          "scored": 25920,
+          "skipped_calls": 12
+        }
+      },
+      "deploy_shadow": {
+        "applied": 28800,
+        "calls": 120,
+        "element_steps": 28800,
+        "extrapolated": 28800,
+        "interval_s": 5,
+        "max_abs": {
+          "temperature_k": 27.82903703543184,
+          "z_mm": 23.931352769576403
+        },
+        "mean_signed": {
+          "temperature_k": 2.6304497341241504,
+          "z_mm": -2.7060207119390443
+        },
+        "rate_rmse": {
+          "heating_k_per_s": 1.3175264205434551,
+          "mean_vz_mm_s": 2.1043182640514546
+        },
+        "rmse": {
+          "temperature_k": 6.587632102717276,
+          "z_mm": 10.521591320257274
+        },
+        "rmse_by_third": [
+          {
+            "element_steps": 9600,
+            "mean_signed_temperature_k": -0.02292269469569573,
+            "mean_signed_z_mm": 2.2096275997778494,
+            "temperature_k": 0.27367049011944,
+            "z_mm": 3.445769129287596
+          },
+          {
+            "element_steps": 9600,
+            "mean_signed_temperature_k": 2.3452316548689796,
+            "mean_signed_z_mm": -4.824371636930941,
+            "temperature_k": 4.758104539887661,
+            "z_mm": 11.9052109191558
+          },
+          {
+            "element_steps": 9600,
+            "mean_signed_temperature_k": 5.569040242199167,
+            "mean_signed_z_mm": -5.503318098664446,
+            "temperature_k": 10.367074602441702,
+            "z_mm": 13.360549382777183
+          }
+        ],
+        "unbalanced_carrier_heat_k": 22.485084327293173,
+        "untouched": 0
+      },
+      "observers": {
+        "final_mean_temperature_k": {
+          "reference": 307.6264396241105,
+          "candidate": 395.32619571905144,
+          "gap": 87.69975609494094,
+          "tolerance": 2.0,
+          "within": false
+        },
+        "frames": {
+          "reference": 121,
+          "candidate": 121,
+          "gap": 0
+        },
+        "height_reversals": {
+          "reference": 3,
+          "candidate": 2,
+          "gap": 1
+        },
+        "liquid_fraction_range": {
+          "reference": 0.24026289943862436,
+          "candidate": 0.3684142639189247,
+          "gap": 0.12815136448030032,
+          "tolerance": 0.1,
+          "within": false
+        },
+        "mean_height_range_mm": {
+          "reference": 74.65863135822484,
+          "candidate": 58.36767239241913,
+          "gap": 16.290958965805707,
+          "tolerance": 20.0,
+          "within": true
+        },
+        "time_mean_height_mm": {
+          "reference": 36.457045520790146,
+          "candidate": 31.128606292584344,
+          "gap": 5.328439228205802,
+          "tolerance": 10.0,
+          "within": true
+        },
+        "time_mean_liquid_fraction": {
+          "reference": 0.11011827316965687,
+          "candidate": 0.2545427002139895,
+          "gap": 0.14442442704433262,
+          "tolerance": 0.1,
+          "within": false
+        },
+        "time_mean_temperature_k": {
+          "reference": 307.7530339679401,
+          "candidate": 335.40954612852084,
+          "gap": 27.656512160580746,
+          "tolerance": 1.0,
+          "within": false
+        }
+      },
+      "numpy_parity": {
+        "rows": 576,
+        "domain_mismatches": 0,
+        "max_relative_difference": 1.1102230246251565e-16
+      }
+    },
+    {
+      "heater_temperature_k": 340,
+      "evaluate": {
+        "agreement": {
+          "ari": 0.14483816182355588,
+          "contingency": {
+            "12": {
+              "molten": 85,
+              "solid": 3460
+            },
+            "14": {
+              "solid": 1050
+            },
+            "18": {
+              "solid": 34
+            },
+            "21": {
+              "molten": 1289,
+              "solid": 1175
+            },
+            "22": {
+              "molten": 1007
+            },
+            "29": {
+              "solid": 10116
+            },
+            "34": {
+              "molten": 75,
+              "solid": 688
+            },
+            "35": {
+              "molten": 1761,
+              "solid": 1582
+            },
+            "36": {
+              "solid": 720
+            },
+            "37": {
+              "molten": 1729,
+              "solid": 701
+            },
+            "38": {
+              "solid": 2505
+            },
+            "39": {
+              "solid": 285
+            },
+            "40": {
+              "solid": 276
+            },
+            "7": {
+              "solid": 262
+            }
+          },
+          "inverse_purity": 0.41239583333333335,
+          "purity": 0.874375
+        },
+        "calls": 120,
+        "events": {},
+        "gain": {
+          "heating_k_per_s": 0.1777647591185284,
+          "mean_vz_mm_s": -0.07891311206521667
+        },
+        "interval_coverage_1_96": {
+          "heating_k_per_s": 0.8351041666666666,
+          "mean_vz_mm_s": 0.8628819444444444
+        },
+        "pooled_rmse": {
+          "heating_k_per_s": 0.02256982015042442,
+          "mean_vz_mm_s": 0.23876854107702208
+        },
+        "routed_rmse": {
+          "heating_k_per_s": 0.018557701508035714,
+          "mean_vz_mm_s": 0.2576105097166814
+        },
+        "scored": 28800,
+        "seconds": 0.19166870999999996,
+        "steady": {
+          "gain": {
+            "heating_k_per_s": 0.1541906364276837,
+            "mean_vz_mm_s": -0.09496661048184096
+          },
+          "pooled_rmse": {
+            "heating_k_per_s": 0.021326463039704483,
+            "mean_vz_mm_s": 0.24171852237287375
+          },
+          "routed_rmse": {
+            "heating_k_per_s": 0.018038122130860975,
+            "mean_vz_mm_s": 0.2646737111333046
+          },
+          "scored": 25920,
+          "skipped_calls": 12
+        }
+      },
+      "deploy_shadow": {
+        "applied": 28800,
+        "calls": 120,
+        "element_steps": 28800,
+        "extrapolated": 12889,
+        "interval_s": 5,
+        "max_abs": {
+          "temperature_k": 51.56392448110364,
+          "z_mm": 56.015981023793415
+        },
+        "mean_signed": {
+          "temperature_k": 3.9290730103189775,
+          "z_mm": -5.634280633238297
+        },
+        "rate_rmse": {
+          "heating_k_per_s": 2.0765120028227875,
+          "mean_vz_mm_s": 2.238139953169229
+        },
+        "rmse": {
+          "temperature_k": 10.382560014113936,
+          "z_mm": 11.190699765846146
+        },
+        "rmse_by_third": [
+          {
+            "element_steps": 9600,
+            "mean_signed_temperature_k": 0.030141926810618624,
+            "mean_signed_z_mm": -1.3368402715803407,
+            "temperature_k": 1.2317152196778194,
+            "z_mm": 5.186740836584915
+          },
+          {
+            "element_steps": 9600,
+            "mean_signed_temperature_k": 2.9107677938245837,
+            "mean_signed_z_mm": -7.321548764872661,
+            "temperature_k": 6.842485262909091,
+            "z_mm": 12.246161433520493
+          },
+          {
+            "element_steps": 9600,
+            "mean_signed_temperature_k": 8.846309310321708,
+            "mean_signed_z_mm": -8.244452863262353,
+            "temperature_k": 16.584810230585063,
+            "z_mm": 14.100515358884127
+          }
+        ],
+        "unbalanced_carrier_heat_k": 40.50088459036799,
+        "untouched": 0
+      },
+      "observers": {
+        "final_mean_temperature_k": {
+          "reference": 309.0911033623685,
+          "candidate": 407.3181353019023,
+          "gap": 98.22703193953384,
+          "tolerance": 2.0,
+          "within": false
+        },
+        "frames": {
+          "reference": 121,
+          "candidate": 121,
+          "gap": 0
+        },
+        "height_reversals": {
+          "reference": 8,
+          "candidate": 8,
+          "gap": 0
+        },
+        "liquid_fraction_range": {
+          "reference": 0.7945033286540716,
+          "candidate": 0.6723388049169349,
+          "gap": 0.12216452373713671,
+          "tolerance": 0.1,
+          "within": false
+        },
+        "mean_height_range_mm": {
+          "reference": 173.29796639676584,
+          "candidate": 106.49477595949105,
+          "gap": 66.8031904372748,
+          "tolerance": 20.0,
+          "within": false
+        },
+        "time_mean_height_mm": {
+          "reference": 100.13668419422812,
+          "candidate": 68.92470134085842,
+          "gap": 31.211982853369705,
+          "tolerance": 10.0,
+          "within": false
+        },
+        "time_mean_liquid_fraction": {
+          "reference": 0.23206344439307777,
+          "candidate": 0.3911317579198792,
+          "gap": 0.15906831352680142,
+          "tolerance": 0.1,
+          "within": false
+        },
+        "time_mean_temperature_k": {
+          "reference": 308.50514559212564,
+          "candidate": 340.4637214127337,
+          "gap": 31.958575820608075,
+          "tolerance": 1.0,
+          "within": false
+        }
+      },
+      "numpy_parity": {
+        "rows": 576,
+        "domain_mismatches": 0,
+        "max_relative_difference": 5.551115123125783e-16
+      }
+    }
+  ],
+  "command": "tools/torch/study_domain_learning.py --scenario lamp --train 325 333.15 345 --test 318 340 --passes 1",
+  "note": "Learned online by ctx.learnDomains from the scenario operator's own pre-bound rates; measured:false. Capacity depends on the recorded budget."
+}

@@ -13,6 +13,7 @@ where they disagree. Keys and route steps: [priority keys](../../../ROADMAP.md#p
 dated record below, and queue its residuals in the same change.
 
 - **P2** · R3 · Lava-lamp and two-liquid phase/transport migration (ledger row 7). (owned by the [scenarios/migrations queue](../../migrations/ROADMAP.md#priority-queue))
+- **P2** · R3 · The frozen frame-scale parcel learner runs away in closed loop (`learn_domains=deploy`, 2026-11-28). (owned by the [engine/inference queue](../../../engine/inference/ROADMAP.md#priority-queue))
 - **P2** · R3 · Let the engine's field-evolution arbitration drive the carrier, retiring the authored column to a validation reference, once its gates pass. (owned by the [lattice queue](../../../engine/lattice/ROADMAP.md#priority-queue))
 
 ## 2026-11-18 frame-scale response domains

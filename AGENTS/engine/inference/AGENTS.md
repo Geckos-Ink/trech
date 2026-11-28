@@ -321,7 +321,8 @@ efflux transport/crossing laws from its normal JS path. Both scenarios default t
 their `reference` sources are audit-only distilled teachers, and their generic paired gates require
 zero OOD plus exact run-level inference accounting. `testscenario_efflux` `learn_domains=learn|evaluate|deploy`
 (operator physics only; `deploy` lets the frozen learner in `data/efflux_domain_learner/` drive
-the transport with the operator as a shadow, graded by `efflux_domain_learner_deploy_closed_loop`) runs `ctx.learnDomains` on the transport operator's own inputs (position,
+the transport with the operator as a shadow, graded by `efflux_domain_learner_deploy_closed_loop`; the
+deploy emits 32 sample rows every 500 ticks for the campaign's NumPy replay) runs `ctx.learnDomains` on the transport operator's own inputs (position,
 radius, velocity, mass, permeant/cleared flags, unit innovations) and outputs (new velocity,
 pre-bound displacement rates). With 13 features the budget picks an affine basis, so the learner
 approximates the smooth SiLU operator piecewise; agreement is reported against

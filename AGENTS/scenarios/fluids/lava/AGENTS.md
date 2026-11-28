@@ -32,5 +32,20 @@ features at the start of an output interval (height, radius, wax temperature, mo
 carrier temperature at the parcel, vertical velocity, and the heater temperature as run context)
 and targets averaged over the fine physics
 steps of that interval (heating rate, mean vertical velocity). It is a coarse-grained meso lift of
-the authored step laws, never fed back into the lamp. Agreement is reported against a molten/solid
-split applied afterwards. Campaign: `tools/torch/study_domain_learning.py --scenario lamp`.
+the authored step laws; `learn` and `evaluate` never feed it back into the lamp. Agreement is
+reported against a molten/solid split applied afterwards. Campaign:
+`tools/torch/study_domain_learning.py --scenario lamp`.
+
+`learn_domains=deploy` (with `domain_learner_model`, normally
+`data/lava_lamp_domain_learner/parcels.json`) closes the loop. Each output frame the authored step
+laws advance the deployed state first; their temperature and height for each parcel are the
+shadow. The frozen learner (`lamp_parcels_deployed`) then predicts the interval's heating rate and
+mean vertical velocity from the frame-start features, and those predictions set each parcel's
+temperature, height (lamp bounds) and vertical velocity (speed cap); density follows. Horizontal
+motion, the carrier column, phase relaxation and the fine-step metrics stay authored. The summary
+gains `domain_learning.shadow` (per parcel-frame RMSE and signed gap of temperature and height, the
+same as interval rates, by run third, and `unbalanced_carrier_heat_k`: the carrier-equivalent heat
+the learned temperatures added beyond the authored exchange) and `parcel_response_driver:
+"learned_domains"`. Frame observers for paired grading are in
+`tools/validation/trech_validation/lamp_observers.py`; the suite case is
+`lava_lamp_domain_learner_deploy_closed_loop` (340 K, held out). Other modes' emits are unchanged.

@@ -55,12 +55,14 @@ TRECH_PARAMETERS({
   description: "learn = the engine grows unlabelled response domains of the frame-scale parcel " +
                "response (heating rate and vertical velocity over one output interval) from the " +
                "fine physics steps, graded prequentially against a pooled law; evaluate = a frozen " +
-               "learner (domain_learner_model) is graded on this run. The lamp is unchanged.",
-  default: "off", choices: ["off", "learn", "evaluate"]
+               "learner (domain_learner_model) is graded on this run; both leave the lamp unchanged. " +
+               "deploy = the frozen learner drives each parcel's temperature, height and vertical " +
+               "velocity every output frame; the authored step laws from the same state run as a shadow.",
+  default: "off", choices: ["off", "learn", "evaluate", "deploy"]
 }, {type: "choice"}); },
 "domain_learner_model": function() { return {
   type: "string", default: "", group: "Inference", label: "Domain learner state",
-  description: "trech_domain_learner_v1 state: warm start for learn, the frozen model for evaluate. " +
+  description: "trech_domain_learner_v1 state: warm start for learn, the frozen model for evaluate and deploy. " +
                "Repository-relative unless absolute."
 }; },
 "engine_field_evolution": function() { return {

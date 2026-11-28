@@ -2,8 +2,8 @@
 
 Scenarios: ``furnace`` (glass from sand, thermal operator; operating point =
 furnace temperature; learn/evaluate/deploy), ``lamp`` (lava lamp, frame-scale parcel
-response; operating point = heater temperature; learn/evaluate) and ``efflux``
-(membrane efflux transport operator; operating point = run seed; learn/evaluate).
+response; operating point = heater temperature; learn/evaluate/deploy) and ``efflux``
+(membrane efflux transport operator; operating point = run seed; learn/evaluate/deploy).
 
 Campaign (all through the engine; nothing here decides a domain):
 
@@ -14,12 +14,16 @@ Campaign (all through the engine; nothing here decides a domain):
               capacity-sized PyTorch residual networks on the reservoir rows and keeps
               them only where a temporal holdout improves on the domain's ridge law.
 3. held out -- at operating points never used for learning, three runs each:
-              ``declared``  the per-material operators (reference trajectory);
+              ``declared``  the scenario's own law (reference trajectory): the furnace's
+                            per-material operators, the lamp's authored step laws, the
+                            efflux transport operator;
               ``evaluate``  the frozen learner graded on that trajectory (state untouched);
-              ``deploy``    the frozen learner drives the thermal update, the declared
-                            operator runs on a copy as a shadow.
-              Deploy is repeated with the specialists. Observers are compared with the
-              declared run and the deploy samples are replayed through the NumPy twin.
+              ``deploy``    the frozen learner drives the scenario's update, its own law
+                            runs from the same state as a shadow.
+              Deploy is repeated with the specialists. Each scenario's observers (furnace
+              products and temperatures, lamp frame observers, efflux clearance) are
+              compared with the declared run and the deploy samples are replayed through
+              the NumPy twin.
 
 The report is JSON plus a Markdown table in ``--out``.
 """
@@ -34,7 +38,9 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "validation"))
 from trech_torch import domain_learner as dl  # noqa: E402
+from trech_validation import lamp_observers  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 SCENARIOS = {
@@ -44,11 +50,11 @@ SCENARIOS = {
                 "train": [1500, 1600, 1700, 1750, 1880], "test": [1560, 1820]},
     "lamp": {"script": "examples/scenarios/lava_lamp/lava_lamp.js",
              "learner": "lamp_parcels", "summary": "lava_lamp_summary",
-             "point": "heater_temperature_k", "deploy": False, "base": {},
+             "point": "heater_temperature_k", "deploy": True, "base": {},
              "train": [325, 333.15, 345], "test": [318, 340]},
     "efflux": {"script": "examples/scenarios/testscenario_efflux/testscenario_efflux.js",
                "learner": "efflux_transport", "summary": "efflux_summary",
-               "point": "seed", "deploy": False, "base": {"physics_source": "operator"},
+               "point": "seed", "deploy": True, "base": {"physics_source": "operator"},
                "train": [101, 102], "test": [201]},
 }
 SCENARIO = ROOT / SCENARIOS["furnace"]["script"]
@@ -84,7 +90,7 @@ def summary(run_dir: Path) -> dict:
     raise SystemExit(f"{run_dir}: no {SUMMARY}")
 
 
-OBSERVERS = [
+FURNACE_OBSERVERS = [
     ("glass_units", lambda s: s["product"]["glass_units"]),
     ("unreacted_sio2", lambda s: s["product"]["unreacted_sio2"]),
     ("remaining_carbonates", lambda s: s["product"]["remaining_carbonates"]),
@@ -96,15 +102,56 @@ OBSERVERS = [
 ]
 
 
-def compare(reference: dict, candidate: dict) -> dict:
+def compare_furnace(reference_dir: Path, candidate_dir: Path) -> dict:
+    reference, candidate = summary(reference_dir), summary(candidate_dir)
     out = {}
-    for name, get in OBSERVERS:
+    for name, get in FURNACE_OBSERVERS:
         a, b = get(reference), get(candidate)
         rel = abs(b - a) / max(abs(a), 1e-12) if a is not None and b is not None else None
         out[name] = {"declared": a, "learned": b, "relative_difference": rel}
     kinds_a, kinds_b = reference["product"]["final_kinds"], candidate["product"]["final_kinds"]
     out["final_kinds"] = {"declared": kinds_a, "learned": kinds_b}
     return out
+
+
+def compare_lamp(reference_dir: Path, candidate_dir: Path) -> dict:
+    """Frame observers of the authored and the deployed lamp (absolute gaps, gated tolerances)."""
+    seen = [lamp_observers.observe(list(dl.iter_emits(d, "material_frame")))
+            for d in (reference_dir, candidate_dir)]
+    return lamp_observers.compare(*seen)
+
+
+def compare_efflux(reference_dir: Path, candidate_dir: Path) -> dict:
+    """Clearance observables against the scenario's own operator tolerances."""
+    reference, candidate = summary(reference_dir), summary(candidate_dir)
+    block_a = reference.get("operator_vs_reference") or {}
+    block_b = candidate.get("operator_vs_reference") or {}
+    obs_a, obs_b = block_a.get("observables") or {}, block_b.get("observables") or {}
+    out = {}
+    for key, limit in sorted((block_a.get("tolerances") or {}).items()):
+        name = key.rsplit("_", 1)[0]
+        a, b = obs_a.get(name), obs_b.get(name)
+        gap = abs(b - a) if a is not None and b is not None else None
+        out[name] = {"reference": a, "candidate": b, "gap": gap, "tolerance": limit,
+                     "within": gap is not None and gap <= limit}
+    return out
+
+
+COMPARE = {"furnace": compare_furnace, "lamp": compare_lamp, "efflux": compare_efflux}
+
+
+def observer_cells(scenario: str, observers: dict, shadow: dict) -> list:
+    if scenario == "furnace":
+        worst = max((v["relative_difference"] or 0.0) for k, v in observers.items() if k != "final_kinds")
+        rmse = shadow.get("rmse", {})
+        return [f"shadow T {rmse.get('temperature_k', float('nan')):.3g} K",
+                f"glass {observers['glass_units']['declared']} / {observers['glass_units']['learned']}",
+                f"max observer diff {worst:.3g}"]
+    rmse = shadow.get("rmse", {})
+    gated = [v for v in observers.values() if "within" in v]
+    cells = ["shadow " + ", ".join(f"{k} {v:.3g}" for k, v in sorted(rmse.items()))]
+    cells.append(f"observers within tolerance {sum(v['within'] for v in gated)}/{len(gated)}")
+    return cells
 
 
 def main(argv=None) -> int:
@@ -192,7 +239,7 @@ def main(argv=None) -> int:
     for temperature in args.test:
         base = dict(test_extra, **{point: temperature})
         entry = {point: temperature}
-        declared = summary(run(args.binary, out / f"declared_{int(temperature)}", base, log)) \
+        declared_dir = run(args.binary, out / f"declared_{int(temperature)}", base, log) \
             if spec["deploy"] else None
         for label, model in models.items():
             evaluate = run(args.binary, out / f"evaluate_{label}_{int(temperature)}",
@@ -208,7 +255,7 @@ def main(argv=None) -> int:
                 samples = [p["samples"] for p in dl.iter_emits(deploy, "domain_learning") if p.get("samples")]
                 entry[label].update({
                     "deploy": deployed.get("domain_learning"),
-                    "observers": compare(declared, deployed),
+                    "observers": COMPARE[args.scenario](declared_dir, deploy),
                     "deploy_validation": deployed.get("validation"),
                     "numpy_parity": dl.replay(state, samples),
                 })
@@ -227,13 +274,11 @@ def main(argv=None) -> int:
             agreement = online.get("agreement") or {}
             cells.append(f"ARI {agreement.get('ari', float('nan')):.3f}")
             if spec["deploy"]:
-                shadow = ((e["deploy"] or {}).get("shadow") or {}).get("rmse", {})
-                obs = e["observers"]
-                worst = max((v["relative_difference"] or 0.0) for k, v in obs.items() if k != "final_kinds")
-                cells += [f"shadow T {shadow.get('temperature_k', float('nan')):.3g} K",
-                          f"glass {obs['glass_units']['declared']} / {obs['glass_units']['learned']}",
-                          f"max observer diff {worst:.3g}",
-                          f"parity {e['numpy_parity']['max_relative_difference']:.2g}"]
+                shadow = (e["deploy"] or {}).get("shadow") or {}
+                cells += observer_cells(args.scenario, e["observers"], shadow)
+                parity = e["numpy_parity"]
+                cells.append(f"parity {parity['max_relative_difference']:.2g} over {parity['rows']} rows"
+                             if parity.get("rows") else "parity n/a (no deploy samples)")
             elif e.get("evaluate_parity"):
                 cells.append(f"parity {e['evaluate_parity']['max_relative_difference']:.2g}")
             lines.append("| " + " | ".join(cells) + " |")

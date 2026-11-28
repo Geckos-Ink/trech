@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from . import declarative
+from . import lamp_observers
 
 if TYPE_CHECKING:
     from .runner import RunContext, RunOutputs
@@ -52,6 +53,8 @@ RUN_LAVA_LAMP_README = "out_lava_lamp_readme_10m"
 RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
 RUN_LAVA_LAMP_COOL = "out_lava_lamp_cool_heater"
 RUN_LAVA_LAMP_PRECISION = "out_lava_lamp_precision_high"
+RUN_LAVA_LAMP_340 = "out_lava_lamp_heater_340"
+RUN_LAVA_LAMP_DEPLOY_340 = "out_lava_lamp_learned_deploy_340"
 RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_H2O_CYCLE_REFERENCE = "out_h2o_cycle_reference"
 RUN_BRIGGS_RAUSCHER = "out_briggs_rauscher"
@@ -5903,6 +5906,104 @@ class EffluxDomainLearnerDeploy(ValidationCase):
                    "membrane crossing stays on its ctx.react operator."])
 
 
+class LavaLampDomainLearnerDeploy(ValidationCase):
+    """A frozen learned-domain parcel law drives the lava lamp in closed loop."""
+
+    name = "lava_lamp_domain_learner_deploy_closed_loop"
+    category = "fluids"
+    model = "data/lava_lamp_domain_learner/parcels.json"
+    build_record = "data/lava_lamp_domain_learner/parcels.build_record.json"
+    # Physics checks of the lamp that read the state the learner drives (temperature, height,
+    # vertical velocity) or the run's bookkeeping. The others (topology, rendered surface,
+    # horizontal convection) are reported, not gated.
+    gated_checks = (
+        "persistent_particle_identity", "configured_duration_reached", "one_frame_per_geant4_tick",
+        "thermodynamic_phase_response", "density_crossing_drives_buoyancy",
+        "bidirectional_motion_emerged", "thermally_caused_reversal",
+        "substantial_vertical_transport", "bounded_continuous_motion",
+    )
+    description = (
+        "lava_lamp at a 340 K heater (held out: the learner saw 325, 333.15 and 345 K) with "
+        "learn_domains=deploy: every output frame the committed frozen learner predicts each "
+        "parcel's heating rate and mean vertical velocity from its frame-start state and those "
+        "predictions set its temperature, height and vertical velocity, naming no phase or droplet "
+        "label. The authored step laws advance the same deployed state first and are the shadow. "
+        "Every parcel-frame must be predicted; the per-frame shadow gap, as an interval rate, must "
+        "beat the pooled single-domain law's held-out RMSE at 340 K (from the build record) for "
+        "both targets and must not grow from the first to the last third of the run; the frame "
+        "observers (time-mean and final temperature, time-mean height and its range, molten "
+        "fraction and its range) must stay within fixed tolerances of the authored run at 340 K; "
+        "and the lamp's thermal and vertical-motion checks must pass. The heat the learned "
+        "temperatures add beyond the authored exchange is reported, not gated."
+    )
+
+    def required_runs(self) -> List[str]:
+        return [RUN_LAVA_LAMP_340, RUN_LAVA_LAMP_DEPLOY_340]
+
+    def _pooled(self) -> Dict[str, float]:
+        path = _REPO_ROOT / self.build_record
+        if not path.exists():
+            return {}
+        record = json.loads(path.read_text())
+        for entry in record.get("held_out") or []:
+            if entry.get("heater_temperature_k") == 340:
+                return dict((entry.get("evaluate") or {}).get("pooled_rmse") or {})
+        return {}
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        for name in self.required_runs():
+            if _need_run(ctx, name) is None:
+                return _skip(self.name, self.description, self.category, name)
+        authored_run, deployed_run = _need_run(ctx, RUN_LAVA_LAMP_340), _need_run(ctx, RUN_LAVA_LAMP_DEPLOY_340)
+        deployed = _last_emit_payload(deployed_run, "lava_lamp_summary") or {}
+        learning = deployed.get("domain_learning") or {}
+        shadow = learning.get("shadow") or {}
+        pooled = self._pooled()
+        observers = lamp_observers.compare(
+            lamp_observers.observe(lamp_observers.frames_from_emits(authored_run.hook_emits or [])),
+            lamp_observers.observe(lamp_observers.frames_from_emits(deployed_run.hook_emits or [])))
+        checks: Dict[str, bool] = {
+            "deploy_mode": learning.get("mode") == "deploy" and
+            deployed.get("parcel_response_driver") == "learned_domains",
+            "every_parcel_frame_predicted": shadow.get("untouched") == 0 and (shadow.get("applied") or 0) > 0
+            and shadow.get("applied") == shadow.get("element_steps"),
+        }
+        rate = shadow.get("rate_rmse") or {}
+        for target in ("heating_k_per_s", "mean_vz_mm_s"):
+            bar = pooled.get(target)
+            checks[f"shadow_{target}_beats_pooled"] = bar is not None and (rate.get(target) or 1e9) <= bar
+        thirds = shadow.get("rmse_by_third") or []
+        if len(thirds) == 3 and all(t.get("element_steps") for t in (thirds[0], thirds[2])):
+            for field_name in ("temperature_k", "z_mm"):
+                checks[f"{field_name}_error_does_not_compound"] = thirds[2][field_name] <= thirds[0][field_name]
+        else:
+            checks["error_by_third_present"] = False
+        for name, entry in observers.items():
+            if "within" in entry:
+                checks[f"observer_{name}"] = entry["within"]
+        scenario = deployed.get("validation") or {}
+        for name in self.gated_checks:
+            checks[f"scenario_{name}"] = bool(scenario.get(name))
+        reported = {k: v for k, v in scenario.items() if k not in self.gated_checks}
+        ok = all(checks.values())
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(checks.values())}/{len(checks)} shadow rate RMSE heating="
+                     f"{rate.get('heating_k_per_s')} vz={rate.get('mean_vz_mm_s')} (pooled {pooled}); "
+                     f"T {observers.get('time_mean_temperature_k', {}).get('gap')} K, height "
+                     f"{observers.get('time_mean_height_mm', {}).get('gap')} mm"),
+            measured={"checks": checks, "shadow": shadow, "observers": observers,
+                      "reported_scenario_checks": reported},
+            expected={"pooled_rmse_340": pooled, "observer_tolerances": lamp_observers.TOLERANCES,
+                      "untouched": 0},
+            notes=["The learned law replaces the lamp's authored frame-scale thermal/vertical response "
+                   "(the authored laws are a hook-layer solver whose coefficients the Geant4-seeded "
+                   "cascade infers); agreement measures closed-loop migration of that response through "
+                   "unlabelled domains, not lava-lamp metrology. Horizontal motion, the carrier column "
+                   "and phase relaxation stay authored."])
+
+
 class GlassChargeRefinement(ValidationCase):
     name = "glass_charge_preserved_under_refinement"
     description = (
@@ -6017,6 +6118,7 @@ ALL_CASES: List[ValidationCase] = [
     GlassDomainLearningUnlabelled(),
     GlassDomainLearnerDeployHeldOut(),
     EffluxDomainLearnerDeploy(),
+    LavaLampDomainLearnerDeploy(),
     GlassChargeRefinement(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),

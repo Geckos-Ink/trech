@@ -110,8 +110,8 @@ const domainLearnerModel = TRECH_PARAMETER("domain_learner_model");
 const LEARNER_STATE = domainLearnerModel
   ? TRECH_READ_JSON(domainLearnerModel.startsWith("/") ? domainLearnerModel : "../../../" + domainLearnerModel)
   : null;
-if (learnDomains === "evaluate" && !LEARNER_STATE) {
-  throw new Error("learn_domains=evaluate needs domain_learner_model");
+if ((learnDomains === "evaluate" || learnDomains === "deploy") && !LEARNER_STATE) {
+  throw new Error("learn_domains=" + learnDomains + " needs domain_learner_model");
 }
 if (heaterTemperatureK <= ambientTemperatureK) {
   throw new Error("heater_temperature_k must exceed ambient_temperature_k");
@@ -695,6 +695,107 @@ function parcelSnapshot(state) {
   };
 }
 
+// The heater temperature is run context: constant within a run, it lets
+// domains learned across a campaign condition on the operating point.
+function learnerFeatures(start, n) {
+  return {
+    z_mm: start.z_mm, radius_mm: start.radius_mm, temperature_k: start.temperature_k,
+    liquid_fraction: start.liquid_fraction, carrier_temperature_k: start.carrier_temperature_k,
+    vz_mm_s: start.vz_mm_s,
+    heater_temperature_k: new Float64Array(n).fill(APPARATUS.heaterTemperatureK)
+  };
+}
+
+// --- closed-loop deployment (learn_domains=deploy) ------------------------------
+// The authored step laws first advance the lamp over the output interval from the DEPLOYED
+// state; what they give each parcel's temperature and height is the shadow. The frozen learner
+// (warm start + frozen) then predicts the interval's heating rate and mean vertical velocity
+// from the frame-start features, and those predictions DRIVE the parcels: temperature, height
+// and vertical velocity are replaced by the learned values (explicit Euler over the interval,
+// the lamp's height bounds and speed cap), density follows. Horizontal motion, the carrier
+// column, phase relaxation and the fine-step metrics stay authored, so the learner owns the
+// thermal/vertical response and its error feeds back into every later frame. The per-frame gap
+// to the shadow, by run third, shows whether it compounds. The heat the learned temperatures
+// add beyond the authored exchange is not taken from the carrier and is reported.
+function deployParcelResponse(ctx, state, start, target, frameIndex) {
+  const dt = target - start.time;
+  if (!(dt > 0)) return;
+  const n = state.n;
+  const features = learnerFeatures(start, n);
+  const report = ctx.learnDomains({
+    name: "lamp_parcels_deployed",
+    time: target,
+    features,
+    options: { warm_start: LEARNER_STATE, frozen: true },
+    report: "summary"
+  });
+  if (!report) throw new Error("learn_domains=deploy requires determinism.mode=predictive");
+  const d = state.deploy;
+  const third = Math.min(2, Math.floor(3 * (frameIndex - 1) / APPARATUS.outputTicks));
+  const phase = d.phases[third];
+  const heating = report.predictions.heating_k_per_s || [];
+  const rise = report.predictions.mean_vz_mm_s || [];
+  const capacityShare = state.params.waxToCarrierHeatCapacityRatio / n;
+  for (let i = 0; i < n; i += 1) {
+    const h = heating[i], v = rise[i];
+    if (h === null || v === null || !Number.isFinite(h) || !Number.isFinite(v)) {
+      d.untouched += 1;
+      continue;
+    }
+    const shadowT = state.temperatureK[i], shadowZ = state.pz[i];
+    const vz = clamp(v, -MAX_SPEED_MM_S, MAX_SPEED_MM_S);
+    state.temperatureK[i] = start.temperature_k[i] + h * dt;
+    state.pz[i] = clamp(start.z_mm[i] + vz * dt, Z_MIN_MM, Z_MAX_MM);
+    state.vz[i] = vz;
+    state.densityGcm3[i] = waxDensityGcm3(state, i);
+    const eT = state.temperatureK[i] - shadowT, eZ = state.pz[i] - shadowZ;
+    d.sq.temperature_k += eT * eT; phase.sq.temperature_k += eT * eT;
+    d.sq.z_mm += eZ * eZ; phase.sq.z_mm += eZ * eZ;
+    d.signed.temperature_k += eT; phase.signed.temperature_k += eT;
+    d.signed.z_mm += eZ; phase.signed.z_mm += eZ;
+    d.maxAbs.temperature_k = Math.max(d.maxAbs.temperature_k, Math.abs(eT));
+    d.maxAbs.z_mm = Math.max(d.maxAbs.z_mm, Math.abs(eZ));
+    d.unbalancedCarrierK += eT * capacityShare;
+    d.applied += 1;
+    phase.n += 1;
+  }
+  d.calls += 1;
+  d.elements += n;
+  d.extrapolated += Number(report.extrapolated || 0);
+  if (frameIndex % 10 === 0 || frameIndex >= APPARATUS.outputTicks) {
+    ctx.emit("domain_learning", TRECH_DOMAIN_LEARNING.summarize(report,
+      { scenario: "lava_lamp", frame: frameIndex, mode: "deploy" },
+      { samples: { features, count: 48 } }));
+  }
+}
+
+function deploySummary(state) {
+  const d = state.deploy;
+  const dt = APPARATUS.outputTickIntervalS;
+  const block = (sq, signed, count) => ({
+    temperature_k: Math.sqrt(sq.temperature_k / Math.max(count, 1)),
+    z_mm: Math.sqrt(sq.z_mm / Math.max(count, 1)),
+    mean_signed_temperature_k: signed.temperature_k / Math.max(count, 1),
+    mean_signed_z_mm: signed.z_mm / Math.max(count, 1)
+  });
+  const all = block(d.sq, d.signed, d.applied);
+  return {
+    calls: d.calls, element_steps: d.elements, applied: d.applied, untouched: d.untouched,
+    extrapolated: d.extrapolated, interval_s: dt,
+    // Per parcel and output frame: learner minus the authored shadow from the same state.
+    rmse: { temperature_k: all.temperature_k, z_mm: all.z_mm },
+    // The same gaps as interval rates, comparable with the learner's target RMSE.
+    rate_rmse: { heating_k_per_s: all.temperature_k / dt, mean_vz_mm_s: all.z_mm / dt },
+    mean_signed: { temperature_k: all.mean_signed_temperature_k, z_mm: all.mean_signed_z_mm },
+    max_abs: d.maxAbs,
+    rmse_by_third: d.phases.map((ph) => Object.assign({ element_steps: ph.n },
+      block(ph.sq, ph.signed, ph.n))),
+    // Carrier-equivalent kelvin the learned temperatures added beyond the authored exchange
+    // (wax heat capacity share), summed over the run: heat the deployment did not conserve.
+    unbalanced_carrier_heat_k: d.unbalancedCarrierK
+  };
+}
+
 function learnParcelResponse(ctx, state, start, target, frameIndex) {
   const dt = target - start.time;
   if (!(dt > 0)) return;
@@ -705,14 +806,7 @@ function learnParcelResponse(ctx, state, start, target, frameIndex) {
     rise[i] = (state.pz[i] - start.z_mm[i]) / dt;
   }
   const finalFrame = frameIndex >= APPARATUS.outputTicks;
-  // The heater temperature is run context: constant within a run, it lets
-  // domains learned across a campaign condition on the operating point.
-  const features = {
-    z_mm: start.z_mm, radius_mm: start.radius_mm, temperature_k: start.temperature_k,
-    liquid_fraction: start.liquid_fraction, carrier_temperature_k: start.carrier_temperature_k,
-    vz_mm_s: start.vz_mm_s,
-    heater_temperature_k: new Float64Array(n).fill(APPARATUS.heaterTemperatureK)
-  };
+  const features = learnerFeatures(start, n);
   const report = ctx.learnDomains({
     name: "lamp_parcels",
     time: target,
@@ -893,6 +987,12 @@ function initState(ctx) {
   state.carrierNextTemperatureK.fill(APPARATUS.ambientTemperatureK);
   initParticles(state);
   initializeConvectionOrientation(state);
+  if (learnDomains === "deploy") {
+    const gaps = () => ({ temperature_k: 0, z_mm: 0 });
+    state.deploy = { calls: 0, elements: 0, applied: 0, untouched: 0, extrapolated: 0,
+      sq: gaps(), signed: gaps(), maxAbs: gaps(), unbalancedCarrierK: 0,
+      phases: [0, 1, 2].map(() => ({ n: 0, sq: gaps(), signed: gaps() })) };
+  }
   ctx.state.lavaLamp = state;
   return state;
 }
@@ -942,7 +1042,8 @@ globalThis.TRECH_HOOKS = {
     const target = frameClock(frameIndex).physicalTimeS;
     const start = learnDomains !== "off" ? parcelSnapshot(state) : null;
     advanceTo(state, target);
-    if (start) learnParcelResponse(ctx, state, start, target, frameIndex);
+    if (learnDomains === "deploy") deployParcelResponse(ctx, state, start, target, frameIndex);
+    else if (start) learnParcelResponse(ctx, state, start, target, frameIndex);
     emitFrame(ctx, state, frameIndex);
     observeValidationFrame(ctx, state, target, frameIndex, frameIndex >= APPARATUS.outputTicks);
   },
@@ -981,10 +1082,16 @@ globalThis.TRECH_HOOKS = {
         note: "Frame-scale parcel response domains learned online by ctx.learnDomains from the " +
               "fine physics steps; no phase or droplet label is read. Prequential (predict-then-" +
               "learn) error against a pooled single-domain law fed the same parcels; agreement " +
-              "with the molten/solid split is computed afterwards.",
+              "with the molten/solid split is computed afterwards. deploy: a frozen learner drives " +
+              "each parcel's temperature, height and vertical velocity every output frame; the " +
+              "authored step laws from the same state are the shadow.",
         learner_state: domainLearnerModel || null,
-        online: state.learning ? TRECH_DOMAIN_LEARNING.finish(state.learning) : null
+        online: state.learning ? TRECH_DOMAIN_LEARNING.finish(state.learning) : null,
+        shadow: learnDomains === "deploy" ? deploySummary(state) : undefined
       },
+      // Which law advanced the parcels' temperature and height: the authored step laws, or
+      // (deploy) the frozen learner with the authored laws as a shadow.
+      parcel_response_driver: learnDomains === "deploy" ? "learned_domains" : undefined,
       inferred_thermofluid_parameters: state.params,
       precision: {
         profile: PRECISION.profile,

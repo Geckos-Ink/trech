@@ -1121,10 +1121,10 @@ population of one run. See the [hook contract](scenario_hooks.md#ctxdetectdomain
 
 ## Response-domain learning emits
 
-With `--param learn_domains=...` the glass furnace (`learn`, `evaluate`, `deploy`), the lava lamp
-(`learn`, `evaluate`) and the efflux test scenario (`learn`, `evaluate`, operator physics) emit
-`domain_learning` records. Efflux `deploy` (frozen learner drives the transport) emits none per
-tick; its `efflux_summary.domain_learning.shadow` holds `calls`, `element_steps`, `applied`,
+With `--param learn_domains=...` the glass furnace, the lava lamp and the efflux test scenario
+(operator physics), each with `learn`, `evaluate` and `deploy`, emit `domain_learning` records.
+Efflux `deploy` (frozen learner drives the transport) emits one with `samples` every 500 ticks;
+its `efflux_summary.domain_learning.shadow` holds `calls`, `element_steps`, `applied`,
 `untouched`, `extrapolated`, `rmse` and `max_abs` (`position`, `velocity`: learner minus the
 shadow operator per component and particle-step) and `rmse_by_third`, and
 `efflux_summary.inference.transport_driver` is `"learned_domains"`. The furnace emits one per tick (last thermal sub-step), the lamp one
@@ -1156,6 +1156,16 @@ mean signed temperature error (learned minus operator) by cell material
 (`mean_signed_temperature_error_by_domain`, with element-steps and the materials it held). The
 learned update drives a field only on cells whose operator rates that field (the glass operator
 rates temperature only).
+
+The lava lamp's `deploy` mode emits a `domain_learning` record with `samples` every tenth frame and
+on the last one. `lava_lamp_summary.domain_learning.shadow` holds `calls`, `element_steps`,
+`applied`, `untouched`, `extrapolated`, `interval_s`, `rmse` and `max_abs` (`temperature_k`,
+`z_mm`: learned minus the authored step laws from the same state, per parcel and output frame),
+`rate_rmse` (the same divided by the interval: `heating_k_per_s`, `mean_vz_mm_s`), `mean_signed`,
+`rmse_by_third` (with `element_steps` and signed means) and `unbalanced_carrier_heat_k` (the
+carrier-equivalent heat the learned temperatures added beyond the authored exchange, summed over
+the run). `lava_lamp_summary.parcel_response_driver` is `"learned_domains"`; both fields are
+absent in the other modes.
 
 ## Engine field-evolution emits
 

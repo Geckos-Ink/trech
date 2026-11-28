@@ -37,8 +37,8 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Domain routing beyond glass from sand: route a second family (lava lamp wax/carrier, membrane efflux) and measure routing domains from particle-derived rows rather than from the scenario's own labelled harvest; let elements outside every envelope queue a Geant4 experiment plan and a `trech arch` job for the uncovered regime. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element or per-pair group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit. `ctx.interact` now routes pairs by their own context; also let it compose pair kinds from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Particle-derived teachers for the online domain learner. `ctx.learnDomains` now learns dynamically changing operator responses (furnace thermal law, lamp parcels, efflux transport), but every teacher is an authored or distilled operator. Feed Geant4-derived rows (CHNO observer, atomic tables) and grade the learned domains against held-out Geant4 runs. Expose the TorchScript specialist index in engine traces and turn recurring uncovered regimes into experiment requests. ([detail](#online-response-domain-learning-2026-11-18))
-- **P2** · R3 · Closed-loop deployment of learned-domain operators beyond the furnace thermal law and efflux transport (landed 2026-11-22): chemistry (`ctx.react` hazards) and the lamp parcel dynamics, each behind a paired observer gate, with compounding error measured over long horizons, not only per step. The efflux learner saturated the 24-domain capacity: decide whether capacity should grow with evidence or whether merges should be stricter. ([detail](#efflux-closed-loop-deployment-2026-11-22))
-- **P3** · R3 · `study_domain_learning.py` still marks efflux `deploy: False` and compares only furnace observers, so efflux deploy runs are graded by the suite case alone. Make the campaign's observers per scenario and run the deploy pass for efflux. ([detail](#efflux-closed-loop-deployment-2026-11-22))
+- **P2** · R3 · Closed-loop deployment of learned-domain operators beyond the furnace thermal law and efflux transport (landed 2026-11-22) and the lava lamp (measured 2026-11-28, fails): chemistry (`ctx.react` hazards) behind a paired observer gate, with compounding error measured over long horizons, not only per step. The efflux learner saturated the 24-domain capacity: decide whether capacity should grow with evidence or whether merges should be stricter. ([detail](#lava-lamp-closed-loop-deployment-2026-11-28))
+- **P2** · R3 · The lava lamp's frozen frame-scale learner runs away in closed loop: at a held-out 340 K heater the wax ends at 407 K, the per-frame shadow gap grows 13× from the first to the last third, and `lava_lamp_domain_learner_deploy_closed_loop` fails. The pooled law runs away too (318 K). Close it in the engine, not with scenario features: a learned law that keeps a restoring response outside its hull (a structural prior or a basis the engine discovers from the members' differences), a trust-gated deploy that hands extrapolating rows back to the shadow law and counts them, and a multi-frame rollout error in the campaign's selection. The learned temperatures also add heat the carrier never gave up (40.5 K carrier-equivalent at 340 K): debit the carrier with the learned exchange. ([detail](#lava-lamp-closed-loop-deployment-2026-11-28))
 - **P2** · R4 · Calibrate the learner's `predictionStd`: the ±1.96σ interval covers 99% of rows in-run but 70–88% under transfer (furnace 1820 K, lamp 318 K), while on the efflux held-out seed it over-covers (~99.5%, bands too wide); add per-domain conformal half-widths from held-out calls and carry them into a deployed state. ([detail](#online-response-domain-learning-2026-11-18))
 - **P2** · R3 · The two-pass furnace learner (2026-11-20) fixed the 1820 K deploy (+2.3 K mean, minimum fusion +1.9 K, case 10/10). At held-out 1560 K the first glass forms 6 ticks early (27 vs 33; operator tolerance 3), where the one-pass learner matched exactly, and the minimum fusion temperature sits at +4.8 K against 5 K. Grade a 1560 K deploy in the suite, and reduce the early-fusion bias without training on a held-out point. ([detail](#furnace-learner-bias-fixed-by-a-two-pass-campaign-2026-11-20))
 - **P3** · R2 · Catch-all domains (wide boxes mixing materials whose laws agree in-sample) transfer poorly; split on joint-support density or a learned membership model, not only on in-sample error. The lava-lamp frame-scale response remains a weak case (velocity 13% worse than pooled inside the training range). ([detail](#online-response-domain-learning-2026-11-18))
@@ -255,6 +255,33 @@ dated record below, and queue its residuals in the same change.
   The existing routing and evolution tests are unchanged.
 - Residuals (queued above): `ctx.react`, `ctx.interact` and `ctx.predict` paths; no scenario
   with overlapping rivals; intermediates are not arbitrated; arbiters are not exported.
+
+## Lava lamp closed-loop deployment (2026-11-28)
+
+- [x] `lava_lamp` `learn_domains=deploy`: each output frame the authored step laws advance the
+  deployed state (the shadow), then the frozen learner (`lamp_parcels_deployed`) sets each
+  parcel's temperature, height and vertical velocity from its predicted heating rate and mean
+  vertical velocity. Horizontal motion, the carrier column and phase relaxation stay authored.
+  The summary's `domain_learning.shadow` carries per parcel-frame RMSE and signed gaps (and the
+  same as interval rates), by run third, and `unbalanced_carrier_heat_k`;
+  `parcel_response_driver` names the driver. `off`/`learn`/`evaluate` emits are unchanged
+  (a 60 s off run matched HEAD except the companion's `field_evolution` score, which also differs
+  between two runs of one tree; see the lattice "deterministic learner capacity" item).
+- [x] Published learner `data/lava_lamp_domain_learner/parcels.json` (rebuilt on heaters 325,
+  333.15, 345 K, no specialists; build record beside it). Suite runs `out_lava_lamp_heater_340`
+  and `out_lava_lamp_learned_deploy_340`; case `lava_lamp_domain_learner_deploy_closed_loop`
+  with gates fixed before the first run (pooled held-out RMSE from the build record, no growth by
+  third, six frame observers from `tools/validation/trech_validation/lamp_observers.py`, nine
+  thermal/vertical scenario checks).
+- [x] `study_domain_learning.py` grades deploy for every scenario with its own observers
+  (furnace products, lamp frame observers, efflux clearance tolerances) and reports NumPy parity
+  with its row count. The efflux deploy now emits 32 sample rows every 500 ticks.
+- Results (600 s). 340 K: shadow RMSE 10.4 K / 11.2 mm per frame (2.08 K/s and 2.24 mm/s against
+  pooled 0.0226 / 0.239), T by third 1.23 / 6.84 / 16.6 K, final mean wax 309.1 → 407.3 K,
+  0/6 observers within tolerance; 318 K: 6.59 K / 10.5 mm, final 307.6 → 395.3 K, 2/6. Parity
+  5.6 × 10⁻¹⁶ over 576 deployed rows. Efflux seed 201 deploy pass: shadow 0.0152 / 0.00225,
+  3/4 clearance observables (the miss is the operator's own `retained_inside`), parity
+  3.4 × 10⁻¹⁶ over 384 rows. The lamp runaway is queued above.
 
 ## Efflux closed-loop deployment (2026-11-22)
 

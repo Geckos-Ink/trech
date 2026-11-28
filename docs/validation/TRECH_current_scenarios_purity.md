@@ -95,7 +95,7 @@ Performance source: [`docs/validation/validation_report.json`](validation_report
 | [h2o_single_molecule](#h2o_single_molecule) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hello_world](#hello_world) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hooks_track_ledger](#hooks_track_ledger) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [lava_lamp](#lava_lamp) | **C** ⚠ | `operator_partial` | 12% | 1 / 7 | 5.0 | 2×hand | nano→macro | 1 pass |
+| [lava_lamp](#lava_lamp) | **C** ⚠ | `operator_partial` | 12% | 1 / 7 | 4.7 | 2×hand | nano→macro | 1 pass |
 | [molecular_01_ethane](#molecular_01_ethane) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 13.4 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_02_ethanol](#molecular_02_ethanol) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 13.4 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_03_formamide](#molecular_03_formamide) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 13.4 | 2×G4 6×dist | atomic→nano | none recorded |
@@ -1083,7 +1083,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: thermal, phase, pair-interface and buoyancy/drag state evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 7 · inference share: 12%
-- Embedded coefficients: 63 in 1255 code lines (5.0/100) · top-level literals: 40 · geometry math: 26
+- Embedded coefficients: 63 in 1342 code lines (4.7/100) · top-level literals: 40 · geometry math: 28
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
 - Inherited from modules: `js/trech_domain_tracking.js`, `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
@@ -1523,7 +1523,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Inference sites: 2 (`evolve` 1, `react` 1) · law-shaped math: 2 · inference share: 50%
-- Embedded coefficients: 15 in 1040 code lines (1.4/100) · top-level literals: 23 · geometry math: 13
+- Embedded coefficients: 15 in 1047 code lines (1.4/100) · top-level literals: 23 · geometry math: 13
 - Geant4 fact reads: 0 · seeded RNG draws: 6 · hooks: yes
 - Comparison-only (excluded): 2 law-shaped sites in comparison code; functions `eventFactsWithReferenceActivation`, `referenceAdvectionVelocity`, `referenceStepCleared`, `referenceStepInside`, `referenceStepRandomVelocity`
 - Inherited from modules: `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients

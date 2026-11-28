@@ -376,5 +376,46 @@ class TraceReferenceTests(unittest.TestCase):
             self.assertEqual(verify_run(plain)["state"], "untraced")
 
 
+def lamp_frame(t: float, z: float, temperature: float, liquid: float) -> dict:
+    return {"tag": "material_frame", "payload": {
+        "time_s": t, "positions_mm": [[0.0, 0.0, z - 1.0], [1.0, 0.0, z + 1.0]],
+        "physics_state": {"mean_temperature_k": temperature, "mean_liquid_fraction": liquid}}}
+
+
+class LavaLampObserverTests(unittest.TestCase):
+    def test_frame_observers_and_reversals(self):
+        from trech_validation import lamp_observers
+        heights = [20.0, 30.0, 40.0, 35.0, 35.5, 50.0, 49.0]
+        emits = [lamp_frame(5.0 * i, z, 300.0 + i, 0.1 * i) for i, z in enumerate(heights)]
+        emits.insert(2, {"tag": "domain_learning", "payload": {}})
+        seen = lamp_observers.observe(lamp_observers.frames_from_emits(emits))
+        self.assertEqual(seen["frames"], 7)
+        self.assertAlmostEqual(seen["time_mean_height_mm"], sum(heights) / 7)
+        self.assertAlmostEqual(seen["mean_height_range_mm"], 30.0)
+        self.assertAlmostEqual(seen["final_mean_temperature_k"], 306.0)
+        self.assertAlmostEqual(seen["liquid_fraction_range"], 0.6)
+        # up, up, down, (0.5 mm: no direction), up, (1 mm: no direction) -> two reversals
+        self.assertEqual(seen["height_reversals"], 2)
+        self.assertIsNone(lamp_observers.observe([]))
+
+    def test_compare_gates_only_toleranced_observers(self):
+        from trech_validation import lamp_observers
+        a = {"time_mean_temperature_k": 310.0, "time_mean_height_mm": 50.0, "height_reversals": 3}
+        b = {"time_mean_temperature_k": 311.5, "time_mean_height_mm": 55.0, "height_reversals": 9}
+        out = lamp_observers.compare(a, b)
+        self.assertFalse(out["time_mean_temperature_k"]["within"])
+        self.assertTrue(out["time_mean_height_mm"]["within"])
+        self.assertNotIn("within", out["height_reversals"])
+        self.assertEqual(out["height_reversals"]["gap"], 6)
+
+    def test_deploy_case_skips_without_runs_and_reads_pooled_bar(self):
+        from trech_validation.cases import LavaLampDomainLearnerDeploy
+        from trech_validation.runner import RunContext
+        case = LavaLampDomainLearnerDeploy()
+        self.assertEqual(case.evaluate(RunContext()).status, "skip")
+        pooled = case._pooled()
+        self.assertEqual(sorted(pooled), ["heating_k_per_s", "mean_vz_mm_s"])
+
+
 if __name__ == "__main__":
     unittest.main()
