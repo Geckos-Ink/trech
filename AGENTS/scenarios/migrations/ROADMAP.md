@@ -22,7 +22,8 @@ dated record below, and queue its residuals in the same change.
 
 - **P1** · R3 · Row 2 — CNT material → device → circuit cascade (cheap deterministic scenarios with validation cases). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
 - **P1** · R3 · Row 3 — magnetic-resonance forward dynamics. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
-- **P1** · R3 · Row 6 remainder — osmosis membrane response: replace the authored `integrateMembrane` pressure/area/bending law with membrane-node operators (efflux promoted 2026-07-26; osmotic particle velocity response and channel passage promoted 2026-11-26). It is the run's hot path (642 vertices × 6 substeps × 6,000 ticks), so cost the per-substep inference before choosing the operator's granularity. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P1** · R3 · Row 6 remainder — osmosis membrane response: replace the authored `integrateMembrane` pressure/area/bending law with membrane-node operators (efflux promoted 2026-07-26; osmotic particle velocity response and channel passage promoted 2026-11-26). Granularity chosen 2026-11-28 from measured cost: one per-vertex `ctx.evolve` call per substep (the mesh volume/area/bending geometry stays declared machinery and supplies its inputs). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P2** · R7 · The osmotic membrane's mesh geometry (`membraneGeometry`: enclosed volume, area and their per-vertex gradients over 1,280 faces, six times per tick) is 82 % of the membrane law and about three quarters of the whole run (21.1 of 24.5 ms per tick); a physics-agnostic engine method for triangle-mesh volume/area gradients would cut it whichever law consumes it. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
 - **P2** · R3 · Seed-averaged osmotic pair: `osmotic_operators_match_reference` grades one trajectory per side, so its water/shrink tolerances (10 molecules, 0.20) are set from a three-seed sweep. Over seeds 31073101/101/202 the operator's mean shrink was 0.43 against the reference's 0.49 (0.405/0.324/0.550 vs 0.423/0.500/0.557), a possible low bias from the motion operator's residual glucose drift (≈0.013). Grade the means over ≥8 seeds per side and tighten the tolerances. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
 - **P2** · R2 · The osmotic operators take no particle-derived input: the bath runs on a 0 MeV geantino and the velocity and passage responses are distilled from the authored teacher alone. Condition them on Geant4-derived material facts, as the efflux crossing operator does with attenuation coefficients and event activation. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
 - **P3** · R3 · The osmotic channel-passage operator's clamped verdict is inexact for 23 of 178,761 fresh rows more than 0.05 from the size threshold, all of them a very small (radius ≈0.2) wrong-polarity molecule in a very wide channel (≈1.15). No declared species is there; fix it before the queued pore-width runs reach that corner. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
@@ -143,6 +144,21 @@ needs.
   the committed fit learns the velocity change on mirrored (−v, −noise) pairs.
   **Osmosis remains:** replace the `integrateMembrane` pressure/area/bending response with
   membrane-node operators; pores and inside/outside accounting remain declared topology.
+  **Cost study (2026-11-28)** before choosing the operator's granularity:
+  [`scripts/bench_membrane_operator_cost.py`](../../../scripts/bench_membrane_operator_cost.py),
+  report [`docs/validation/membrane_operator_cost.json`](../../../docs/validation/membrane_operator_cost.json).
+  The scenario now times `integrateMembrane` and its in-loop `membraneGeometry` in a
+  `debug:osmotic_membrane` trace (spans only; untraced output unchanged). Measured on the
+  Release build: the authored law costs 24.45 ms per tick, 146.7 s of a 158 s default run (93 %);
+  over 2,857 fully recorded ticks (the trace caps a category at 20,000 records), mesh geometry is
+  21.1 ms of it (82 %) and the vertex update 4.7 ms. A synthetic per-vertex operator (6 inputs →
+  `d_rho_dt`, two SiLU layers) over 642 vertices costs 0.23 / 0.42 / 0.88 ms per `ctx.evolve`
+  call at widths 16 / 32 / 64 (array building included, the same per call at either
+  granularity): per substep that is 1.4–5.3 ms per tick (8–32 s per run), per tick 1.3–4.3 s per
+  run. **Decision:** keep the law's substep structure, one call per substep. Its inference costs
+  about what the update it replaces costs, so granularity does not decide the run time; the
+  geometry does, and it is queued as an engine method (P2 above). Synthetic weights grade cost
+  only.
   Extend `efflux_first_order_kinetics` and `osmotic_shift_observed` with independent compound,
   concentration, temperature and pore-width runs; grade selectivity, clearance rate/half-life,
   flux direction, pressure delta, turgor/crenation and solute retention.

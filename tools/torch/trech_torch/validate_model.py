@@ -509,10 +509,13 @@ def _provenance_hash(run_dir: Path) -> Optional[str]:
                 line = line.strip()
                 if line:
                     record = json.loads(line)
+                    # A run that failed before Geant4 produced no data; it identifies nothing.
+                    if record.get("phase") == "run_failed":
+                        continue
                     if record.get("config_hash"):
                         return str(record["config_hash"])
                     # Older/synthetic provenance: the configuration text identifies the run.
-                    if isinstance(record.get("config_json"), str):
+                    if isinstance(record.get("config_json"), str) and record["config_json"]:
                         return "sha256:" + hashlib.sha256(record["config_json"].encode()).hexdigest()[:16]
                     return None
     except (OSError, ValueError):

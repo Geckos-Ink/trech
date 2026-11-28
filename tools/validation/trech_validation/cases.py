@@ -3535,7 +3535,10 @@ class H2oMoleculeBondsStable(ValidationCase):
         "bound and energy-conserving over time -- 'stable without exploding'. "
         "Asserts the scenario's own validation: no bond ever exceeds 1.6x "
         "equilibrium, mean bond/angle stay near equilibrium (0.957 A / 104.52 "
-        "deg), and total energy drifts <2% over the run."
+        "deg), and total energy drifts <2% over the run. A 300 K thermal ensemble "
+        "(8 Maxwell-Boltzmann replicas) then measures the vibrational spectrum: it must "
+        "match the force field's harmonic normal modes within 1% and keep measured "
+        "water's mode order; its gap to measured gas-phase fundamentals is reported."
     )
     category = "molecule"
 
@@ -3553,6 +3556,15 @@ class H2oMoleculeBondsStable(ValidationCase):
                 status="fail", summary="no molecule_summary emit (run incomplete?)")
         val = p["validation"]
         ok, declared = _declared_family_verdict(self.name, "h2o_molecule_stability", run)
+        spectrum = _last_emit_payload(run, "molecule_spectrum") or {}
+        sval = spectrum.get("validation") or {}
+        peaks = spectrum.get("peaks_cm1") or {}
+        gaps = sval.get("relative_gap_to_measured") or {}
+        spectrum_text = (" spectrum " + "/".join(f"{peaks.get(m, 0):.0f}" for m in
+                                                 ("symmetric_stretch", "bend", "antisymmetric_stretch"))
+                         + " cm-1 (gap to measured " + "/".join(f"{100 * gaps.get(m, 0):+.1f}%" for m in
+                                                               ("symmetric_stretch", "bend", "antisymmetric_stretch"))
+                         + ")") if peaks else " (no molecule_spectrum emit)"
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
@@ -3561,14 +3573,21 @@ class H2oMoleculeBondsStable(ValidationCase):
                      f"max_bond={p.get('max_bond_A', 0):.4f}A "
                      f"mean_angle={p.get('mean_angle_deg', 0):.2f}deg "
                      f"energy_drift={p.get('energy_drift_fraction', 0) * 100:.3f}% "
-                     f"(r0=0.9572A, theta0=104.52deg)"),
+                     f"(r0=0.9572A, theta0=104.52deg)" + spectrum_text),
             measured={"mean_bond_A": round(float(p.get("mean_bond_A") or 0.0), 4),
                       "max_bond_A": round(float(p.get("max_bond_A") or 0.0), 4),
                       "mean_angle_deg": round(float(p.get("mean_angle_deg") or 0.0), 2),
                       "energy_drift_fraction": round(float(p.get("energy_drift_fraction") or 0.0), 5),
                       "bonds_stable": bool(val.get("bonds_stable")),
-                      "energy_conserved": bool(val.get("energy_conserved"))},
-            expected="stable_without_exploding (bonds bounded near r0, energy drift <2%)")
+                      "energy_conserved": bool(val.get("energy_conserved")),
+                      "spectrum_peaks_cm1": peaks,
+                      "spectrum_gap_to_harmonic": sval.get("max_abs_gap_to_harmonic"),
+                      "spectrum_gap_to_measured": gaps,
+                      "ensemble_temperature_k": spectrum.get("temperature_kinetic_k")},
+            expected="stable_without_exploding (bonds bounded near r0, energy drift <2%); "
+                     "thermal spectrum within 1% of the force field's harmonic modes, measured mode order",
+            references=["Measured H2O fundamentals 3657/1595/3756 cm-1 (Shimanouchi, NIST CCCBDB)",
+                        "Wilson GF normal-mode analysis of a bent XY2 molecule"])
 
 
 class H2oClusterFluidStable(ValidationCase):

@@ -90,7 +90,7 @@ Performance source: [`docs/validation/validation_report.json`](validation_report
 | [h2o_cluster_fluid](#h2o_cluster_fluid) | **E** | `reference_only` | — | 0 / 0 | 2.3 | — | — | 1 pass |
 | [h2o_diffusion_temperature](#h2o_diffusion_temperature) | **E** | `reference_only` | 0% | 0 / 3 | 4.7 | — | — | 1 pass |
 | [h2o_fluid](#h2o_fluid) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [h2o_molecule_stability](#h2o_molecule_stability) | **E** | `reference_only` | — | 0 / 0 | 3.2 | — | — | 1 pass |
+| [h2o_molecule_stability](#h2o_molecule_stability) | **E** | `reference_only` | 0% | 0 / 3 | 1.9 | — | — | 1 pass |
 | [h2o_optics_beam](#h2o_optics_beam) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [h2o_single_molecule](#h2o_single_molecule) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hello_world](#hello_world) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
@@ -991,9 +991,9 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `reference_only`, companion `reference_only`.
 - Authored residual still forcing behaviour: flexible-water bond and angle force laws
-- Inference sites: 0 · law-shaped math: 0 · inference share: —
-- Embedded coefficients: 6 in 187 code lines (3.2/100) · top-level literals: 9 · geometry math: 9
-- Geant4 fact reads: 0 · seeded RNG draws: 0 · hooks: yes
+- Inference sites: 0 · law-shaped math: 3 · inference share: 0%
+- Embedded coefficients: 6 in 311 code lines (1.9/100) · top-level literals: 11 · geometry math: 14
+- Geant4 fact reads: 0 · seeded RNG draws: 1 · hooks: yes
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 
 **Performance**
@@ -1657,7 +1657,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Authored residual still forcing behaviour: pressure-driven area-conserving membrane response (integrateMembrane) is still authored on both paths
 - Ledger note: The default physics_source=operator runs a distilled micro ctx.evolve particle velocity response and a ctx.react channel-passage operator that infers which molecules cross from their size/polarity and the channel's declared width/polarity; the retired Langevin refresh and passage rule are reference* and reachable only with physics_source=reference. Free flight, bath walls and membrane reflection are numerical machinery.
 - Inference sites: 2 (`evolve` 1, `react` 1) · law-shaped math: 0 · inference share: 100%
-- Embedded coefficients: 17 in 1042 code lines (1.6/100) · top-level literals: 32 · geometry math: 20
+- Embedded coefficients: 17 in 1044 code lines (1.6/100) · top-level literals: 32 · geometry math: 20
 - Geant4 fact reads: 0 · seeded RNG draws: 5 · hooks: yes
 - Comparison-only (excluded): functions `referenceApplyLangevinThermostat`, `referenceChannelPasses`, `referenceStepParticle`
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`

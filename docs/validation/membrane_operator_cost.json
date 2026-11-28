@@ -1,0 +1,91 @@
+{
+  "schema": "trech_membrane_operator_cost_v1",
+  "vertices": 642,
+  "substeps": 6,
+  "ticks_measured": 2000,
+  "scenario_ticks": 6000,
+  "binary": "trech",
+  "note": "synthetic weights: cost only, not accuracy",
+  "operator": [
+    {
+      "width": 16,
+      "granularity": "per_tick",
+      "calls_per_tick": 1,
+      "wall_s": 1.6612825000000004,
+      "inference_ms_per_call": 0.2089069375000001,
+      "inference_us_per_vertex": 0.325400214174455,
+      "projected_inference_s_per_scenario_run": 1.2534416250000007
+    },
+    {
+      "width": 16,
+      "granularity": "per_substep",
+      "calls_per_tick": 6,
+      "wall_s": 5.471692624999999,
+      "inference_ms_per_call": 0.2284147778333332,
+      "inference_us_per_vertex": 0.3557862583073726,
+      "projected_inference_s_per_scenario_run": 8.222932001999995
+    },
+    {
+      "width": 32,
+      "granularity": "per_tick",
+      "calls_per_tick": 1,
+      "wall_s": 2.0139093750000043,
+      "inference_ms_per_call": 0.38522037500000206,
+      "inference_us_per_vertex": 0.6000317367601278,
+      "projected_inference_s_per_scenario_run": 2.3113222500000123
+    },
+    {
+      "width": 32,
+      "granularity": "per_substep",
+      "calls_per_tick": 6,
+      "wall_s": 7.73682625,
+      "inference_ms_per_call": 0.4171759132499999,
+      "inference_us_per_vertex": 0.6498067184579438,
+      "projected_inference_s_per_scenario_run": 15.018332876999997
+    },
+    {
+      "width": 64,
+      "granularity": "per_tick",
+      "calls_per_tick": 1,
+      "wall_s": 2.683738833999996,
+      "inference_ms_per_call": 0.720135104499998,
+      "inference_us_per_vertex": 1.121705770249218,
+      "projected_inference_s_per_scenario_run": 4.320810626999988
+    },
+    {
+      "width": 64,
+      "granularity": "per_substep",
+      "calls_per_tick": 6,
+      "wall_s": 13.242085999999986,
+      "inference_ms_per_call": 0.8759475590833321,
+      "inference_us_per_vertex": 1.364404297637589,
+      "projected_inference_s_per_scenario_run": 31.534112126999958
+    }
+  ],
+  "baseline": {
+    "1_builds_per_tick_s": 1.2434686250000002,
+    "6_builds_per_tick_s": 2.730715291000001
+  },
+  "authored": [
+    {
+      "ticks": 6000,
+      "mean_ms_per_tick": 24.452377046666665,
+      "median_ms_per_tick": 24.135,
+      "total_s": 146.71426227999964,
+      "suppressed_records": 0,
+      "source": "osmotic_law_spans/trech_trace.jsonl"
+    },
+    {
+      "ticks": 2857,
+      "mean_ms_per_tick": 25.77695889114456,
+      "median_ms_per_tick": 24.177,
+      "total_s": 73.64477155200011,
+      "suppressed_records": 22000,
+      "source": "osmotic_geometry_spans/trech_trace.jsonl",
+      "geometry_ticks": 2857,
+      "geometry_ms_per_tick": 21.077900825691312,
+      "update_ms_per_tick": 4.699058065453284,
+      "geometry_share": 0.8177031633057538
+    }
+  ]
+}

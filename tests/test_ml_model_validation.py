@@ -157,6 +157,19 @@ def check_run_gates() -> None:
         replay = vm.validate(root / "lin.json", test_runs=[str(root / "replay")], training_runs=[str(root / "train")], **kw)
         leak = {g["name"]: g for g in replay["gates"]}["run_leakage"]
         assert leak["status"] == "fail" and "same configuration" in leak["detail"], leak
+        # A run_failed record (a run that stopped before Geant4) identifies nothing: it is skipped,
+        # and an empty config never hashes to a shared identity.
+        failed = root / "failed"
+        failed.mkdir()
+        (failed / "trech_provenance.jsonl").write_text(json.dumps(
+            {"phase": "run_failed", "config_json": "", "config_hash": "", "failure": {"stage": "evaluate"}}) + "\n")
+        assert vm._provenance_hash(failed) is None
+        (failed / "trech_provenance.jsonl").write_text(
+            (root / "train" / "trech_provenance.jsonl").read_text()
+            + json.dumps({"phase": "run_failed", "config_json": "", "config_hash": ""}) + "\n")
+        assert vm._provenance_hash(failed) == vm._provenance_hash(root / "train")
+        (failed / "trech_provenance.jsonl").write_text(json.dumps({"phase": "run_start", "config_json": ""}) + "\n")
+        assert vm._provenance_hash(failed) is None
 
         import torch  # noqa: F401
         assert train(common + ["--validation-runs", str(root / "test"), "--widths", "12,6",

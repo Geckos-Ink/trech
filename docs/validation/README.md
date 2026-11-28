@@ -39,6 +39,7 @@ of these results. Its camera, clock or color mapping can come from the viewer.
 | [Static model audit](ml_model_audit.md) | Committed-model structure and carried trust checks. |
 | [ml_model_recheck.json](ml_model_recheck.json) | Machine-readable sidecar for the corresponding Markdown report. |
 | [Fresh-run model rechecks](ml_model_recheck.md) | Independent seed checks and producer-replay results. |
+| [membrane_operator_cost.json](membrane_operator_cost.json) | What the osmotic membrane law costs per tick (82 % of it mesh geometry) against a learned per-vertex operator at three widths and two granularities; explained in [the osmotic scenario doc](../scenarios/testscenario_osmotic-todo.md#cost-of-a-membrane-operator-2026-11-28). |
 | [search_comparison_particle_observer.json](search_comparison_particle_observer.json) | Architecture-search strategies compared on the Geant4 particle-observer runs; explained in [evolved architectures](../inference/evolvo_architectures.md#search-quality-on-geant4-runs-2026-11-27). |
 | [validation_glass_of_water.json](validation_glass_of_water.json) | Machine-readable sidecar for the corresponding Markdown report. |
 | [Glass-of-Water validation](validation_glass_of_water.md) | Optical inverse checks against recorded trajectories. |

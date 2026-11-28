@@ -58,6 +58,7 @@ const units = helpers.units;
 const geometry = helpers.geometry;
 
 const physicsSource = TRECH_PARAMETER("physics_source");
+const MEMBRANE_TRACE = TRECH_TRACE.channel("osmotic_membrane");
 const THERMOSTAT_MODEL = "osmotic_thermostat_operator";
 const CROSSING_MODEL = "osmotic_crossing_operator";
 const THERMOSTAT_ROLE = "osmotic_particle_motion";
@@ -374,7 +375,9 @@ function integrateMembrane(membrane, pressureInside, pressureOutside) {
   const rho = membrane.rho;
   const lap = new Float64Array(n);
   for (let s = 0; s < SCENARIO.membraneSubsteps; s += 1) {
-    const geo = membraneGeometry(membrane, dV, dA);
+    // Timed separately in a debug trace (osmotic_membrane): the mesh geometry an operator would
+    // still need as its inputs, versus the update an operator would replace.
+    const geo = MEMBRANE_TRACE.span("membraneGeometry", () => membraneGeometry(membrane, dV, dA));
     const cV = -pressureDrive / mobility;
     const cA = 2.0 * kA * (geo.area / membrane.area0 - 1.0) / membrane.area0;
     for (let i = 0; i < n; i += 1) {
@@ -925,7 +928,10 @@ globalThis.TRECH_HOOKS = {
     // impulses per area on each side, exponentially averaged) while its lipid
     // area is held, so shrinking folds the excess area (crenation). Particles
     // the moving wall sweeps past are carried with it.
-    integrateMembrane(state.membrane, state.pressureInsideEMA, state.pressureOutsideEMA);
+    // The span only times the authored law in a debug trace (category osmotic_membrane); it never
+    // changes the call or its result. It is the cost baseline for the queued membrane operator.
+    MEMBRANE_TRACE.span("integrateMembrane",
+                        () => integrateMembrane(state.membrane, state.pressureInsideEMA, state.pressureOutsideEMA));
     if (state.membrane.meanRadius < state.minMembraneMeanRadius) {
       state.minMembraneMeanRadius = state.membrane.meanRadius;
     }

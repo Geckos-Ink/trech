@@ -185,7 +185,7 @@ also rewrite that row.
 | 4 | [`h2o_bulk_freeze_boil`](../../examples/scenarios/h2o_bulk_freeze_boil/h2o_bulk_freeze_boil.js) | E | No suite case | The reference target for bucket slot 3, a Geant4-trained water operator that freezes. | Core, and give it a case |
 | 5 | [`h2o_diffusion_temperature`](../../examples/scenarios/h2o_diffusion_temperature/h2o_diffusion_temperature.js) | E | 1 suite case | Diffusion trend against measured water. | Keep |
 | 6 | [`h2o_cluster_fluid`](../../examples/scenarios/h2o_cluster_fluid/h2o_cluster_fluid.js) | E | 1 suite case | A small hydrogen-bonded droplet. | Keep (named by ledger row 8) |
-| 7 | [`h2o_molecule_stability`](../../examples/scenarios/h2o_molecule_stability/h2o_molecule_stability.js) | E | 1 suite case | A single flexible molecule. | Keep (named by ledger row 8) |
+| 7 | [`h2o_molecule_stability`](../../examples/scenarios/h2o_molecule_stability/h2o_molecule_stability.js) | E | 1 suite case | A single flexible molecule, its 300 K thermal ensemble and vibrational spectrum (within 0.11 % of the force field's normal modes; measured gap reported, bend −9.5 %; 2026-11-28). | Keep (named by ledger row 8) |
 | 8 | [`h2o_fluid`](../../examples/scenarios/h2o_fluid/h2o_fluid.js) | G | 1 suite case; `run_validation.sh` | Transport through a salt-and-brine apparatus. | Fold into `water_salt_recipe` or keep as a transport fixture |
 | 9 | [`h2o_single_molecule`](../../examples/scenarios/h2o_single_molecule/h2o_single_molecule.js) | G | No case, no test | A subpixel molecule-shaped geometry fixture. | Remove |
 
@@ -194,7 +194,7 @@ also rewrite that row.
 | Rank | Scenario | Grade | Evidence | What only it covers | Verdict |
 | --- | --- | --- | --- | --- | --- |
 | 1 | [`testscenario_efflux`](../../examples/scenarios/testscenario_efflux/testscenario_efflux.js) | B | 2 suite cases; [design](testscenario_efflux.md) | A frozen learned operator deployed in closed loop; the promoted row 6 half. | Core |
-| 2 | [`testscenario_osmotic`](../../examples/scenarios/testscenario_osmotic/testscenario_osmotic.js) | C | 2 suite cases | Distilled particle velocity and channel-passage operators (2026-11-26); its authored membrane law is bucket slot 5 (ledger row 6 remainder), and this bundle is that migration's acceptance test. | Core |
+| 2 | [`testscenario_osmotic`](../../examples/scenarios/testscenario_osmotic/testscenario_osmotic.js) | C | 2 suite cases | Distilled particle velocity and channel-passage operators (2026-11-26); its authored membrane law is bucket slot 5 (ledger row 6 remainder), and this bundle is that migration's acceptance test. The law's cost is measured (93 % of the run, 82 % of it mesh geometry; per-substep operator chosen, 2026-11-28). | Core |
 | 3 | [`testscenario_pascal`](../../examples/scenarios/testscenario_pascal/testscenario_pascal.js) | E | 1 suite case | Pressure transmission in rigid and deformable vessels; last step of ledger row 8. | Keep |
 
 ## 9. Magnetic resonance

@@ -133,6 +133,147 @@ function verletStep(state) {
   return { bond1: f1.bond1, bond2: f1.bond2, angle: f1.angle, pe: f1.pe, ke, etot: f1.pe + ke };
 }
 
+// ---- thermal ensemble and vibrational spectrum -------------------------------------------------
+// After the stability run, the same force field is sampled as a thermal ensemble: REPLICAS copies
+// start at the equilibrium geometry with Maxwell-Boltzmann velocities at ENSEMBLE_T (ctx.rng), lose
+// their centre-of-mass and rigid-rotation parts, and are scaled to the canonical mean vibrational
+// energy 3 kT (three harmonic modes, potential energy zero at equilibrium), so equipartition gives a
+// kinetic temperature of ENSEMBLE_T. Each replica runs SPECTRUM_STEPS velocity-Verlet steps; the
+// power spectra of the symmetric-stretch, antisymmetric-stretch and bend coordinates, summed over
+// replicas, locate the molecule's vibrational frequencies. These are this classical force field's
+// frequencies (the physics for comparison); the validation companion grades them.
+const KB_AMU = 8.31446262e-7;      // Boltzmann constant in amu*A^2/fs^2 per K
+const C_CM_PER_FS = 2.99792458e-5; // speed of light, cm/fs (frequency in fs^-1 -> cm^-1)
+const ENSEMBLE_T = 300.0;
+const REPLICAS = 8;
+const SPECTRUM_STEPS = 8192;       // per replica: 1.64 ps at 0.2 fs, 20.4 cm^-1 bins
+const BANDS_CM1 = { bend: [1000, 2400], symmetric_stretch: [2800, 4800], antisymmetric_stretch: [2800, 4800] };
+
+const cross = (a, b) => v(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+
+// Remove centre-of-mass velocity and rigid rotation (omega = I^-1 L about the centre of mass).
+function removeRigidMotion(pos, vel) {
+  const atoms = [["O", MASS.O], ["H1", MASS.H], ["H2", MASS.H]];
+  const total = MASS.O + 2 * MASS.H;
+  let com = v(0, 0, 0), p = v(0, 0, 0);
+  for (const [k, m] of atoms) { com = add(com, scale(pos[k], m / total)); p = add(p, scale(vel[k], m)); }
+  for (const [k] of atoms) vel[k] = sub(vel[k], scale(p, 1 / total));
+  let L = v(0, 0, 0);
+  const I = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  for (const [k, m] of atoms) {
+    const r = sub(pos[k], com);
+    L = add(L, scale(cross(r, vel[k]), m));
+    const rr = dot(r, r), c = [r.x, r.y, r.z];
+    for (let i = 0; i < 3; i += 1) {
+      for (let j = 0; j < 3; j += 1) I[i][j] += m * ((i === j ? rr : 0) - c[i] * c[j]);
+    }
+  }
+  const det = I[0][0] * (I[1][1] * I[2][2] - I[1][2] * I[2][1]) -
+              I[0][1] * (I[1][0] * I[2][2] - I[1][2] * I[2][0]) +
+              I[0][2] * (I[1][0] * I[2][1] - I[1][1] * I[2][0]);
+  const solve = (col) => {  // Cramer: replace column `col` of I with L
+    const M = I.map((row) => row.slice());
+    const l = [L.x, L.y, L.z];
+    for (let i = 0; i < 3; i += 1) M[i][col] = l[i];
+    return (M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) -
+            M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) +
+            M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0])) / det;
+  };
+  const omega = v(solve(0), solve(1), solve(2));
+  for (const [k] of atoms) vel[k] = sub(vel[k], cross(omega, sub(pos[k], com)));
+}
+
+// In-place iterative radix-2 FFT (n a power of two).
+function fft(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i += 1) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < len / 2; k += 1) {
+        const a = i + k, b = a + len / 2;
+        const xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+        const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+      }
+    }
+  }
+}
+
+// Adds the Hann-windowed power spectrum of `series` (mean removed) into `power`.
+function accumulatePower(series, power) {
+  const n = series.length;
+  let mean = 0;
+  for (let i = 0; i < n; i += 1) mean += series[i] / n;
+  const re = new Float64Array(n), im = new Float64Array(n);
+  for (let i = 0; i < n; i += 1) re[i] = (series[i] - mean) * 0.5 * (1 - Math.cos(2 * Math.PI * i / (n - 1)));
+  fft(re, im);
+  for (let k = 0; k <= n / 2; k += 1) power[k] += re[k] * re[k] + im[k] * im[k];
+}
+
+// Strongest bin inside a band, refined by a parabola through the log power of its neighbours.
+function peakCm1(power, band, binCm1) {
+  let best = -1;
+  for (let k = Math.ceil(band[0] / binCm1); k <= Math.floor(band[1] / binCm1) && k < power.length - 1; k += 1) {
+    if (best < 0 || power[k] > power[best]) best = k;
+  }
+  const l = Math.log(power[best - 1]), c = Math.log(power[best]), r = Math.log(power[best + 1]);
+  const delta = (l - 2 * c + r) !== 0 ? 0.5 * (l - r) / (l - 2 * c + r) : 0;
+  return (best + delta) * binCm1;
+}
+
+function thermalSpectrum(rng) {
+  const powers = { symmetric_stretch: new Float64Array(SPECTRUM_STEPS / 2 + 1),
+                   antisymmetric_stretch: new Float64Array(SPECTRUM_STEPS / 2 + 1),
+                   bend: new Float64Array(SPECTRUM_STEPS / 2 + 1) };
+  let keSum = 0, keCount = 0, worstDrift = 0;
+  for (let rep = 0; rep < REPLICAS; rep += 1) {
+    const pos = equilibriumPositions();
+    const draw = (m) => { const s = Math.sqrt(KB_AMU * ENSEMBLE_T / m); return v(rng.normal(0, s), rng.normal(0, s), rng.normal(0, s)); };
+    const vel = { O: draw(MASS.O), H1: draw(MASS.H), H2: draw(MASS.H) };
+    removeRigidMotion(pos, vel);
+    const f = Math.sqrt(3 * KB_AMU * ENSEMBLE_T / kineticEnergy(vel));
+    for (const k of ["O", "H1", "H2"]) vel[k] = scale(vel[k], f);
+    const replica = { pos, vel, force: computeForces(pos) };
+    const e0 = kineticEnergy(vel);
+    const sym = new Float64Array(SPECTRUM_STEPS), asym = new Float64Array(SPECTRUM_STEPS);
+    const bend = new Float64Array(SPECTRUM_STEPS);
+    let eMin = Infinity, eMax = -Infinity;
+    for (let i = 0; i < SPECTRUM_STEPS; i += 1) {
+      const obs = verletStep(replica);
+      sym[i] = 0.5 * (obs.bond1 + obs.bond2);
+      asym[i] = 0.5 * (obs.bond1 - obs.bond2);
+      bend[i] = obs.angle;
+      keSum += obs.ke; keCount += 1;
+      eMin = Math.min(eMin, obs.etot); eMax = Math.max(eMax, obs.etot);
+    }
+    worstDrift = Math.max(worstDrift, (eMax - eMin) / e0);
+    accumulatePower(sym, powers.symmetric_stretch);
+    accumulatePower(asym, powers.antisymmetric_stretch);
+    accumulatePower(bend, powers.bend);
+  }
+  const binCm1 = 1 / (SPECTRUM_STEPS * DT * C_CM_PER_FS);
+  const peaks = {};
+  for (const mode of Object.keys(BANDS_CM1)) peaks[mode] = peakCm1(powers[mode], BANDS_CM1[mode], binCm1);
+  return {
+    temperature_target_k: ENSEMBLE_T,
+    // Three vibrational degrees of freedom after removing translation and rotation.
+    temperature_kinetic_k: 2 * (keSum / keCount) / (3 * KB_AMU),
+    replicas: REPLICAS, steps_per_replica: SPECTRUM_STEPS, dt_fs: DT,
+    duration_ps_per_replica: SPECTRUM_STEPS * DT / 1000,
+    bin_cm1: binCm1,
+    worst_energy_drift_fraction: worstDrift,
+    peaks_cm1: peaks,
+    method: "Hann-windowed FFT power of internal coordinates, summed over replicas; parabolic peak refinement"
+  };
+}
+
 function initState() {
   const pos = equilibriumPositions();
   // Deliberate kick: stretch the H1 bond +0.20 A and bend H2 by +6 deg so both
@@ -224,6 +365,10 @@ globalThis.TRECH_HOOKS = {
         energy_drift_fraction: energyDrift,
         validation: TRECH_CHECKS["h2o_molecule_stability"]["checks0"](bondsStable, energyConserved, exploded)
       });
+      const spectrum = thermalSpectrum(ctx.rng);
+      spectrum.validation = TRECH_CHECKS["h2o_molecule_stability"]["spectrum0"](
+        spectrum, { kb: KB, ka: KA, r0: R0, theta0: THETA0, mass: MASS, cCmPerFs: C_CM_PER_FS });
+      ctx.emit("molecule_spectrum", spectrum);
     }
   }
 };

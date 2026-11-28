@@ -43,8 +43,10 @@ function provenanceConfigHash(runDir) {
     if (!line.trim()) continue;
     try {
       const record = JSON.parse(line);
+      // A run that failed before Geant4 produced no data; it identifies nothing.
+      if (record.phase === 'run_failed') continue;
       if (record.config_hash) return String(record.config_hash);
-      if (typeof record.config_json === 'string') {
+      if (typeof record.config_json === 'string' && record.config_json) {
         return 'sha256:' + require('node:crypto').createHash('sha256').update(record.config_json).digest('hex').slice(0, 16);
       }
     } catch (_) { /* unreadable line: no identity */ }

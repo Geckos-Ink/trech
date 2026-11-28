@@ -16,6 +16,7 @@ JavaScript bundles, reusable processes, molecular examples and scenario validati
 | [Independent process references](process_references.md) | NaCl interface and airflow comparisons and their limits. |
 | [Scenario bundles](scenario_bundles.md) | Physics roots and presentation/validation companions. |
 | [Reusable solution processes](solution_processes.md) | Process-library declarations, model bindings and units. |
+| [Single water molecule spectrum](water_molecule_spectrum.md) | The 300 K thermal ensemble of one water molecule, its vibrational spectrum and how it is graded against the force field's normal modes and measured fundamentals. |
 | [Passive membrane efflux](testscenario_efflux.md) | Biological clearance comparison and scenario design. |
 | [Osmotic-dehydration design](testscenario_osmotic-todo.md) | Original objectives and implementation notes; retain the comparison labels. |
 | [Pascal-principle design](testscenario_pascal-todo.md) | Original mechanics validation proposal and acceptance goals. |

@@ -43,6 +43,33 @@ does not cross, and pressure scoring. The retired laws are `reference*` function
 byte for byte. **The membrane's response is still the authored `integrateMembrane` law on both
 paths**: the pressure, area and bending terms that shrink and fold the cell.
 
+### Cost of a membrane operator (2026-11-28)
+
+The membrane is the next law to become an engine operator, and it is the run's hot path, so its
+cost was measured before choosing how often the operator runs. Run the scenario with
+`--trace debug:osmotic_membrane` and the trace times each `integrateMembrane` call (one per tick)
+and each `membraneGeometry` call inside it (one per substep). The spans only observe: an untraced
+run writes the same output as before. Then
+`python3 scripts/bench_membrane_operator_cost.py --authored-trace <run>/trech_trace.jsonl` times a
+synthetic per-vertex operator through `ctx.evolve` and writes a report like the committed
+[membrane_operator_cost.json](../validation/membrane_operator_cost.json).
+
+| Part | Cost |
+| --- | --- |
+| Authored membrane law | 24.5 ms per tick: 147 s of a 158 s run (93 %) |
+| Its mesh geometry (volume, area and their per-vertex gradients, 6× per tick) | 21.1 ms per tick (82 % of the law) |
+| Its vertex update | 4.7 ms per tick |
+| A learned per-vertex operator, one call per substep (widths 16–64) | 1.4–5.3 ms per tick |
+| The same operator, one call per tick | 0.2–0.7 ms per tick |
+
+So an operator called every substep costs about what the update it replaces costs, and the
+granularity hardly changes the run time. The operator will keep the law's six substeps. What
+would make the run faster is the geometry, which any membrane law needs as input; a general
+engine method for triangle-mesh volume and area gradients is queued. The synthetic operator's
+weights are random: this measures cost, not accuracy. The trace keeps at most 20,000 records per
+category, so a full run records all 6,000 law spans but the geometry share comes from the 2,857
+ticks recorded in full.
+
 Two lessons from training, worth knowing before retraining either model:
 
 * *A velocity bias becomes a drift.* The velocity memory (γ = 0.96) multiplies any constant

@@ -10,7 +10,7 @@ const vm = require('node:vm');
 
 const { evaluate, summarize, library, LIB } = require('../lib/load');
 const { ModelStore, parseBytes } = require('../lib/store');
-const { Orchestrator, trainerArgs } = require('../lib/orchestrate');
+const { Orchestrator, trainerArgs, provenanceConfigHash } = require('../lib/orchestrate');
 
 // VM-realm objects have foreign prototypes; compare their JSON form.
 const eq = (actual, expected, message) => assert.deepEqual(JSON.parse(JSON.stringify(actual)), expected, message);
@@ -735,4 +735,18 @@ test('CLI inspects unsaved drafts from stdin and never deletes without --yes', (
   const yes = spawnSync(process.execPath, [CLI, 'delete', 'x@v1', '--store', store.dir, '--yes', '--json'], { encoding: 'utf8' });
   assert.equal(yes.status, 0, yes.stderr);
   eq(store.read().models, {});
+});
+
+test('a run_failed provenance record identifies no run configuration', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'trech-prov-'));
+  const file = path.join(dir, 'trech_provenance.jsonl');
+  const line = (r) => JSON.stringify(r) + '\n';
+  fs.writeFileSync(file, line({ phase: 'run_failed', config_json: '', config_hash: '', failure: { stage: 'evaluate' } }));
+  assert.equal(provenanceConfigHash(dir), null);
+  fs.writeFileSync(file, line({ phase: 'run_failed', config_json: '{}', config_hash: 'aa' }) +
+    line({ phase: 'run_start', config_json: '{"a":1}', config_hash: 'bb' }));
+  assert.equal(provenanceConfigHash(dir), 'bb');
+  fs.writeFileSync(file, line({ phase: 'run_start', config_json: '' }));
+  assert.equal(provenanceConfigHash(dir), null);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
