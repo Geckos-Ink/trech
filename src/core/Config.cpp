@@ -443,6 +443,20 @@ RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
   if (!std::isfinite(cfg.timeBudgetSeconds) || cfg.timeBudgetSeconds < 0.0) {
     throw std::runtime_error("run.timeBudgetSeconds must be finite and non-negative");
   }
+  if (has(j, "precisionTarget") && objectAt(j.at("precisionTarget"), "precisionTarget")) {
+    const auto& target = j.at("precisionTarget");
+    located("precisionTarget", [&] {
+      cfg.precisionRelativeStderr = fieldOr(target, "relativeStderr", 0.0);
+      cfg.precisionMinEvents = fieldOr(target, "minEvents", cfg.precisionMinEvents);
+    });
+    if (!std::isfinite(cfg.precisionRelativeStderr) || cfg.precisionRelativeStderr <= 0.0 ||
+        cfg.precisionRelativeStderr >= 1.0) {
+      throw std::runtime_error("run.precisionTarget.relativeStderr must be in (0, 1)");
+    }
+    if (cfg.precisionMinEvents < 2) {
+      throw std::runtime_error("run.precisionTarget.minEvents must be at least 2");
+    }
+  }
   return cfg;
 }
 
@@ -1596,6 +1610,10 @@ std::string configToJsonString(const TrechConfig& cfg) {
   }
   if (cfg.run.timeBudgetSeconds > 0.0) {
     root["run"]["timeBudgetSeconds"] = cfg.run.timeBudgetSeconds;
+  }
+  if (cfg.run.precisionRelativeStderr > 0.0) {
+    root["run"]["precisionTarget"] = {{"relativeStderr", cfg.run.precisionRelativeStderr},
+                                      {"minEvents", cfg.run.precisionMinEvents}};
   }
   // Only a scenario that selects non-default physics carries a `physics` block.
   if (!cfg.physics.list.empty() || cfg.physics.radioactiveDecayThresholdYears > 0.0 ||

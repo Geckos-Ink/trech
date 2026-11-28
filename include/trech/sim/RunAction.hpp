@@ -62,6 +62,8 @@ public:
 
   void BeginOfRunAction(const G4Run* run) override;
   void EndOfRunAction(const G4Run* run) override;
+  // "precision_target", "time_budget" or "event_limit" for a run that may stop early.
+  std::string stopReason(int requestedEvents) const;
   void AddEnergyDeposit(G4double edep);
   // stepSpecies: the sim::secondary_species class of the particle taking the
   // step (primaries included); the deposit's per-class split uses it.

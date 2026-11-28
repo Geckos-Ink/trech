@@ -152,6 +152,10 @@ struct ProvenanceRecord {
   // determinism and hook fields are written only when the config was parsed
   // (failureConfigParsed), so a script that failed to evaluate claims no seed or mode.
   std::string failureJson;
+  // run.precisionTarget (run_start: the target; run_end: also reached/events/achieved): canonical
+  // JSON written as `precision_target`, with `requested_events` and (run_end) `stop_reason`.
+  // Empty (and absent) for runs without a target, so their records keep their bytes.
+  std::string precisionTargetJson;
   bool failureConfigParsed = false;
 };
 

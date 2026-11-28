@@ -1479,6 +1479,16 @@ requested count and budget. The visualization scene's `n_events` is updated to c
 Config JSON/hash retains the requested workload. The time bound is soft and excludes Geant4
 initialization/model loading; full events/hooks and output work can exceed it.
 
+`run.precisionTarget` (`{relativeStderr, minEvents}`) is conditionally serialized too. With a
+target, scores add `precision_target` (schema `trech_precision_target_v1`: `tally`
+`event_edep_mev`, `relative_stderr`, `min_events`, `reached`, `events`, `mean_mev`,
+`achieved_relative_stderr`, null before two events or with a zero mean), `requested_events` and
+`stop_reason` (`precision_target`, `time_budget` or `event_limit`; `precision_target` only when the
+target ended the run before its event limit). `run_start` provenance adds `requested_events` and
+`precision_target` (`relative_stderr`, `min_events`); `run_end` adds `stop_reason` and the outcome
+fields (`reached`, `events`, `achieved_relative_stderr`). See
+[adaptive precision](adaptive_precision.md#statistical-precision-target).
+
 With third-argument options, `ctx.cascade` metadata adds `stagesLimited` (unexecuted limited
 stages), `targetsReached` and `stopReason` (`complete`, `stage_budget`, `targets_reached`,
 `targets_unavailable`). Each limited trace entry has `ran:false` and `skipReason` equal to

@@ -95,7 +95,8 @@ def build_precision_report(
         "interaction_counts": dict(playback.interaction_counts),
         "medium_interaction_counts": dict(playback.medium_interaction_counts),
     }
-    for key in ("requested_events", "stop_reason", "simulation_wall_seconds", "time_budget_seconds"):
+    for key in ("requested_events", "stop_reason", "simulation_wall_seconds", "time_budget_seconds",
+                "precision_target"):
         if key in scores:
             simulation[key] = scores[key]
     for key in ("primaries_transmitted_fraction", "primaries_uncollided_fraction"):

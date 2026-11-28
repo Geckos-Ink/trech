@@ -69,10 +69,50 @@ Run-start metadata retains the requested count. Run-end scores and provenance re
 count. Config JSON/hash retains the requested workload and budget. Studio displays both counts.
 The live lab's existing measured rounds-per-tick planner remains available independently.
 
+## Statistical precision target
+
+```sh
+build/dev/trech run experiment.js --events 100000 --precision-target 0.02 --output build/precise
+```
+
+A precision target stops the run once its main tally is statistically precise enough, instead
+of after a fixed number of events. After each event the engine adds that event's total deposited
+energy, the same per-event value behind `system_event_edep_*`. It stops (after that event, like
+the time budget) once the standard error of the mean is at most the target fraction of the mean.
+For example, 0.02 means the mean deposit per event is known to ±2 % (one standard error).
+`--events`/`run.nEvents` stays the upper limit.
+
+The equivalent config block is `run.precisionTarget: {relativeStderr: 0.02, minEvents: 30}`.
+`relativeStderr` must be in (0, 1), and `minEvents` (at least 2, default 30) keeps a few lucky
+early events from ending the run. The block is serialized only when set, so other configs keep
+their bytes. The CLI flag sets `relativeStderr` and keeps the config's `minEvents`, or 30.
+
+Unlike the time budget, the stop depends only on the events themselves. The run uses a serial
+Geant4 manager, so the stopping event is a function of the seed and the config. Strict runs accept
+a precision target and still replay byte for byte. `run.threads` above 1 is refused, as are lab,
+UI and macro sessions. A run whose events deposit nothing (mean 0) never reaches a target and
+runs every event. Both stops can be combined; the run ends at whichever comes first.
+
+This is the engine's estimate of its own Monte Carlo **sampling** error. It says nothing about
+whether a physics model or a learned operator is accurate.
+
+Scores carry `precision_target` (schema `trech_precision_target_v1`: `tally`
+(`event_edep_mev`), `relative_stderr`, `min_events`, `reached`, `events`, `mean_mev`,
+`achieved_relative_stderr`, which is null before two events or with a zero mean), plus
+`requested_events` and `stop_reason` (`precision_target`, `time_budget` or `event_limit`).
+Provenance carries the target on `run_start`, and the outcome and `stop_reason` on `run_end`.
+Measured on a 1 MeV photon beam into a 200 mm water world: a 5 % target stopped after 564 of 4000
+events, with an achieved 4.997 % that equals the run's own
+`system_event_edep_stderr_mev / system_event_edep_mean_mev`. `tests/test_precision_target.py`
+(CTest `trech_precision_target`) checks this, strict replay, the CLI flag, an unreachable target, a
+zero-deposit beam and the threads refusal.
+
 ## Studio and captures
 
 The **Precision and resources** dock exposes continuous scenario refinement, predictive time
-budgets, surface/mesh detail, Gaussian parcel merge radius, target frame rate and a preview
+budgets, a **Statistical precision** target (percent; it passes `--precision-target`, starts
+from the scenario's own `run.precisionTarget`, and is disabled for multi-threaded scenarios),
+surface/mesh detail, Gaussian parcel merge radius, target frame rate and a preview
 working-memory allowance. Typed particle/cell counts live in Scenario options and require a rerun.
 Automatic rendering adjusts detail smoothly from measured CPU preparation/submission cost,
 with an eight-observation cadence and hysteresis. Viewport pixel area, particle count and the

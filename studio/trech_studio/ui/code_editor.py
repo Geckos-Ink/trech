@@ -75,7 +75,7 @@ _CONFIG_MEMBERS = {
          "geometry", "materials", "models", "hooks", "stratify", "lab"),
     "detector": ("worldSizeMm", "worldMaterial", "mediumBoxMm", "mediumMaterial",
                  "temperatureK", "pressureAtm"),
-    "run": ("nEvents", "seed", "threads", "timeBudgetSeconds"),
+    "run": ("nEvents", "seed", "threads", "timeBudgetSeconds", "precisionTarget"),
     "beam": ("name", "particle", "energyMeV", "direction", "originMm", "spotRadiusMm",
              "divergenceDeg", "energySpreadFractional", "polarization", "polarizationAngleDeg",
              "spectrum", "active"),

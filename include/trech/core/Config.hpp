@@ -71,6 +71,12 @@ struct RunConfig {
   int nEvents = 10;
   std::uint64_t seed = 12345;
   double timeBudgetSeconds = 0.0; // opt-in predictive-only soft deadline
+  // Optional statistical stop (`precisionTarget: {relativeStderr, minEvents}`): the run ends once
+  // the standard error of the mean per-event deposited energy is at most `precisionRelativeStderr`
+  // of that mean, after at least `precisionMinEvents` events. 0 = off (not serialized). nEvents
+  // stays the upper limit. Runs serially, so strict mode keeps byte replay.
+  double precisionRelativeStderr = 0.0;
+  int precisionMinEvents = 30;
   // Worker-thread count. 0 keeps Geant4's default (multithreaded with the
   // hardware count). Set to 1 to force serial event processing, which makes
   // hook-driven scenarios whose state accumulates across events (e.g. the MD

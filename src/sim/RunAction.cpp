@@ -10,6 +10,7 @@
 #include "trech/sim/KleinNishina.hpp"
 #include "trech/sim/PhotonuclearKinematics.hpp"
 #include "trech/core/SimulationBudget.hpp"
+#include "trech/core/PrecisionTarget.hpp"
 #include "trech/core/FormalLaws.hpp"
 #include "trech/core/HookFailure.hpp"
 #include "trech/core/Trace.hpp"
@@ -806,6 +807,7 @@ void TrechRunAction::fillTrackHookCounters(ProvenanceRecord& record) const {
 
 void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   if (options_.simulationBudget) options_.simulationBudget->begin();
+  if (options_.precisionTarget) options_.precisionTarget->begin();
   activeNEvents_ = run ? run->GetNumberOfEventToBeProcessed() : cfg_.run.nEvents;
   activeSeed_ = cfg_.run.seed;
   activeRunId_ = run ? run->GetRunID() : -1;
@@ -857,6 +859,11 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.nEvents = activeNEvents_;
   record.requestedEvents = activeNEvents_;
   record.timeBudgetSeconds = cfg_.run.timeBudgetSeconds;
+  if (options_.precisionTarget) {
+    record.precisionTargetJson = nlohmann::json{
+        {"relative_stderr", options_.precisionTarget->target()},
+        {"min_events", options_.precisionTarget->minEvents()}}.dump();
+  }
   record.seed = activeSeed_;
   record.determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
   record.predictiveMode = record.determinismMode == "predictive";
@@ -914,9 +921,19 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   }
 }
 
+// Why a run that may stop early ended: the precision target first (it is the reason to stop),
+// then the time budget, else every requested event ran.
+std::string TrechRunAction::stopReason(int requestedEvents) const {
+  if (options_.precisionTarget && options_.precisionTarget->reached() && activeNEvents_ < requestedEvents) {
+    return "precision_target";
+  }
+  if (options_.simulationBudget && activeNEvents_ < requestedEvents) return "time_budget";
+  return "event_limit";
+}
+
 void TrechRunAction::EndOfRunAction(const G4Run* run) {
   const int requestedEvents = activeNEvents_;
-  if (options_.simulationBudget && run) activeNEvents_ = run->GetNumberOfEvent();
+  if ((options_.simulationBudget || options_.precisionTarget) && run) activeNEvents_ = run->GetNumberOfEvent();
   auto* accumulables = G4AccumulableManager::Instance();
   if (isMasterRunAction()) {
     RecordHookOnRunEnd();
@@ -1504,10 +1521,26 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
     scores["requested_events"] = requestedEvents;
     scores["simulation_wall_seconds"] = simulationWallSeconds;
     scores["time_budget_seconds"] = cfg_.run.timeBudgetSeconds;
-    scores["stop_reason"] = activeNEvents_ < requestedEvents ? "time_budget" : "event_limit";
-    if (cfg_.viz.enable) {
-      writeVizSceneManifest(cfg_, options_, options_.outputDir, activeNEvents_, activeSeed_);
-    }
+    scores["stop_reason"] = stopReason(requestedEvents);
+  }
+  if (options_.precisionTarget) {
+    const auto& target = *options_.precisionTarget;
+    const double achieved = target.relativeStderr();
+    scores["requested_events"] = requestedEvents;
+    scores["stop_reason"] = stopReason(requestedEvents);
+    scores["precision_target"] = {
+        {"schema", "trech_precision_target_v1"},
+        {"tally", "event_edep_mev"},
+        {"relative_stderr", target.target()},
+        {"min_events", target.minEvents()},
+        {"reached", target.reached()},
+        {"events", target.events()},
+        {"mean_mev", target.mean()},
+        // null before two events or with a zero mean (never a fake 0).
+        {"achieved_relative_stderr", std::isfinite(achieved) ? nlohmann::json(achieved) : nlohmann::json()}};
+  }
+  if ((options_.simulationBudget || options_.precisionTarget) && cfg_.viz.enable) {
+    writeVizSceneManifest(cfg_, options_, options_.outputDir, activeNEvents_, activeSeed_);
   }
   scores["seed"] = activeSeed_;
   scores["physics_list"] = options_.physicsList;
@@ -1896,9 +1929,22 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.nEvents = activeNEvents_;
   record.requestedEvents = requestedEvents;
   record.timeBudgetSeconds = cfg_.run.timeBudgetSeconds;
+  if (options_.precisionTarget) {
+    const auto& target = *options_.precisionTarget;
+    const double achieved = target.relativeStderr();
+    record.precisionTargetJson = nlohmann::json{
+        {"relative_stderr", target.target()},
+        {"min_events", target.minEvents()},
+        {"reached", target.reached()},
+        {"events", target.events()},
+        {"achieved_relative_stderr",
+         std::isfinite(achieved) ? nlohmann::json(achieved) : nlohmann::json()}}.dump();
+  }
   if (options_.simulationBudget) {
     record.simulationWallSeconds = simulationWallSeconds;
-    record.stopReason = activeNEvents_ < requestedEvents ? "time_budget" : "event_limit";
+  }
+  if (options_.simulationBudget || options_.precisionTarget) {
+    record.stopReason = stopReason(requestedEvents);
   }
   record.seed = activeSeed_;
   record.determinismMode = determinismMode;

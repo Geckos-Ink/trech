@@ -23,7 +23,7 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R6 · Models dock: per-candidate search report, two-checkpoint metric diff, runs that used a checkpoint, summary rebuild on store change, `models: [...]` cursor check for inserted snippets. ([detail](#models-dock-2026-11-10))
 - **P2** · R6 · Spectra: re-inspect target choices after **Use trained run** and compare two runs' leaderboards side by side. ([detail](#spectrum-prediction-extension-2026-11-07))
 - **P3** · R6 · Code editor: mark the source line behind an unknown config key (engine reports config paths only). ([detail](#event-multiplicity-in-run-summary-2026-11-10))
-- **P3** · R4 · Automatic accuracy/convergence control (needs engine error estimates); GPU timestamps and measured VRAM; streaming/out-of-core emits. ([detail](#adaptive-precision-and-resources))
+- **P3** · R4 · GPU timestamps and measured VRAM; streaming/out-of-core emits; convergence control beyond the event-deposit precision target (other tallies and model-error targets, which need engine error estimates for them). ([detail](#adaptive-precision-and-resources))
 - **gated** · R6 · Native screenshots of the Models and Spectra docks (media gates). ([detail](#models-dock-2026-11-10))
 
 ## Test isolation fixed (2026-11-26)
@@ -50,9 +50,17 @@ dated record below, and queue its residuals in the same change.
 - [ ] Residual: hook emits/particle frames still load in memory. Streaming/out-of-core loading and
   worker-thread surface extraction are needed for very large runs; surface neck construction can
   still require quadratic temporary memory. Trajectory budget changes apply on reopening output.
-- [ ] Residual: automatic simulation accuracy/convergence control needs engine/scenario error
-  estimates; Studio currently submits continuous factors and event/time budgets. It never invents
-  missing models or claims a render refinement improves simulation accuracy.
+- [x] (2026-11-28) Automatic convergence control on the engine's own sampling error: the dock's
+  **Statistical precision** control (percent, starting from the scenario's `run.precisionTarget`,
+  disabled for multi-threaded scenarios) passes `--precision-target`, and the run summary's
+  **Statistical precision target** section shows events completed / limit, stop reason, target,
+  achieved relative standard error and the honesty note. The engine stops the run
+  ([engine record](../../engine/precision/ROADMAP.md#statistical-precision-target-2026-11-28));
+  Studio only submits the target and reads the result. `studio/tests/test_adaptive.py` covers the
+  control's arguments and the summary.
+- [ ] Residual: convergence control for other tallies and for model error (learned operators,
+  cascades) needs engine error estimates for them. Studio never invents missing models or claims
+  a render refinement improves simulation accuracy.
 
 ## Bundle-declared validation in Run summary (2026-11-09)
 

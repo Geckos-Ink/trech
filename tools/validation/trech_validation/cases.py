@@ -5309,13 +5309,16 @@ class MagneticResonanceBrainImage(ValidationCase):
     name = "magnetic_resonance_brain_image"
     description = (
         "Stage-4 2D brain MRI: a procedural BrainWeb-inspired axial head phantom is "
-        "painted with each tissue's Geant4-computed mobile-¹H (proton) density, and "
-        "a k-space acquisition + 2D FFT reconstruct the image "
+        "painted with each tissue's Geant4-computed mobile-¹H (proton) density, "
+        "acquired by a spin-warp protocol (readout gradient, stepped phase-encode "
+        "gradient, explicit voxel sums into k-space) and reconstructed by a 2D FFT "
         "(scripts/run_magnetic_resonance_brain.py). Asserts the reconstructed "
         "per-tissue intensity tracks Geant4 proton density, CSF/ventricles are the "
         "brightest soft tissue, grey matter is brighter than white matter, the "
         "skull is dark, the background is black, the reconstruction is faithful to "
-        "the proton-density phantom, and no engine spin rule was used."
+        "the proton-density phantom, the head reconstructs at the size the gradients "
+        "imply (within half a pixel) while a 3% gradient miscalibration is detected, "
+        "and no engine spin rule was used."
     )
     category = "resonance"
 
@@ -5340,9 +5343,12 @@ class MagneticResonanceBrainImage(ValidationCase):
             "background_black": bool(val.get("background_black")),
             "reconstruction_faithful": bool(val.get("reconstruction_faithful")),
             "no_engine_spin_rule": bool(val.get("no_engine_spin_rule")),
+            "geometry_from_gradients": bool(val.get("geometry_from_gradients")),
+            "miscalibration_detected": bool(val.get("miscalibration_detected")),
         }
         ok, declared = _declared_family_verdict(
             self.name, "testscenario_magnetic_resonance_brain", run)
+        acquisition = v.get("acquisition") or {}
         corr_ip = float(v.get("corr_intensity_proton") or 0.0)
         recon_corr = float(v.get("recon_phantom_corr") or 0.0)
         tissues = v.get("tissues") or {}
@@ -5359,17 +5365,25 @@ class MagneticResonanceBrainImage(ValidationCase):
                      f"intensity↔proton r={corr_ip:.3f} recon r={recon_corr:.3f} "
                      f"grey={table.get('grey', {}).get('mean_intensity')} "
                      f"white={table.get('white', {}).get('mean_intensity')} "
-                     f"skull={table.get('skull', {}).get('mean_intensity')}"),
+                     f"skull={table.get('skull', {}).get('mean_intensity')} "
+                     f"geometry err={acquisition.get('geometry_error_mm', float('nan')):.3f} mm "
+                     f"(control {acquisition.get('control_geometry_error_mm', float('nan')):.3f})"),
             measured={**required, "corr_intensity_proton": corr_ip,
-                      "recon_phantom_corr": recon_corr, "tissues": table},
+                      "recon_phantom_corr": recon_corr, "tissues": table,
+                      "geometry_error_mm": acquisition.get("geometry_error_mm"),
+                      "control_geometry_error_mm": acquisition.get("control_geometry_error_mm"),
+                      "fov_mm_from_gradients": acquisition.get("fov_mm_from_gradients")},
             expected={
                 "intensity_tracks_proton_density": "corr(reconstructed intensity, Geant4 proton density) >= 0.95",
                 "csf_brightest_soft_tissue": "CSF/ventricles >= grey, white, muscle",
                 "grey_brighter_than_white": "grey-matter intensity > white-matter (proton density)",
                 "skull_dark": "skull < 0.5 * grey; background_black: air < 0.12",
                 "reconstruction_faithful": "corr(reconstruction, proton-density phantom) >= 0.9",
+                "geometry_from_gradients": "head half-widths within half a pixel of the object's",
+                "miscalibration_detected": "gradients 3% weak move them by more than half a pixel",
             },
-            references=["BrainWeb MNI anatomical phantom (inspiration); MRI proton-density weighting"])
+            references=["BrainWeb MNI anatomical phantom (inspiration); MRI proton-density weighting",
+                        "spin-warp imaging: k = gamma_bar * integral G dt; FOV = 1 / (gamma_bar Gx dwell)"])
 
 
 class GlassFromSandMaterialCreation(ValidationCase):

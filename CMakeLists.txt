@@ -17,6 +17,7 @@ add_library(trech_core
   src/core/FormalLaws.cpp
   src/core/LabSession.cpp
   src/core/SimulationBudget.cpp
+  src/core/PrecisionTarget.cpp
   src/core/Provenance.cpp
   src/core/Sha256.cpp
   src/core/RunOptions.cpp

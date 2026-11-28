@@ -120,6 +120,11 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
       j["stop_reason"] = record.stopReason;
     }
   }
+  if (!record.precisionTargetJson.empty()) {
+    j["requested_events"] = record.requestedEvents;
+    j["precision_target"] = nlohmann::json::parse(record.precisionTargetJson);
+    if (record.phase == "run_end") j["stop_reason"] = record.stopReason;
+  }
   j["seed"] = record.seed;
   j["determinism_mode"] = record.determinismMode;
   j["predictive_mode"] = record.predictiveMode;

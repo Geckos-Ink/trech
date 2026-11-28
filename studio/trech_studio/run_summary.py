@@ -822,6 +822,23 @@ def build_run_summary(result: Any, registry: Any = None) -> RunSummary:
             note="Predictive scheduling; soft event-boundary limit. Initialization is excluded.",
         ))
 
+    target = scores.get("precision_target")
+    if isinstance(target, dict):
+        achieved = target.get("achieved_relative_stderr")
+        out.sections.append(SummarySection(
+            "Statistical precision target",
+            rows=[SummaryRow("events completed / limit", f"{scores.get('n_events')} / {scores.get('requested_events')}"),
+                  SummaryRow("stop reason", str(scores.get("stop_reason"))),
+                  SummaryRow("target (relative standard error)", f"{100 * float(target.get('relative_stderr') or 0):.3g} %"),
+                  SummaryRow("achieved", "no estimate (fewer than two events or a zero mean)" if achieved is None
+                             else f"{100 * float(achieved):.4g} %"),
+                  SummaryRow("reached", "yes" if target.get("reached") else "no"),
+                  SummaryRow("mean deposit per event (MeV)", _fmt(target.get("mean_mev")))],
+            note=("Engine stop on the Monte Carlo standard error of the mean per-event deposited energy "
+                  f"(at least {target.get('min_events')} events, serial run). It measures the Geant4 tally's "
+                  "sampling precision, not the accuracy of any physics model."),
+        ))
+
     # --- 2b. precision profile (what the scenario actually refined) -----------------------
     profile = pick("precision_profile")
     axes = scores.get("precision_axes")

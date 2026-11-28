@@ -442,6 +442,18 @@ if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
       "$<TARGET_FILE:trech>")
   set_tests_properties(trech_beam_particle_refusal PROPERTIES TIMEOUT 400)
 endif()
+# Brain MRI driver: spin-warp gradient encoding (FOV from gradients, point-source registration,
+# FFT equivalence on grid, miscalibration rescale). numpy only, through TRECH_ML_PYTHON.
+add_test(NAME trech_mr_brain_acquisition
+  COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_mr_brain_acquisition.py)
+# run.precisionTarget: a serial run stops once its event-deposit mean reaches a relative standard
+# error; strict replay, the CLI flag, unreachable/zero-deposit targets and the threads refusal.
+if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
+  add_test(NAME trech_precision_target
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_precision_target.py"
+      "$<TARGET_FILE:trech>")
+  set_tests_properties(trech_precision_target PROPERTIES TIMEOUT 600)
+endif()
 # A run that stops before Geant4 (evaluate, config, onInit, Geant4 setup) writes one run_failed
 # provenance record with a checked trace reference; runs that already write provenance do not.
 if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)

@@ -60,6 +60,8 @@ bundle.
 | `strict` (default) | Fixed-work replay with model inference disabled. Use one worker for callbacks that accumulate JavaScript state across events. |
 | `predictive` | Enables configured model paths and logs the inference and artifact provenance. The batch CLI can use a soft `--time-budget` that stops at complete event boundaries. |
 
+In either mode, `--precision-target <r>` stops a batch run once the per-event deposit mean has a relative standard error of at most r (serial; see [the precision target](adaptive_precision.md#statistical-precision-target)).
+
 `--refinement` changes supported scenario precision axes. See
 [work budgets and refinement](adaptive_precision.md), the
 [hook API](scenario_hooks.md#determinism-modes) and

@@ -58,6 +58,17 @@ def test_controls_enable_only_supported_simulation_axes():
     assert panel.command_args() == ["--refinement", "3.125", "--time-budget", "0.25"]
     panel.set_config({"determinism": {"mode": "strict"}})
     assert panel.command_args() == []
+    # The statistical precision target works in strict mode (serial stop) and starts from the
+    # scenario's own value; a multi-threaded scenario cannot take one.
+    panel.set_config({"determinism": {"mode": "strict"},
+                      "run": {"precisionTarget": {"relativeStderr": 0.02, "minEvents": 30}}})
+    assert panel.target.isEnabled() and panel.command_args() == ["--precision-target", "0.02"]
+    panel.target.setValue(5.0)
+    assert panel.command_args() == ["--precision-target", "0.05"]
+    panel.set_config({"determinism": {"mode": "strict"}, "run": {"threads": 4}})
+    assert not panel.target.isEnabled() and panel.command_args() == []
+    panel.set_config({"determinism": {"mode": "strict"}})
+    assert panel.target.value() == 0 and panel.command_args() == []
     panel.detail.setValue(2.25)
     panel.merge_radius.setValue(1.2)
     assert panel.render_budget().detail == 2.25
@@ -147,3 +158,26 @@ def test_invalid_merge_scale_cannot_enter_renderer_budget():
     for value in (0, .49, 2.01, math.inf, math.nan):
         with pytest.raises(ValueError):
             RenderBudget(merge_radius_scale=value)
+
+
+def test_precision_target_output_is_summarised(tmp_path):
+    import json
+    from trech_studio.engine.outputs import load_run_result
+    from trech_studio.precision import build_precision_report
+    from trech_studio.render.playback import Playback
+    from trech_studio.run_summary import build_run_summary
+    target = {"schema": "trech_precision_target_v1", "tally": "event_edep_mev", "relative_stderr": 0.05,
+              "min_events": 30, "reached": True, "events": 564, "mean_mev": 0.298,
+              "achieved_relative_stderr": 0.04997}
+    scores = {"phase": "run_end", "n_events": 564, "requested_events": 5000,
+              "stop_reason": "precision_target", "precision_target": target}
+    (tmp_path / "trech_scores.jsonl").write_text(json.dumps(scores))
+    run = load_run_result(tmp_path)
+    assert build_precision_report(run, Playback(kind="empty")).simulation["precision_target"] == target
+    summary = build_run_summary(run)
+    section = next(s for s in summary.sections if s.title == "Statistical precision target")
+    rows = {r.label: r.value for r in section.rows}
+    assert rows["events completed / limit"] == "564 / 5000"
+    assert rows["stop reason"] == "precision_target" and rows["reached"] == "yes"
+    assert rows["achieved"] == "4.997 %" and rows["target (relative standard error)"] == "5 %"
+    assert "not the accuracy of any physics model" in section.note

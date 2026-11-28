@@ -556,7 +556,14 @@ rendering and the working allowance can reduce effective detail; turn off automa
 a fixed interactive detail. Preview export freezes the selected detail/radius/memory settings and
 records them in its JSON sidecar. Simulation count changes require Run again.
 
-The dock exposes continuous scenario refinement and predictive simulation time budgets. Automatic
+The dock exposes continuous scenario refinement, predictive simulation time budgets and a
+**Statistical precision** target. Set it to, say, 2 % and the engine stops the run once the mean
+deposited energy per event is known to ±2 % (one standard error), after at least 30 events; the
+event count stays the limit. It works in strict mode and starts from the scenario's own
+`run.precisionTarget`. It is disabled when the scenario asks for more than one thread. The run
+summary's **Statistical precision target** section shows how many events ran, why the run
+stopped, and the precision it reached. This is the Geant4 tally's sampling precision, not a
+model's accuracy. Automatic
 preview detail responds to measured CPU frame cost, viewport size and estimated resource budgets;
 geometry tessellation and surface grids change, while emitted coordinates/time stay fixed. The
 working allowance also controls preview trajectory loading and GPU cache lengths. GPU execution

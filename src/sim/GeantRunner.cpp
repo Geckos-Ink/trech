@@ -3,6 +3,7 @@
 #include "trech/sim/Geant4Trace.hpp"
 #include "trech/core/LabSession.hpp"
 #include "trech/core/SimulationBudget.hpp"
+#include "trech/core/PrecisionTarget.hpp"
 #include "trech/core/Provenance.hpp"
 #include "trech/chem/DnaChemistry.hpp"
 #include "trech/ml/OpticsSurrogate.hpp"
@@ -235,6 +236,15 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
     }
     options.simulationBudget = std::make_shared<SimulationBudget>(cfg.run.timeBudgetSeconds);
   }
+  if (cfg.run.precisionRelativeStderr > 0.0) {
+    // The stop is evaluated on the event order: a persistent lab kernel and UI/macro sessions
+    // run several BeamOn calls, so only a batch run takes it.
+    if (retainRunManager || options.enableUi || !options.macroPath.empty()) {
+      throw std::runtime_error("run.precisionTarget requires a batch run (not lab, UI or macro mode).");
+    }
+    options.precisionTarget = std::make_shared<PrecisionTarget>(cfg.run.precisionRelativeStderr,
+                                                                cfg.run.precisionMinEvents);
+  }
   if (!options.outputDir.empty()) {
     std::filesystem::create_directories(options.outputDir);
   }
@@ -310,14 +320,16 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
     options.modelArtifactsJson = manifest.dump();
   }
 
-  runManager = cfg.run.timeBudgetSeconds > 0.0
+  // A time budget and a precision target both stop on the event order: serial kernel.
+  const bool stopsOnEventOrder = cfg.run.timeBudgetSeconds > 0.0 || cfg.run.precisionRelativeStderr > 0.0;
+  runManager = stopsOnEventOrder
       ? G4RunManagerFactory::CreateRunManager(G4RunManagerType::SerialOnly)
       : G4RunManagerFactory::CreateRunManager();
 
   // Optional explicit worker-thread count (run.threads). 0 keeps Geant4's
   // default; a positive value (typically 1) forces deterministic serial event
   // processing for hook-driven scenarios whose state accumulates across events.
-  if (cfg.run.threads > 0 && cfg.run.timeBudgetSeconds == 0.0) {
+  if (cfg.run.threads > 0 && !stopsOnEventOrder) {
     runManager->SetNumberOfThreads(cfg.run.threads);
   }
 

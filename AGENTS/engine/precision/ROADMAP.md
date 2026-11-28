@@ -16,6 +16,26 @@ dated record below, and queue its residuals in the same change.
 
 - **P2** · R4 · Soft deadlines cannot interrupt a long event, hook or initialization; confidence/error-driven space/time refinement needs validated scenario error estimates first. ([detail](#adaptive-precision-inference-depth-and-resource-scheduling))
 - **P2** · R4 · Shared per-run inference budget: cascade caps are per call and batched `evolve`/`react`/`interact` calls are atomic. ([detail](#adaptive-precision-inference-depth-and-resource-scheduling))
+- **P3** · R4 · Precision-target residuals: the stop watches only the total per-event deposit; let a run name another tally (a scored volume's deposit, a transmitted fraction, a declared emit) and grade several at once; a multi-threaded stop that stays reproducible (fixed event blocks merged in order); lab sessions and Studio's live lab. ([detail](#statistical-precision-target-2026-11-28))
+
+## Statistical precision target (2026-11-28)
+
+- [x] `run.precisionTarget {relativeStderr, minEvents}` / `--precision-target <r>`: a batch run stops
+  (soft, after the event) once the standard error of the mean per-event deposited energy is at
+  most r of the mean, after at least `minEvents` (default 30); `nEvents` stays the limit. This is
+  the first engine error estimate that drives work: the Monte Carlo sampling error of the run's
+  own tally, not a model-accuracy claim. Serial manager, so strict mode keeps byte replay;
+  threads > 1, lab, UI and macro are refused. Scores `precision_target`
+  (`trech_precision_target_v1`), `requested_events`, `stop_reason`; provenance target on
+  `run_start` and outcome on `run_end`; conditional serialization keeps other config hashes.
+  Measured: a 1 MeV photon beam into 200 mm of water with a 5% target stopped at 564 of 4000
+  events, achieved 4.9966% = the run's `system_event_edep_stderr_mev / mean` (to 1e-15), and the
+  replay was identical. CTest `trech_precision_target` 9/9 (early stop, estimator identity, strict
+  replay, provenance, CLI flag equivalence, unreachable target, zero-deposit geantino, threads
+  refusal, unchanged shape without a target); `test_adaptive_precision` adds the Welford-vs-direct
+  estimator, min events, zero mean, NaN, parse/round-trip and refusals. Studio: the Precision dock's
+  **Statistical precision** control and a run-summary section
+  ([workspace roadmap](../../studio/workspace/ROADMAP.md#adaptive-precision-and-resources)).
 
 ## Adaptive precision, inference depth and resource scheduling
 

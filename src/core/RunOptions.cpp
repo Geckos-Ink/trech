@@ -65,6 +65,8 @@ std::string runUsage() {
       << "  --events <n>      Override event count\n"
       << "  --refinement <x>  Continuous scenario precision factor (run/inspect)\n"
       << "  --time-budget <s> Soft simulation wall-time budget (predictive run only)\n"
+      << "  --precision-target <r> Stop once the per-event deposit mean has relative standard\n"
+      << "                    error <= r (0 < r < 1; run mode; serial; nEvents stays the limit)\n"
       << "  --param <n>=<json> Override a typed TRECH_VALUE (run/inspect/lab scenario; repeatable)\n"
       << "  --viz             Capture trajectories + scene manifest for 3D replay (run only)\n"
       << "  --viz-all         As --viz, also recording non-optical particles (run only)\n"
@@ -228,9 +230,9 @@ RunOptions parseRunOptions(int argc, char** argv) {
 
   for (int i = argStart; i < argc; ++i) {
     const std::string arg = argv[i];
-    if (arg == "--refinement" || arg == "--time-budget") {
+    if (arg == "--refinement" || arg == "--time-budget" || arg == "--precision-target") {
       if (options.command == CliCommand::Lab ||
-          (arg == "--time-budget" && options.command != CliCommand::Run)) {
+          (arg != "--refinement" && options.command != CliCommand::Run)) {
         options.valid = false;
         options.error = arg + " is only supported in " +
             (arg == "--refinement" ? "run/inspect mode." : "run mode.");
@@ -249,7 +251,13 @@ RunOptions parseRunOptions(int argc, char** argv) {
         options.error = arg + " requires a finite positive number.";
         return options;
       }
+      if (arg == "--precision-target" && value >= 1.0) {
+        options.valid = false;
+        options.error = "--precision-target requires a relative standard error in (0, 1).";
+        return options;
+      }
       if (arg == "--refinement") options.refinement = value;
+      else if (arg == "--precision-target") options.precisionRelativeStderr = value;
       else options.timeBudgetSeconds = value;
       continue;
     }
@@ -496,6 +504,13 @@ void applyRunOverrides(TrechConfig& cfg, const RunOptions& options) {
   }
   if (options.hasEventOverride) {
     cfg.run.nEvents = options.eventOverride;
+  }
+  if (options.precisionRelativeStderr > 0.0) {
+    cfg.run.precisionRelativeStderr = options.precisionRelativeStderr;
+  }
+  if (cfg.run.precisionRelativeStderr > 0.0 && cfg.run.threads > 1) {
+    throw std::runtime_error("run.precisionTarget stops on the serial event order; "
+                             "run.threads must be 0 or 1.");
   }
   if (cfg.run.timeBudgetSeconds > 0.0) {
     if (cfg.determinism.mode != "predictive") {

@@ -13,7 +13,8 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 dated record below, and queue its residuals in the same change.
 
 - **P1** · R3 · Magnetic-resonance forward dynamics migration (ledger row 3) and a proton density → image cascade (inference queue). (owned by the [scenarios/migrations queue](../migrations/ROADMAP.md#priority-queue))
-- **P3** · R2 · T1/T2-weighted sequences (needs a Geant4-anchored relaxation proxy), 2D phase encoding from acquired k-space, real BrainWeb ingestion. ([detail](#magnetic-resonance-mrinmr-track--standing-objective))
+- **P3** · R2 · T1/T2-weighted sequences (needs a Geant4-anchored relaxation proxy), real BrainWeb ingestion, non-Cartesian trajectories. Spin-warp phase encoding landed 2026-11-28. ([detail](#magnetic-resonance-mrinmr-track--standing-objective))
+- **gated** · R6 · Recapture the README brain GIF and catalog thumbnail with the spin-warp acquisition (they still show the FFT-of-phantom pipeline). ([detail](#magnetic-resonance-mrinmr-track--standing-objective))
 
 ## Magnetic-resonance (MRI/NMR) track — standing objective
 
@@ -69,6 +70,20 @@ is used only to grade the gap-to-truth.
   `tools/viz/demos/magnetic_resonance_brain.png` (README hero). Guarded by
   `magnetic_resonance_brain_image` (7/7). Honest scope: the anatomy is a digital phantom and the
   k-space/FFT is signal processing; the contrast is Geant4-derived.
+- **[Spin-warp acquisition landed 2026-11-28]** `scripts/run_magnetic_resonance_brain.py` no longer
+  takes `fft2(rho)` as its "acquisition". The phantom is drawn at twice the scanner resolution and
+  acquired through a declared protocol (`PROTOCOL`: 62.5 kHz readout, 1 ms phase encode, TE 5 ms,
+  one uniform 40 ms readout decay, 0.1% receiver noise): every k-space sample is the explicit voxel
+  sum under Gx = 8.16 mT/m and the n-th Gy step (0.130 mT/m), the FOV follows from
+  1/(γ̄·Gx·dwell) = 180 mm, and the inverse FFT reconstructs on that grid. The 3D volume phase-encodes
+  y and z. New flags: `geometry_from_gradients` (head half-widths 71.82/88.17 mm vs the object's
+  72.00/88.13 mm, error 0.18 mm, tolerance half a pixel 0.375 mm) and `miscalibration_detected`
+  (gradients 3% weak shrink them by 2.19 mm). Contrast is unchanged (intensity↔proton r 0.999,
+  reconstruction r 0.964 vs 0.966 before, air 0.095 vs 0.097; 3D r 0.999/0.989). The case is 9/9
+  flags and 16/16 declared family checks; `tests/test_mr_brain_acquisition.py` (CTest
+  `trech_mr_brain_acquisition`) checks the FOV, point-source registration in 2D/3D, exact FFT
+  equivalence on grid and the 3% rescale. Guide: [docs/scenarios/magnetic_resonance_imaging.md](../../../docs/scenarios/magnetic_resonance_imaging.md).
+  The committed README GIF/thumbnail were not recaptured (gated media).
 - **[optional future]** T1/T2-weighted sequences (relaxation contrast, needs a Geant4-anchored
-  relaxation proxy), 2-D phase encoding from acquired k-space, and real BrainWeb data ingestion remain
-  open MRI extensions.
+  relaxation proxy), non-Cartesian trajectories and real BrainWeb data ingestion remain open MRI
+  extensions.

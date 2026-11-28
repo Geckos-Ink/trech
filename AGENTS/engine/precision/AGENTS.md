@@ -24,3 +24,11 @@ Read the root principles and the parent handbook first; then open only the subca
   timing budgets. `ScaleCascade` chooses dependency-ready stages within a band, with registration
   order breaking ties; optional third-argument `ctx.cascade` limits (`maxStages`, `targetOutputs`)
   disclose every omitted stage. No three-stage cap. Full contract: [`docs/engine/adaptive_precision.md`](../../../docs/engine/adaptive_precision.md).
+- **Statistical precision target:** `run.precisionTarget {relativeStderr, minEvents}` /
+  `--precision-target` (`src/core/PrecisionTarget.cpp`, Welford over each event's total deposit,
+  the `system_event_edep_*` tally). `TrechEventAction` observes after `RecordEventSummary` and
+  soft-aborts with the time budget; `TrechRunAction::stopReason` picks `precision_target` >
+  `time_budget` > `event_limit`. Serial manager (`stopsOnEventOrder` in `GeantRunner.cpp`), so
+  strict mode keeps replay; threads > 1 is refused in `applyRunOverrides`, lab/UI/macro in
+  `runGeant4Impl`. Scores `precision_target` (`trech_precision_target_v1`); provenance
+  `precision_target` / `stop_reason`. A sampling-error stop, never a model-accuracy claim.

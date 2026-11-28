@@ -206,7 +206,7 @@ row 3 (priority P1) migrates them together onto one operator.
 | --- | --- | --- | --- | --- | --- |
 | 1 | [`testscenario_magnetic_resonance`](../../examples/scenarios/testscenario_magnetic_resonance/testscenario_magnetic_resonance.js) | E | 1 suite case | Free-induction decay of a water phantom; the base of ledger row 3. | Core |
 | 2 | [`testscenario_magnetic_resonance_imaging`](../../examples/scenarios/testscenario_magnetic_resonance_imaging/testscenario_magnetic_resonance_imaging.js) | E | 1 suite case | Frequency encoding and Fourier reconstruction of a 1D profile. | Core |
-| 3 | [`testscenario_magnetic_resonance_brain`](../../examples/scenarios/testscenario_magnetic_resonance_brain/testscenario_magnetic_resonance_brain.js) | E | Suite case via a dedicated runner | 2D/3D k-space reconstruction of a procedural phantom. | Keep |
+| 3 | [`testscenario_magnetic_resonance_brain`](../../examples/scenarios/testscenario_magnetic_resonance_brain/testscenario_magnetic_resonance_brain.js) | E | Suite case via a dedicated runner | Gradient-encoded (spin-warp) 2D/3D acquisition and FFT reconstruction of a procedural phantom, with geometry graded against the gradients (2026-11-28). | Keep |
 | 4 | [`testscenario_magnetic_resonance_tissues`](../../examples/scenarios/testscenario_magnetic_resonance_tissues/testscenario_magnetic_resonance_tissues.js) | E | Suite case via a dedicated runner | Tissue contrast, which the brain phantom also shows through its tissue proton densities. | Remove, or fold into the brain case |
 
 ## 10. Carbon nanotube electronics

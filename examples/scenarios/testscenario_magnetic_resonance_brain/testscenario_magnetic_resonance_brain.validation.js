@@ -21,7 +21,7 @@ TRECH_VALIDATIONS["testscenario_magnetic_resonance_brain"] = {
     }
   ],
   "family_case": "magnetic_resonance_brain_image",
-  "family_summary": "Driver-recorded brain image: the seven validation flags plus explicit intensity/proton r >= 0.95, reconstruction r >= 0.9, grey above white, skull below half of grey and air below 0.12.",
+  "family_summary": "Driver-recorded brain image from a gradient-encoded (spin-warp) acquisition: the nine validation flags plus explicit intensity/proton r >= 0.95, reconstruction r >= 0.9, grey above white, skull below half of grey, air below 0.12, and head geometry within half a pixel of the object's while 3%-weak gradients move it by more.",
   "family_checks": [
     {"id": "intensity_tracks_proton_density", "tag": "mr_brain_image", "field": "validation.intensity_tracks_proton_density", "op": "eq", "expected": true},
     {"id": "csf_brightest_soft_tissue", "tag": "mr_brain_image", "field": "validation.csf_brightest_soft_tissue", "op": "eq", "expected": true},
@@ -30,6 +30,10 @@ TRECH_VALIDATIONS["testscenario_magnetic_resonance_brain"] = {
     {"id": "background_black", "tag": "mr_brain_image", "field": "validation.background_black", "op": "eq", "expected": true},
     {"id": "reconstruction_faithful", "tag": "mr_brain_image", "field": "validation.reconstruction_faithful", "op": "eq", "expected": true},
     {"id": "no_engine_spin_rule", "tag": "mr_brain_image", "field": "validation.no_engine_spin_rule", "op": "eq", "expected": true},
+    {"id": "geometry_from_gradients", "tag": "mr_brain_image", "field": "validation.geometry_from_gradients", "op": "eq", "expected": true},
+    {"id": "miscalibration_detected", "tag": "mr_brain_image", "field": "validation.miscalibration_detected", "op": "eq", "expected": true},
+    {"id": "geometry_error_within_half_pixel", "tag": "mr_brain_image", "field": "acquisition.geometry_error_mm", "op": "le", "reference": {"tag": "mr_brain_image", "field": "acquisition.geometry_tolerance_mm"}},
+    {"id": "fov_from_gradients", "tag": "mr_brain_image", "field": "acquisition.fov_mm_from_gradients", "op": "within", "expected": 180.0, "abs_tol": 1e-6},
     {"id": "intensity_proton_correlation", "tag": "mr_brain_image", "field": "corr_intensity_proton", "op": "ge", "expected": 0.95},
     {"id": "reconstruction_correlation", "tag": "mr_brain_image", "field": "recon_phantom_corr", "op": "ge", "expected": 0.9},
     {"id": "grey_above_white", "tag": "mr_brain_image", "field": "tissues.grey.mean_intensity", "op": "gt", "reference": {"tag": "mr_brain_image", "field": "tissues.white.mean_intensity"}},

@@ -2,10 +2,13 @@
 
 #include "trech/core/Config.hpp"
 #include "trech/core/RunOptions.hpp"
+#include "trech/core/PrecisionTarget.hpp"
 #include "trech/core/SimulationBudget.hpp"
 #include "trech/js/JsRuntime.hpp"
 
+#include <cmath>
 #include <cstdio>
+#include <vector>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -26,8 +29,67 @@ int main() {
     budget.begin();
     require(!budget.exhausted(), "new run must reset budget");
     require(budget.observeElapsed(2.0), "one atomic event may exceed budget");
+    // Precision target: the relative standard error of the mean, the same estimator as the run's
+    // system_event_edep_stderr_mev (sample variance / n).
+    {
+      trech::PrecisionTarget target(0.1, 3);
+      target.begin();
+      require(std::isinf(target.relativeStderr()), "no estimate before two events");
+      const std::vector<double> values = {1.0, 1.2, 0.8, 1.1, 0.9};
+      double sum = 0.0;
+      for (std::size_t i = 0; i < values.size(); ++i) {
+        const bool reached = target.observe(values[i]);
+        sum += values[i];
+        const double n = static_cast<double>(i + 1);
+        double ss = 0.0;
+        for (std::size_t k = 0; k <= i; ++k) ss += (values[k] - sum / n) * (values[k] - sum / n);
+        if (i >= 1) {
+          const double direct = std::sqrt(ss / (n - 1.0) / n) / (sum / n);
+          require(std::fabs(target.relativeStderr() - direct) < 1e-14, "Welford must match the direct estimator");
+        }
+        // 0.1 needs the third event (min_events) and a small enough spread.
+        require(reached == (i >= 2 && target.relativeStderr() <= 0.1), "reached follows min events and target");
+      }
+      require(target.reached() && target.events() == 5, "target stays reached");
+      require(target.observe(std::numeric_limits<double>::quiet_NaN()) && target.events() == 5,
+              "a non-finite tally is not evidence");
+      target.begin();
+      require(!target.reached() && target.events() == 0, "a new run resets the target");
+      for (int i = 0; i < 50; ++i) target.observe(0.0);
+      require(!target.reached() && std::isinf(target.relativeStderr()), "a zero mean never reaches the target");
+    }
+    {
+      auto with = trech::configFromJsonString(R"({"run":{"precisionTarget":{"relativeStderr":0.02,"minEvents":50}}})");
+      require(with.run.precisionRelativeStderr == 0.02 && with.run.precisionMinEvents == 50, "target parses");
+      auto again = trech::configFromJsonString(trech::configToJsonString(with));
+      require(again.run.precisionRelativeStderr == 0.02 && again.run.precisionMinEvents == 50, "target round trips");
+      require(with.unknownKeys.empty(), "target keys are known");
+      for (const char* bad : {R"({"run":{"precisionTarget":{"relativeStderr":0}}})",
+                              R"({"run":{"precisionTarget":{"relativeStderr":1.5}}})",
+                              R"({"run":{"precisionTarget":{"relativeStderr":0.1,"minEvents":1}}})",
+                              R"({"run":{"precisionTarget":0.1}})"}) {
+        bool refused = false;
+        try { trech::configFromJsonString(bad); } catch (const std::exception&) { refused = true; }
+        require(refused, "invalid precision targets are refused");
+      }
+      // Strict mode keeps the target (the serial stop replays); more than one thread is refused.
+      trech::RunOptions none;
+      trech::applyRunOverrides(with, none);
+      require(with.run.threads == 0, "a precision target does not rewrite the config's threads");
+      with.run.threads = 4;
+      bool refused = false;
+      try { trech::applyRunOverrides(with, none); } catch (const std::exception&) { refused = true; }
+      require(refused, "a multi-threaded precision target is refused");
+      trech::RunOptions flag;
+      flag.precisionRelativeStderr = 0.05;
+      auto plain = trech::configFromJsonString("{}");
+      trech::applyRunOverrides(plain, flag);
+      require(plain.run.precisionRelativeStderr == 0.05 && plain.run.precisionMinEvents == 30,
+              "--precision-target sets the target with the default minimum");
+    }
     auto original = nlohmann::json::parse(trech::configToJsonString(trech::TrechConfig{}));
     require(!original["run"].contains("timeBudgetSeconds"), "default config hash changed");
+    require(!original["run"].contains("precisionTarget"), "default config hash changed by the precision target");
     auto cfg = trech::configFromJsonString(R"({"run":{"timeBudgetSeconds":0.5},"determinism":{"mode":"predictive"}})");
     trech::RunOptions options;
     trech::applyRunOverrides(cfg, options);

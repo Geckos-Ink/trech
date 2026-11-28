@@ -27,6 +27,20 @@ class AdaptiveControls(QWidget):
         self.seconds.setSuffix(" s")
         self.seconds.setSpecialValueText("Fixed work")
         self.seconds.setToolTip("Predictive runs only. Soft simulation budget checked after full events; initialization is excluded.")
+        # Convergence control: the engine stops the run once the Monte Carlo standard error of its
+        # mean per-event deposit reaches this fraction of the mean (run.precisionTarget). It is a
+        # statistical stop on the engine's own tally, not a claim about model accuracy.
+        self.target = QDoubleSpinBox(self)
+        self.target.setRange(0.0, 50.0)
+        self.target.setDecimals(2)
+        self.target.setSingleStep(0.5)
+        self.target.setSuffix(" %")
+        self.target.setSpecialValueText("Run every event")
+        self.target.setToolTip(
+            "Stop once the standard error of the mean per-event deposited energy is at most this "
+            "percentage of the mean (at least 30 events; the event count stays the limit). Serial "
+            "run; strict runs still replay byte for byte. Statistical precision of the Geant4 "
+            "tally only, not the accuracy of any model.")
         self.auto = QCheckBox("Adapt rendering to frame cost", self)
         self.auto.setChecked(True)
         self.detail = QDoubleSpinBox(self)
@@ -58,6 +72,7 @@ class AdaptiveControls(QWidget):
         form.addRow("Run precision profile", self.refine)
         form.addRow("Refinement factor", self.refinement)
         form.addRow("Simulation time", self.seconds)
+        form.addRow("Statistical precision", self.target)
         form.addRow("Preview", self.auto)
         form.addRow("Surface / mesh detail", self.detail)
         form.addRow("Parcel merge radius", self.merge_radius)
@@ -78,6 +93,11 @@ class AdaptiveControls(QWidget):
                             for a in axes if a.get('role') in ('spatial', 'representation'))
         self.axes_info.setText("Particle/cell counts: Scenario options → Run again." +
                                ("\nResolved sampling: " + summary if summary else ''))
+        # A scenario's own target is shown as the starting value; the engine refuses it with threads.
+        own = ((config.get("run") or {}).get("precisionTarget") or {}).get("relativeStderr")
+        threads = int((config.get("run") or {}).get("threads") or 0)
+        self.target.setEnabled(threads <= 1)
+        self.target.setValue(float(own) * 100.0 if own and threads <= 1 else 0.0)
         predictive = (config.get("determinism") or {}).get("mode") == "predictive"
         self.seconds.setEnabled(predictive)
         if not predictive:
@@ -89,6 +109,8 @@ class AdaptiveControls(QWidget):
             args += ["--refinement", str(self.refinement.value())]
         if self.seconds.value() > 0:
             args += ["--time-budget", str(self.seconds.value())]
+        if self.target.isEnabled() and self.target.value() > 0:
+            args += ["--precision-target", f"{self.target.value() / 100.0:g}"]
         return args
 
     def render_budget(self) -> RenderBudget:

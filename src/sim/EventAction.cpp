@@ -3,6 +3,7 @@
 #include "trech/sim/EventRecords.hpp"
 #include "trech/sim/RunAction.hpp"
 #include "trech/core/SimulationBudget.hpp"
+#include "trech/core/PrecisionTarget.hpp"
 
 #include "G4Event.hh"
 #include "G4RunManager.hh"
@@ -135,7 +136,11 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
                               photonTrackLengthMm);
     }
   }
-  if (event && options_.simulationBudget && options_.simulationBudget->finishEvent()) {
+  // Both stops are soft: the finished event is kept and no further event starts. The precision
+  // target sees the same per-event deposit as the run's event moments.
+  const bool precise = event && options_.precisionTarget && options_.precisionTarget->observe(totalEdepMeV);
+  const bool outOfTime = event && options_.simulationBudget && options_.simulationBudget->finishEvent();
+  if (precise || outOfTime) {
     G4RunManager::GetRunManager()->AbortRun(true);
   }
   if (!cfg_.stratify.enable) {

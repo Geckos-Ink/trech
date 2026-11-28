@@ -158,6 +158,12 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   density check has **three** outcomes — covered, starved, and *not checked* (the model carries no
   joint reference), because showing an unchecked stage as clean would be the silent guess the trust
   profile exists to prevent.
+- **Statistical precision target — Shipped (2026-11-28).** `AdaptiveControls.target` (percent)
+  adds `--precision-target <fraction>` to the run command; `set_config` seeds it from
+  `run.precisionTarget.relativeStderr` and disables it when `run.threads > 1`.
+  `build_precision_report` copies `precision_target`; `build_run_summary` adds a
+  **Statistical precision target** section. The engine owns the stop
+  ([precision handbook](../../engine/precision/AGENTS.md)).
 - **Precision profile surfaced — Shipped (2026-08-15).** A run that declares `config.precision`
   shows its rung (`preview`/`balanced`/`high`/`convergence`/`custom`) and every mapped axis in the
   Run-summary panel, the preview status line and each capture sidecar. A `custom` rung says which
