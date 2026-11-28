@@ -15,7 +15,7 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R6 · Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab`, and live batches redraw the viewport instead of only logging to the console (engine reinitialization is a runtime P1). Options-panel `params`, saved-edit reloads (`--watch`) and generation/refusal logging landed 2026-11-21 in **Run ▸ Start live lab**; a status widget for the active generation and a timed batch loop at `lab.targetHz` are still missing. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · All-scenario render parity: moving apparatus meshes, scalar colour bars, chart/text overlays, simultaneous streams and an all-family capture matrix. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P2** · R6 · Transform gizmos (translate/rotate/scale) on the selected volume. ([detail](#milestone-2--real-time-scenario-editing))
-- **P2** · R6 · Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics. Undo/redo landed 2026-11-22; nested creation and reparenting landed 2026-11-23 (parent control, parent-composed viewport placement); custom material definitions landed 2026-11-26. Per-field engine diagnostics remain. ([detail](#milestone-2--real-time-scenario-editing))
+- **P3** · R6 · Per-field diagnostics cover geometry substitutions and ignored keys only: a draft edit is not re-checked before it runs (a `trech inspect` pass on Apply could report unknown keys and materials live), and run-level records (hook failures, precision refusals) have no field to land on. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Callback-bearing scene round-trip: reconstruct typed declarations (`TRECH_VALUE`), companions and callback source so a run that registered hooks can be exported; `scene_to_config` still refuses `hooks.registered`. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Code editor: inline error markers, dynamic aliases/computed properties, template interpolation and complete config-schema completion (from Milestone 0). ([detail](../ROADMAP.md#milestone-0--the-basis-this-scaffold-landed-2026-07-11))
 - **P3** · R6 · Dependency packaging refuses model files the recorded run never opened (strict mode or a disabled optics/stratifier loader records no SHA-256), so such transport runs cannot be exported with their declared model; files a model names internally are not followed. ([detail](#milestone-2--real-time-scenario-editing))
@@ -141,7 +141,17 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   with an undeclared volume material reported one `material_fallback` to G4_AIR; the run's viz
   scene loads back with components equal to the recorded config. Studio pytest 391/391,
   `tools/viz` 20/20, Release CTest 81/81.
-- [ ] Inspector extensions: per-field engine diagnostics and crash
+- [x] **Per-field engine diagnostics (2026-11-28):** `run_summary.engine_field_diagnostics`
+  maps each `geometry_resolution` issue to the Inspector field it concerns (material fallback →
+  material, world/medium material, parent fallback → parent, skipped volume → shape, overlap →
+  position, both siblings) and each `config_unknown_keys` path under `geometry.volumes[i]`,
+  `beam`/`beams[i]` or `environment` to its volume (named from the recorded config), beam or the
+  World. The Inspector adds an **Engine diagnostics · recorded run** section and sets the edit
+  field's tooltip; loading another scene clears it. `geometry_resolution_marks` now shares the
+  issue parser (same lines). Evidence: a real `trech run` of a volume with
+  `material: "unobtanium"` and `colour` read back as material and key rows on that volume (and
+  showed `positionMm` is not a key the engine reads). `test_inspector_diagnostics.py` 4 tests.
+- [ ] Inspector extensions: crash
   recovery. Current
   Inspector drafts require a matching, exportable transport run; callback/model-bearing scenarios
   continue through the source editor and typed Options.

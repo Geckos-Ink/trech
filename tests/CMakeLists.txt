@@ -136,6 +136,11 @@ target_link_libraries(test_process_spatial PRIVATE trech_js)
 target_compile_definitions(test_process_spatial PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_process_spatial COMMAND test_process_spatial)
 
+add_executable(test_process_energy test_process_energy.cpp)
+target_link_libraries(test_process_energy PRIVATE trech_js)
+target_compile_definitions(test_process_energy PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME trech_process_energy COMMAND test_process_energy)
+
 add_executable(test_process_empty_population test_process_empty_population.cpp)
 target_link_libraries(test_process_empty_population PRIVATE trech_js)
 target_compile_definitions(test_process_empty_population PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")

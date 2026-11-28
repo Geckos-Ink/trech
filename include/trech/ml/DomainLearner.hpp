@@ -113,6 +113,7 @@ struct DomainLearnerResult {
   std::vector<double> predictionStd;
   std::vector<std::uint8_t> extrapolated;
   std::size_t extrapolatedCount = 0;
+  std::size_t withheldCount = 0;        // predictions withheld by withholdExtrapolated()
   std::size_t scored = 0;               // rows graded prequentially
   std::vector<double> routedRmse;       // per target, this call
   std::vector<double> pooledRmse;       // single-domain baseline, same rows
@@ -122,6 +123,13 @@ struct DomainLearnerResult {
   std::vector<TendencyEstimate> tendencies;  // learner-level series
   double seconds = 0.0;
 };
+
+// Trust gate for callers that apply predictions (closed-loop deployment): every row the learner
+// flagged as extrapolating (outside its domain's envelope or joint support) gets NaN predictions
+// and standard deviations, so the caller keeps its own law there. Grading, routing and the
+// learner's state are untouched; only the published predictions change. Returns the rows
+// withheld (also stored in `withheldCount`).
+std::size_t withholdExtrapolated(DomainLearnerResult& result, std::size_t targets);
 
 class DomainLearner {
  public:

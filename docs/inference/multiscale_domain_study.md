@@ -220,10 +220,33 @@ each frame's small error is integrated by the next. At 340 K, 12,889 of the 28,8
 parcel-frames were extrapolating. The engine and its NumPy twin agree on 576 deployed sample
 rows to 5.6 × 10⁻¹⁶, so the predictions are the learner's own.
 
-This is the measured answer to "do open-loop gains survive closed loop" for the lamp: no. The
-suite case `lava_lamp_domain_learner_deploy_closed_loop` pairs `out_lava_lamp_learned_deploy_340`
-with the authored `out_lava_lamp_heater_340` and fails 11/21. All nine thermal and vertical-motion
-scenario checks pass; the shadow, compounding and observer gates fail. Reproduce:
+So the open-loop gains do not survive a free closed loop for the lamp.
+
+**Trust-gated deploy (2026-11-28, the default).** The engine can now withhold its learner's
+predictions on every row the learner itself flags as extrapolating (`withhold_extrapolated`). The
+lamp's deploy uses that by default (`deploy_trust_gate`): such a parcel keeps the shadow law's
+response for that frame and is counted as *handed back*. The learner then only drives states
+inside its own support, and the error stops feeding on itself:
+
+| Heater (600 s, gated) | Learner share | Shadow RMSE per frame, T / height | T RMSE by third (K) | Final mean wax T, authored → deploy | Time-mean T gap | Observers within tolerance |
+| --- | ---: | --- | --- | --- | ---: | ---: |
+| 340 K | 85.4% | 0.51 K / 2.97 mm | 0.566 / 0.365 / 0.568 | 309.1 → 307.3 K | 0.55 K | 5/6 |
+| 318 K | 0% | — | — | 307.6 → 307.6 K | 0 | 6/6 |
+
+At 340 K the gate hands back 4,207 of the 28,800 parcel-frames, about half of them in the
+first third, when the wax first warms. The carrier-heat imbalance falls from 40.5 K to −0.65 K.
+At 318 K every row is remote, so every parcel is handed back and the run is the authored one;
+it says nothing about the learner. The gated lamp still fails its gate, 19/23. Over the
+parcel-frames it drives, the learner's per-frame gap is 0.10 K/s and 0.59 mm/s, about 4.5× and
+2.5× the pooled law's open-loop error. The temperature gap by third is flat rather than falling
+(0.566 → 0.568 K). The molten-fraction range differs by 0.116 against a 0.10 tolerance.
+
+The suite case `lava_lamp_domain_learner_deploy_closed_loop` pairs `out_lava_lamp_learned_deploy_340`
+(gated, the default) with the authored `out_lava_lamp_heater_340`. Ungated it scored 11/21. Gated
+it scores 19/23: two gate checks replace "every parcel-frame predicted" (every parcel-frame
+driven or handed back; learner share ≥ 0.5, fixed before the gated run). All nine thermal and
+vertical-motion scenario checks pass in both. `--param deploy_trust_gate=false` reproduces the
+runaway. Reproduce the gated run:
 
 ```bash
 trech run examples/scenarios/lava_lamp/lava_lamp.js --param heater_temperature_k=340 \

@@ -18,7 +18,9 @@ returns data the panel renders, so it is unit-testable headless.
 
 from __future__ import annotations
 
+import json
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -1016,16 +1018,7 @@ def build_run_summary(result: Any, registry: Any = None) -> RunSummary:
     return out
 
 
-def geometry_resolution_marks(result: Any) -> Dict[Tuple[str, str], List[str]]:
-    """Engine-recorded geometry substitutions and overlaps keyed by Outliner node ``(kind, name)``.
-
-    Reads the provenance ``geometry_resolution`` block verbatim (run_end first, then
-    run_start for an interrupted run). A volume issue maps to ``("volume", name)``; a world
-    material fallback maps to ``("world", "")``. The medium box has no Outliner node, so its
-    fallback is keyed ``("medium", "")`` for callers that want it. A sibling overlap marks both
-    volumes; a protrusion marks the protruding volume. Each value lists one short line per
-    issue. No block (nothing substituted, or an older run) gives ``{}``.
-    """
+def _resolution_block(result: Any) -> Optional[Dict[str, Any]]:
     block = _run_end_provenance(result).get("geometry_resolution")
     if not isinstance(block, dict):
         for rec in reversed(getattr(result, "provenance", []) or []):
@@ -1033,8 +1026,21 @@ def geometry_resolution_marks(result: Any) -> Dict[Tuple[str, str], List[str]]:
                 block = rec["geometry_resolution"]
                 break
     if not isinstance(block, dict) or not isinstance(block.get("issues"), list):
-        return {}
-    marks: Dict[Tuple[str, str], List[str]] = {}
+        return None
+    return block
+
+
+# The Inspector field each engine geometry issue concerns (volume view; world/medium below).
+_ISSUE_FIELD = {"volume_skipped": "shape", "parent_fallback": "parent",
+                "material_fallback": "material", "overlap": "position"}
+
+
+def _resolution_issues(result: Any) -> List[Tuple[Tuple[str, str], str, str]]:
+    """``(node key, field, line)`` per engine geometry issue, in record order (see below)."""
+    block = _resolution_block(result)
+    if block is None:
+        return []
+    out: List[Tuple[Tuple[str, str], str, str]] = []
     for issue in block["issues"]:
         if not isinstance(issue, dict):
             continue
@@ -1044,6 +1050,7 @@ def geometry_resolution_marks(result: Any) -> Dict[Tuple[str, str], List[str]]:
         requested = str(issue.get("requested") or "(unnamed)")
         resolved = str(issue.get("resolved") or "")
         reason = str(issue.get("reason") or "")
+        field = _ISSUE_FIELD.get(kind, "volume")
         if kind == "volume_skipped":
             line = f"not built by the engine ({reason or 'skipped'})"
         elif kind == "parent_fallback":
@@ -1059,18 +1066,92 @@ def geometry_resolution_marks(result: Any) -> Dict[Tuple[str, str], List[str]]:
                 line = f"overlaps '{requested}'{depth_text} (overlap)"
                 # The sibling is equally ambiguous for Geant4 navigation: mark it too.
                 if role == "volume" and issue.get("requested"):
-                    marks.setdefault(("volume", requested), []).append(
-                        f"overlaps '{volume}'{depth_text} (overlap)")
+                    out.append((("volume", requested), field, f"overlaps '{volume}'{depth_text} (overlap)"))
         else:
             line = f"{kind or 'substitution'}: {requested} → {resolved or '?'}"
         if role == "volume" and volume:
             key = ("volume", volume)
-        elif role in ("world", "medium"):
-            key = (role, "")
+        elif role == "world":
+            key, field = ("world", ""), "world_material" if kind == "material_fallback" else "world"
+        elif role == "medium":
+            key, field = ("medium", ""), "medium"
         else:
             continue
+        out.append((key, field, line))
+    return out
+
+
+def geometry_resolution_marks(result: Any) -> Dict[Tuple[str, str], List[str]]:
+    """Engine-recorded geometry substitutions and overlaps keyed by Outliner node ``(kind, name)``.
+
+    Reads the provenance ``geometry_resolution`` block verbatim (run_end first, then
+    run_start for an interrupted run). A volume issue maps to ``("volume", name)``; a world
+    material fallback maps to ``("world", "")``. The medium box has no Outliner node, so its
+    fallback is keyed ``("medium", "")`` for callers that want it. A sibling overlap marks both
+    volumes; a protrusion marks the protruding volume. Each value lists one short line per
+    issue. No block (nothing substituted, or an older run) gives ``{}``.
+    """
+    marks: Dict[Tuple[str, str], List[str]] = {}
+    for key, _field, line in _resolution_issues(result):
         marks.setdefault(key, []).append(line)
     return marks
+
+
+_UNKNOWN_VOLUME = re.compile(r"^geometry\.volumes\[(\d+)\]\.(.+)$")
+_UNKNOWN_BEAMS = re.compile(r"^beams\[(\d+)\]\.(.+)$")
+
+
+def engine_field_diagnostics(result: Any) -> Dict[Tuple[str, str], Dict[str, List[str]]]:
+    """Engine diagnostics per Inspector node and field, read from the run's provenance.
+
+    Geometry issues (``geometry_resolution``) land on the field they concern: a material
+    fallback on ``material`` (``world_material`` for the world, ``medium`` for the medium box),
+    a parent fallback on ``parent``, a skipped volume on ``shape`` and an overlap on
+    ``position``. Config keys the engine never read (``config_unknown_keys``) land on the node
+    they belong to under ``unknown:<key>``: ``geometry.volumes[i].<key>`` on that volume (named
+    from the recorded config), ``beam.<key>`` / ``beams[i].<key>`` on the beam and
+    ``environment.<key>`` on the world. Studio adds nothing the engine did not record.
+    """
+    out: Dict[Tuple[str, str], Dict[str, List[str]]] = {}
+    for key, field, line in _resolution_issues(result):
+        out.setdefault(key, {}).setdefault(field, []).append(line)
+    start = result.run_start_provenance() if hasattr(result, "run_start_provenance") else None
+    prov = _run_end_provenance(result) or start or {}
+    unknown = prov.get("config_unknown_keys") or (start or {}).get("config_unknown_keys") or []
+    if not isinstance(unknown, list) or not unknown:
+        return out
+    try:
+        config = json.loads((start or prov).get("config_json") or "{}")
+    except (TypeError, ValueError):
+        config = {}
+    volumes = ((config.get("geometry") or {}).get("volumes") or []) if isinstance(config, dict) else []
+    beams = config.get("beams") if isinstance(config, dict) and isinstance(config.get("beams"), list) else []
+    single_beam = config.get("beam") if isinstance(config, dict) and isinstance(config.get("beam"), dict) else {}
+    note = "ignored by the engine (unknown key)"
+    for path in unknown:
+        path = str(path)
+        match = _UNKNOWN_VOLUME.match(path)
+        if match:
+            index = int(match.group(1))
+            name = volumes[index].get("name") if index < len(volumes) and isinstance(volumes[index], dict) else None
+            if name:
+                out.setdefault(("volume", str(name)), {}).setdefault("unknown:" + match.group(2), []).append(note)
+            continue
+        match = _UNKNOWN_BEAMS.match(path)
+        if match:
+            index = int(match.group(1))
+            beam = beams[index] if index < len(beams) and isinstance(beams[index], dict) else {}
+            name = beam.get("name") or beam.get("particle")
+            if name:
+                out.setdefault(("beam", str(name)), {}).setdefault("unknown:" + match.group(2), []).append(note)
+            continue
+        if path.startswith("beam.") and single_beam:
+            name = single_beam.get("name") or single_beam.get("particle")
+            if name:
+                out.setdefault(("beam", str(name)), {}).setdefault("unknown:" + path[5:], []).append(note)
+        elif path.startswith("environment."):
+            out.setdefault(("world", ""), {}).setdefault("unknown:" + path[12:], []).append(note)
+    return out
 
 
 def _run_end_provenance(result: Any) -> Dict[str, Any]:

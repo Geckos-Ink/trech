@@ -121,7 +121,7 @@ Performance source: [`docs/validation/validation_report.json`](validation_report
 | [validation_glass_of_water](#validation_glass_of_water) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [viz_refraction_demo](#viz_refraction_demo) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 3 info, 11 pass |
 | [water_box](#water_box) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
-| [water_salt_recipe](#water_salt_recipe) | **G** | `no_active_material_law` | 0% | 0 / 1 | 1.5 | — | — | none recorded |
+| [water_salt_recipe](#water_salt_recipe) | **G** | `no_active_material_law` | 0% | 0 / 1 | 1.3 | — | — | none recorded |
 
 ## Scenarios
 
@@ -1083,7 +1083,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: thermal, phase, pair-interface and buoyancy/drag state evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 7 · inference share: 12%
-- Embedded coefficients: 63 in 1342 code lines (4.7/100) · top-level literals: 40 · geometry math: 28
+- Embedded coefficients: 63 in 1351 code lines (4.7/100) · top-level literals: 40 · geometry math: 28
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
 - Inherited from modules: `js/trech_domain_tracking.js`, `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
@@ -1776,7 +1776,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `no_active_material_law`, companion `no_active_material_law`.
 - Ledger note: Calls reusable solution process libraries; no built-in kinetics or models. The supplied recipe blocks on missing operators and emits no invented spatial motion.
 - Inference sites: 0 · law-shaped math: 1 · inference share: 0%
-- Embedded coefficients: 10 in 665 code lines (1.5/100) · top-level literals: 7 · geometry math: 0
+- Embedded coefficients: 10 in 747 code lines (1.3/100) · top-level literals: 7 · geometry math: 0
 - Geant4 fact reads: 0 · seeded RNG draws: 0 · hooks: yes
 - Inherited from modules: `js/trech_solution_processes.js`, `js/trech_process_runtime.js`, `js/trech_process_operators.js` — 0 inference / 1 law-shaped / 10 coefficients
 

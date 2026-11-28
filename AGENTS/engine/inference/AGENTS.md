@@ -327,6 +327,11 @@ radius, velocity, mass, permeant/cleared flags, unit innovations) and outputs (n
 pre-bound displacement rates). With 13 features the budget picks an affine basis, so the learner
 approximates the smooth SiLU operator piecewise; agreement is reported against
 cleared/permeant/retained classes applied afterwards.
+**Trust gate.** `trech::ml::withholdExtrapolated(result, targets)` (JS `withhold_extrapolated: true`,
+per call) blanks predictions and standard deviations on rows the learner flags as extrapolating
+and records `withheldCount`; routing, grading and state are untouched (`trech_domain_learner`
+checks it). A caller that applies predictions keeps its own law there. The lava lamp's deploy
+uses it by default (`deploy_trust_gate`).
 `ctx.cascade(seed, modelNames)` can narrow a property pass when the same config also declares
 independent operator models. Operator models declare `operator_role`, `element_kind`, and
 `required_context_keys`; absent an explicit `models` override, `ctx.evolve` selects the single

@@ -203,6 +203,83 @@
             declared: Object.fromEntries(Object.entries(declared).map(([k, u]) => [k, describeDims(u.dims)])),
             checks};
   }
+  // Optional `energy_balance` (2026-11-28): coupled sensible/latent energy accounting for
+  // continuous bindings. Each term converts a state change into energy through a per-element
+  // aux quantity (heat capacity per kelvin, latent heat per unit of melt fraction, ...):
+  // dH_i = sum_t per_unit_t[i] * (after_t[i] - before_t[i]). An optional context `source` is
+  // the power delivered per element (scope "element") or to the whole population (scope
+  // "total"). A proposal whose energy change differs from source*dt by more than
+  // absolute_tolerance + relative_tolerance * (gross exchange) is refused before commit, so an
+  // operator cannot melt a parcel without paying its latent heat. It checks the engine's
+  // proposal against declared quantities; it supplies no thermal or phase law.
+  function energyAudit(contract, writable, spatial) {
+    if (contract.operation === "react") throw new Error("energy_balance applies to evolve/interact bindings");
+    const spec = contract.energy_balance;
+    if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new Error("energy_balance must be an object");
+    requireText(spec.unit, "energy_balance unit");
+    const target = parseUnit(spec.unit);
+    if (!sameDims(target, parseUnit("J"))) throw new Error("energy_balance unit is not an energy: " + spec.unit);
+    const scope = spec.scope === undefined ? (spatial ? "total" : "element") : spec.scope;
+    if (!["element", "total"].includes(scope)) throw new Error("energy_balance scope must be element or total");
+    if (spatial && scope !== "total")
+      throw new Error("energy_balance on a spatial binding balances the whole population (scope total)");
+    const tolerance = (key, fallback) => {
+      const value = spec[key] === undefined ? fallback : spec[key];
+      if (!Number.isFinite(value) || value < 0) throw new Error("energy_balance " + key + " must be >= 0");
+      return value;
+    };
+    const relative = tolerance("relative_tolerance", 1e-9), absolute = tolerance("absolute_tolerance", 0);
+    if (!Array.isArray(spec.terms) || !spec.terms.length) throw new Error("energy_balance needs terms");
+    const seen = new Set();
+    const terms = spec.terms.map(term => {
+      const field = writable.find(f => term && f.name === term.field);
+      const carrier = contract.aux.find(a => term && a.name === term.per_unit);
+      if (!field) throw new Error("energy_balance term field is not a state field: " + (term && term.field));
+      if (!carrier) throw new Error("energy_balance per_unit must be a declared aux array: " + term.per_unit);
+      if (seen.has(field.name)) throw new Error("Duplicate energy_balance term: " + field.name);
+      seen.add(field.name);
+      const product = parseUnit(field.unit + " " + carrier.unit);
+      if (!sameDims(product, target))
+        throw new Error("energy_balance term " + field.name + " gives " + describeDims(product.dims) +
+          ", not energy (" + field.unit + " x " + carrier.unit + ")");
+      return {field: field.name, per_unit: carrier.name, factor: product.scale / target.scale};
+    });
+    let source = null;
+    if (spec.source !== undefined) {
+      const item = contract.context.find(c => c.name === spec.source);
+      if (!item) throw new Error("energy_balance source must be a declared context value: " + spec.source);
+      const product = parseUnit(item.unit + " s");
+      if (!sameDims(product, target)) throw new Error("energy_balance source is not a power: " + item.unit);
+      source = {name: item.name, factor: product.scale / target.scale};
+    }
+    return {unit: spec.unit, scope, relative, absolute, terms, source};
+  }
+  function energyResidual(energy, before, after, aux, context, dt) {
+    const count = before[energy.terms[0].field].length;
+    const supplied = energy.source ? context[energy.source.name] * dt * energy.source.factor : 0;
+    const change = new Float64Array(count), gross = new Float64Array(count);
+    for (const term of energy.terms)
+      for (let i = 0; i < count; i++) {
+        const dH = term.factor * aux[term.per_unit][i] * (after[term.field][i] - before[term.field][i]);
+        change[i] += dH; gross[i] += Math.abs(dH);
+      }
+    let maxResidual = 0, violation = -1, element = -1, totalChange = 0, totalGross = 0;
+    for (let i = 0; i < count; i++) {
+      totalChange += change[i]; totalGross += gross[i];
+      if (energy.scope !== "element") continue;
+      const residual = Math.abs(change[i] - supplied);
+      const allowed = energy.absolute + energy.relative * Math.max(gross[i], Math.abs(supplied));
+      maxResidual = Math.max(maxResidual, residual);
+      if (residual > allowed && residual > violation) { violation = residual; element = i; }
+    }
+    if (energy.scope === "total") {
+      const residual = Math.abs(totalChange - supplied);
+      const allowed = energy.absolute + energy.relative * Math.max(totalGross, Math.abs(supplied));
+      return {ok: residual <= allowed, residual, gross: totalGross, element: null};
+    }
+    return {ok: element < 0, residual: element < 0 ? maxResidual : violation, gross: totalGross,
+      element: element < 0 ? null : element};
+  }
   function bind(definition) {
     const contract = copy(definition);
     if (!contract || !["evolve", "react", "interact"].includes(contract.operation))
@@ -349,6 +426,7 @@
         }
     }
     if (contract.dimensional_check === true) dimensions = dimensionalAudit(contract, writable, coordinates);
+    const energy = contract.energy_balance !== undefined ? energyAudit(contract, writable, spatial) : null;
     function totals(state, count) {
       return contract.conservation.map(vector => Array.from({length: count}, (_, i) =>
         writable.reduce((sum, field) => exactSum(sum,
@@ -506,6 +584,14 @@
               throw new Error("Process violated conservation: " + contract.conservation[v].name);
         }
       } catch (error) { return failure("invalid_proposal", error.message, engine, true); }
+      let balance = null;
+      if (energy) {
+        balance = energyResidual(energy, state, proposed, aux, context, dt);
+        if (!balance.ok)
+          return failure("energy_imbalance", "Process violated energy balance" +
+            (balance.element === null ? "" : " at element " + balance.element) + ": residual " +
+            balance.residual + " " + energy.unit, engine, true);
+      }
       for (const field of writable) state[field.name] = proposed[field.name].slice();
       trace.count(contract.id + ".advanced");
       if (trace.enabled("debug"))
@@ -513,12 +599,17 @@
           operator_role: contract.operator_role, elements: state[writable[0].name].length,
           inferences: engine.inferenceCount, selection: engine.selection ? engine.selection.status : null});
       return {ran: true, accepted: true, contract_id: contract.id, error: null, engine,
+        ...(balance ? {energy: {scope: energy.scope, unit: energy.unit, max_residual: balance.residual,
+          gross_exchange: balance.gross}} : {}),
         ...(artifacts ? {artifacts: copy(artifacts)} : {})};
     }
     trace.debug("process contract bound", {contract: contract.id, operation: contract.operation,
       operator_role: contract.operator_role, element_kind: contract.element_kind || null,
       spatial: !!spatial, dimensional_check: !!dimensions});
-    return dimensions ? {contract: copy(contract), advance, dimensions: copy(dimensions)} : {contract: copy(contract), advance};
+    const bound = {contract: copy(contract), advance};
+    if (dimensions) bound.dimensions = copy(dimensions);
+    if (energy) bound.energy = copy(energy);
+    return bound;
   }
   globalThis.TRECH_PROCESS_OPERATORS = {bind, units};
 })();

@@ -70,11 +70,13 @@ They feed two cases in `cases.py`:
 - `lava_lamp_domain_learner_deploy_closed_loop`: the frozen lamp learner
   (`data/lava_lamp_domain_learner/parcels.json`) drives each parcel's temperature, height and
   vertical velocity at a held-out 340 K heater (`out_lava_lamp_learned_deploy_340`), paired with
-  the authored `out_lava_lamp_heater_340`. Every parcel-frame must be predicted; the shadow gap as
-  an interval rate must beat the pooled law's held-out RMSE from the build record and must not grow
-  by third; six frame observers (`lamp_observers.py`, tolerances fixed 2026-11-28 before the first
-  run) and nine thermal/vertical scenario checks must hold. It **fails** (2026-11-28): the wax runs
-  away to 407 K; queued in the [inference roadmap](../../engine/inference/ROADMAP.md#priority-queue).
+  the authored `out_lava_lamp_heater_340`. The engine's trust gate is on: rows the learner flags as
+  extrapolating are handed back to the authored law. Every parcel-frame must be driven or handed
+  back and the learner must drive at least half; the shadow gap over learned rows as an interval
+  rate must beat the pooled law's held-out RMSE from the build record and must not grow by third;
+  six frame observers (`lamp_observers.py`, tolerances fixed 2026-11-28 before the first run) and
+  nine thermal/vertical scenario checks must hold. It **fails 19/23** (2026-11-28; ungated it ran
+  away to 407 K, 11/21); queued in the [inference roadmap](../../engine/inference/ROADMAP.md#priority-queue).
 
 The full campaign (training, freezing, specialists, held-out evaluate/deploy, NumPy parity) is
 `tools/torch/study_domain_learning.py --scenario furnace|lamp|efflux`. A published learner carries

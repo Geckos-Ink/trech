@@ -29,6 +29,12 @@ from ..scene.model import MaterialDef, SceneModel, Shape, VolumeNode
 from ..precision import PrecisionReport
 
 
+# Inspector label for each engine-diagnostic field key (run_summary.engine_field_diagnostics).
+_DIAGNOSTIC_LABELS = {"material": "material", "parent": "parent", "shape": "shape",
+                      "position": "position in parent", "world_material": "material",
+                      "medium": "medium", "volume": "volume", "world": "world"}
+
+
 def _fmt_vec(v) -> str:
     return "(" + ", ".join(f"{x:.3g}" for x in v) + ")"
 
@@ -48,6 +54,7 @@ class Inspector(QScrollArea):
         self._draft = False
         self._source_config = {}
         self._fields = {}
+        self._diagnostics = {}
         self._body = QWidget(self)
         self._layout = QVBoxLayout(self._body)
         self._layout.setContentsMargins(10, 10, 10, 10)
@@ -70,6 +77,42 @@ class Inspector(QScrollArea):
 
     def set_precision(self, precision: Optional[PrecisionReport]) -> None:
         self._precision = precision
+
+    def set_field_diagnostics(self, diagnostics: Optional[dict]) -> None:
+        """Engine diagnostics of the loaded run per ``(kind, name)`` node and field
+        (``run_summary.engine_field_diagnostics``); ``None`` clears them."""
+        self._diagnostics = dict(diagnostics or {})
+
+    def _show_diagnostics(self, kind: str, name: str) -> int:
+        """One row per engine-recorded issue under its field label; the matching edit field
+        gets the same text as its tooltip. Returns the rows shown."""
+        fields = {key: list(lines) for key, lines in self._diagnostics.get((kind, name), {}).items()}
+        if kind == "world":  # the medium box has no node of its own; its issues show here
+            for key, lines in self._diagnostics.get(("medium", ""), {}).items():
+                fields.setdefault(key, []).extend(lines)
+        if not fields:
+            return 0
+        form = self._section("Engine diagnostics · recorded run")
+        rows = 0
+        for key in sorted(fields):
+            label = ("key " + key[len("unknown:"):]) if key.startswith("unknown:") else _DIAGNOSTIC_LABELS.get(key, key)
+            for line in fields[key]:
+                text = QLabel(line, self._body)
+                text.setWordWrap(True)
+                text.setProperty("role", "warn")
+                text.setObjectName("engine_diagnostic_" + key)
+                form.addRow(label, text)
+                rows += 1
+            widget = self._fields.get(key)
+            if widget is not None:
+                widget.setToolTip("Engine, recorded run: " + "; ".join(fields[key]))
+                widget.setProperty("engine_diagnostic", True)
+        note = QLabel("Read from the loaded run's provenance (geometry_resolution, "
+                      "config_unknown_keys); a draft edit is not re-checked until it runs.", self._body)
+        note.setWordWrap(True)
+        note.setProperty("role", "warn")
+        self._layout.addWidget(note)
+        return rows
 
     # --- routing ------------------------------------------------------------------------
 
@@ -250,6 +293,7 @@ class Inspector(QScrollArea):
             world.addRow("size (mm)", QLabel(f"{s.world_size_mm:.3g}"))
         if s.medium_size_mm:
             world.addRow("medium", QLabel(f"{s.medium_material} @ {s.medium_size_mm:.3g} mm"))
+        self._show_diagnostics("world", "")
         run = self._section("Recorded run" if self._draft else "Run")
         run.addRow("events", QLabel(str(s.run.n_events)))
         run.addRow("seed", QLabel(str(s.run.seed)))
@@ -398,6 +442,7 @@ class Inspector(QScrollArea):
             form.addRow("rotation (deg)", QLabel(_fmt_vec(vol.rotation_deg)))
         form.addRow("tags", QLabel(", ".join(vol.tags) or "—"))
         form.addRow("score edep", QLabel("yes" if vol.score_edep else "no"))
+        self._show_diagnostics("volume", name)
 
         # How this volume renders: physics-derived look (at its own thickness) + authored hints.
         appear = self._scene.volume_appearance(vol)
@@ -467,6 +512,7 @@ class Inspector(QScrollArea):
             form.addRow("energy (eV)", QLabel(f"{beam.energy_ev:.4g}"))
             form.addRow("direction", QLabel(_fmt_vec(beam.direction)))
         form.addRow("active", QLabel("yes" if beam.active else "no"))
+        self._show_diagnostics("beam", name)
         self._layout.addStretch(1)
 
     def _material_components(self, mat: MaterialDef) -> list:

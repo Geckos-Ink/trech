@@ -107,6 +107,10 @@ const learnDomains = TRECH_PARAMETER("learn_domains");
 // this script declares no field and only reserves the emits the companion asks for.
 const validationFrameEmits = TRECH_CHECKS["lava_lamp"].observeFrameEmits();
 const domainLearnerModel = TRECH_PARAMETER("domain_learner_model");
+// deploy only: the engine withholds every prediction its learner flags as extrapolating, and
+// those parcels keep the authored (shadow) response for that frame. false reproduces the
+// ungated closed loop of 2026-11-28, which runs away.
+const deployTrustGate = TRECH_PARAMETER("deploy_trust_gate");
 const LEARNER_STATE = domainLearnerModel
   ? TRECH_READ_JSON(domainLearnerModel.startsWith("/") ? domainLearnerModel : "../../../" + domainLearnerModel)
   : null;
@@ -717,6 +721,9 @@ function learnerFeatures(start, n) {
 // thermal/vertical response and its error feeds back into every later frame. The per-frame gap
 // to the shadow, by run third, shows whether it compounds. The heat the learned temperatures
 // add beyond the authored exchange is not taken from the carrier and is reported.
+// With the trust gate (deploy_trust_gate, default on) the engine publishes no prediction for a
+// row its learner flags as extrapolating; that parcel is handed back to the shadow law for the
+// frame and counted, so the learner drives only states inside its own support.
 function deployParcelResponse(ctx, state, start, target, frameIndex) {
   const dt = target - start.time;
   if (!(dt > 0)) return;
@@ -727,10 +734,12 @@ function deployParcelResponse(ctx, state, start, target, frameIndex) {
     time: target,
     features,
     options: { warm_start: LEARNER_STATE, frozen: true },
+    withhold_extrapolated: deployTrustGate,
     report: "summary"
   });
   if (!report) throw new Error("learn_domains=deploy requires determinism.mode=predictive");
   const d = state.deploy;
+  const withheld = Number(report.withheld || 0);
   const third = Math.min(2, Math.floor(3 * (frameIndex - 1) / APPARATUS.outputTicks));
   const phase = d.phases[third];
   const heating = report.predictions.heating_k_per_s || [];
@@ -762,6 +771,10 @@ function deployParcelResponse(ctx, state, start, target, frameIndex) {
   d.calls += 1;
   d.elements += n;
   d.extrapolated += Number(report.extrapolated || 0);
+  // Withheld rows are the untouched ones the trust gate produced: handed back, not missing.
+  d.handedBack += withheld;
+  d.untouched -= withheld;
+  phase.handedBack += withheld;
   if (frameIndex % 10 === 0 || frameIndex >= APPARATUS.outputTicks) {
     ctx.emit("domain_learning", TRECH_DOMAIN_LEARNING.summarize(report,
       { scenario: "lava_lamp", frame: frameIndex, mode: "deploy" },
@@ -782,13 +795,18 @@ function deploySummary(state) {
   return {
     calls: d.calls, element_steps: d.elements, applied: d.applied, untouched: d.untouched,
     extrapolated: d.extrapolated, interval_s: dt,
+    trust_gate: deployTrustGate ? "withhold_extrapolated" : "none",
+    // Parcel-frames the gate handed back to the authored law, and the learner's share.
+    handed_back: d.handedBack,
+    learned_share: d.applied / Math.max(d.elements, 1),
     // Per parcel and output frame: learner minus the authored shadow from the same state.
     rmse: { temperature_k: all.temperature_k, z_mm: all.z_mm },
     // The same gaps as interval rates, comparable with the learner's target RMSE.
     rate_rmse: { heating_k_per_s: all.temperature_k / dt, mean_vz_mm_s: all.z_mm / dt },
     mean_signed: { temperature_k: all.mean_signed_temperature_k, z_mm: all.mean_signed_z_mm },
     max_abs: d.maxAbs,
-    rmse_by_third: d.phases.map((ph) => Object.assign({ element_steps: ph.n },
+    // RMSE over the parcel-frames the learner drove; handed_back counts the rest of the third.
+    rmse_by_third: d.phases.map((ph) => Object.assign({ element_steps: ph.n, handed_back: ph.handedBack },
       block(ph.sq, ph.signed, ph.n))),
     // Carrier-equivalent kelvin the learned temperatures added beyond the authored exchange
     // (wax heat capacity share), summed over the run: heat the deployment did not conserve.
@@ -990,8 +1008,8 @@ function initState(ctx) {
   if (learnDomains === "deploy") {
     const gaps = () => ({ temperature_k: 0, z_mm: 0 });
     state.deploy = { calls: 0, elements: 0, applied: 0, untouched: 0, extrapolated: 0,
-      sq: gaps(), signed: gaps(), maxAbs: gaps(), unbalancedCarrierK: 0,
-      phases: [0, 1, 2].map(() => ({ n: 0, sq: gaps(), signed: gaps() })) };
+      sq: gaps(), signed: gaps(), maxAbs: gaps(), unbalancedCarrierK: 0, handedBack: 0,
+      phases: [0, 1, 2].map(() => ({ n: 0, handedBack: 0, sq: gaps(), signed: gaps() })) };
   }
   ctx.state.lavaLamp = state;
   return state;

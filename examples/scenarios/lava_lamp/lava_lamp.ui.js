@@ -65,6 +65,12 @@ TRECH_PARAMETERS({
   description: "trech_domain_learner_v1 state: warm start for learn, the frozen model for evaluate and deploy. " +
                "Repository-relative unless absolute."
 }; },
+"deploy_trust_gate": function() { return {
+  type: "boolean", label: "Deploy trust gate", group: "Inference", default: true,
+  description: "deploy only: the engine withholds predictions its frozen learner flags as " +
+               "extrapolating, and those parcels keep the authored response for that frame. Off " +
+               "lets the learner drive every parcel (the ungated closed loop runs away)."
+}; },
 "engine_field_evolution": function() { return {
   type: "boolean", label: "Validate engine field methods", group: "Inference", default: true,
   description: "Validation only: the validation companion declares the carrier column to " +

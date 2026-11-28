@@ -1845,4 +1845,19 @@ DomainLearner DomainLearner::fromState(const nlohmann::json& state, bool frozen)
   return learner;
 }
 
+std::size_t withholdExtrapolated(DomainLearnerResult& result, std::size_t targets) {
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  std::size_t withheld = 0;
+  for (std::size_t i = 0; i < result.extrapolated.size(); ++i) {
+    if (!result.extrapolated[i]) continue;
+    for (std::size_t k = 0; k < targets; ++k) {
+      result.predictions[i * targets + k] = nan;
+      result.predictionStd[i * targets + k] = nan;
+    }
+    ++withheld;
+  }
+  result.withheldCount = withheld;
+  return withheld;
+}
+
 }  // namespace trech::ml

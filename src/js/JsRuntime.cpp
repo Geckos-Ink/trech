@@ -2588,6 +2588,12 @@ static JSValue jsHookLearnDomains(JSContext* ctx, JSValueConst, int argc, JSValu
     return JS_ThrowRangeError(ctx, "ctx.learnDomains tendencies must be significant or all");
   }
 
+  // Per-call trust gate: `withhold_extrapolated: true` publishes no prediction for a row the
+  // learner flags as extrapolating, so a caller that applies predictions keeps its own law there.
+  JSValue withholdVal = JS_GetPropertyStr(ctx, spec, "withhold_extrapolated");
+  const bool withhold = !JS_IsUndefined(withholdVal) && JS_ToBool(ctx, withholdVal) > 0;
+  JS_FreeValue(ctx, withholdVal);
+
   trech::ml::DomainLearnerResult result;
   try {
     batch.time = hasTime ? time : static_cast<double>(learner->calls() + 1);
@@ -2596,12 +2602,14 @@ static JSValue jsHookLearnDomains(JSContext* ctx, JSValueConst, int argc, JSValu
     return JS_ThrowInternalError(ctx, "ctx.learnDomains %s failed: %s", name.c_str(), e.what());
   }
   const std::size_t t = o.targets.size();
+  if (withhold) trech::ml::withholdExtrapolated(result, t);
   nlohmann::json out = {{"name", name}, {"call", result.call}, {"time", batch.time},
                         {"frozen", o.frozen}, {"features", o.features}, {"targets", o.targets},
                         {"elementDomains", result.elementDomains},
                         {"predictionDomains", result.predictionDomains},
                         {"scored", result.scored}, {"extrapolated", result.extrapolatedCount},
                         {"seconds", result.seconds}};
+  if (withhold) out["withheld"] = result.withheldCount;
   nlohmann::json predictions = nlohmann::json::object(), stds = nlohmann::json::object();
   nlohmann::json routed = nlohmann::json::object(), pooled = nlohmann::json::object();
   nlohmann::json coverage = nlohmann::json::object();

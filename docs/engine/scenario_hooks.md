@@ -812,7 +812,7 @@ load. Changing either after startup requires a restart.
 
 ### `ctx.learnDomains`
 
-- `ctx.learnDomains({name, features, targets?, time?, options?, report?, export_rows?, tendencies?})` grows
+- `ctx.learnDomains({name, features, targets?, time?, options?, report?, export_rows?, tendencies?, withhold_extrapolated?})` grows
   **response domains** of a live population online (`trech::ml::DomainLearner`). `features` and
   `targets` are objects of equal-length numeric arrays (sorted by name). `targets` is the response
   the scenario's own operator produced for those rows (the teacher). The learner persists across
@@ -845,6 +845,12 @@ load. Changing either after startup requires a restart.
   - **Frozen.** `options.frozen: true` routes and predicts; with targets it grades
     (`metrics`) but changes nothing that drives a prediction: laws, predictor choices and trend
     histories stay as restored.
+  - **Trust gate.** `withhold_extrapolated: true` (per call, unlike `options`) publishes `null`
+    predictions and standard deviations for every row the learner flags as extrapolating (outside
+    its domain's envelope or more than 1.5 support radii from its joint support), and the result
+    adds `withheld`, the number of rows withheld. Routing, grading and the learner's state are
+    unchanged. A caller that applies predictions keeps its own law on those rows. The lava lamp's
+    `deploy` does this by default: with it, the frozen learner's closed loop stops running away.
   - **Change and drift.** A domain's own-law error far above its history (`drift_z`²×) marks a
     change point. A forgetting learner (`forgetting` < 1, default 0.97) then drops the domain's
     pre-change rows. A stationary learner (`forgetting: 1`) keeps reservoir-sampled rows of

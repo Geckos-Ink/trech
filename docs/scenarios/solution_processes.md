@@ -347,6 +347,43 @@ both dimension and scale, and `hazard_<channel>` = 1/s for a declared channel; `
 kelvin field fails because the engine integrates with `dt` in seconds. Other outputs are only
 parsed. The flag is opt-in: without it no label is parsed and the bound contract is unchanged.
 
+### Coupled sensible and latent energy (`energy_balance`)
+
+A continuous binding (`evolve`, or `interact` over a spatial population) may declare how its
+state changes cost energy. Each term pairs a state field with a per-element aux quantity, the
+energy per unit of that field, so the enthalpy change of element *i* is
+ΔH = Σ per_unit[i] × Δfield[i]. A field in kelvin with a heat capacity in `J/K` is a sensible
+term; a melt fraction (`1`) with a latent heat in `J` is a latent term. After the engine operator
+proposes the step, and before anything is committed, the binding checks that ΔH equals the
+declared `source` × dt. The source is a context power (`W`), delivered per element
+(`scope: "element"`, the default for `evolve`) or to the whole population (`scope: "total"`, the
+only scope for a spatial binding, where pair exchange moves energy between members).
+
+```js
+const melt = TRECH_PROCESS_OPERATORS.bind({...definition,
+  fields: [{name: "temperature_k", unit: "K"}, {name: "melt_fraction", unit: "1", min: 0, max: 1}],
+  aux: [{name: "heat_capacity", unit: "J/K"}, {name: "latent_heat", unit: "kJ"}],
+  context: [{name: "heating_w", unit: "W"}],
+  energy_balance: {unit: "J", source: "heating_w",
+    terms: [{field: "temperature_k", per_unit: "heat_capacity"},
+            {field: "melt_fraction", per_unit: "latent_heat"}]}});
+```
+
+Example: a parcel with 50 J/K and 10 kJ of latent heat that the operator cools by 2 K while it
+melts 1% more in one second balances with no source (−100 J + 100 J). If the operator melts
+2% instead, the step needs 100 W more. Without a 100 W `heating_w` the step is refused
+with `energy_imbalance`, and the state and clock are left as they were. The check allows
+`absolute_tolerance` (in `unit`, default 0) plus `relative_tolerance` (default 10⁻⁹) of the
+gross exchange Σ|term| or the supplied energy, whichever is larger. Labels must parse. Each term's
+field unit × aux unit must be an energy, and the source unit × s too; scale prefixes (`kJ`) are
+converted by their factor. Bind fails on a missing field or aux, a source that is not a power, a
+discrete `react` binding, or an element scope on a spatial binding. An accepted result carries
+`energy: {scope, unit, max_residual, gross_exchange}`, and the bound object carries the
+resolved `energy` audit.
+
+This is an accounting contract over declared quantities. It supplies no thermal or phase-change
+law, it does not move heat between elements, and no scenario declares it yet.
+
 Missing catalog access returns `catalog_unavailable`. An empty loaded group or missing/incomplete
 model unit metadata returns `unit_metadata_missing`; differing labels or missing/extra expected IO
 returns `unit_mismatch`. All block before inference/RNG and preserve state/clock. After a catalog
@@ -363,6 +400,7 @@ catalog; bindings without units or pins retain their prior path and never read i
 | `unit_metadata_missing`, `unit_mismatch` | `blocked` | no operator call, no commit |
 | `invalid_context`, `invalid_binding` | `rejected` | no operator call, no commit |
 | `invalid_proposal` | `rejected` | no; raw engine report retained |
+| `energy_imbalance` | `rejected` | no; raw engine report retained |
 | `operator_exception` | `rejected` | no; error text retained, run-level accounting remains authoritative |
 
 Invalid contract definitions and nonpositive/nonfinite `dt` throw authoring errors. Exceptions from
@@ -398,8 +436,9 @@ These are execution-contract checks, not validation of heat or mass transport.
 ## What still needs implementation
 
 This is orchestration, not a new phase-change model. No validated dissolution, energy transport,
-evaporation or crystallization model is bundled. Heating is sequential thermal preparation;
-latent-heat/energy coupling during subsequent operations is unavailable. Single-channel integer
+evaporation or crystallization model is bundled. Heating is sequential thermal preparation.
+A binding can now refuse a step whose sensible and latent energy do not balance
+(`energy_balance`), but no operator transports that energy and no recipe declares it. Single-channel integer
 transitions are bounded to the existing one-transition-per-element/call contract, not a calibrated
 macroscopic rate. Spatial cells, diffusion/advection, interfaces, simultaneous coupled processes,
 nucleation and reversible growth/dissolution require additional process/operator support.

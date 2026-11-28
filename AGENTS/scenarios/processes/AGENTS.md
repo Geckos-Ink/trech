@@ -28,7 +28,12 @@ Read the root principles and the parent handbook first; then open only the subca
 
 **Reusable process authoring:** `trech_process_runtime.js` owns generic validated sequencing;
 `trech_process_operators.js` binds unit-declared continuous/discrete process contracts to engine
-operators, isolates auxiliary arrays and commits only valid proposals. C++ `ctx.operatorCatalog()`
+operators, isolates auxiliary arrays and commits only valid proposals. An optional
+`energy_balance` (continuous bindings only) converts declared state changes into energy through
+per-element aux quantities (sensible: field × heat capacity; latent: melt fraction × latent heat),
+compares the total with a declared context power × dt per element or for the whole population,
+and refuses an unbalanced proposal as `energy_imbalance` before commit (CTest
+`trech_process_energy`). It is accounting, not a heat-transport law; no scenario declares it yet. C++ `ctx.operatorCatalog()`
 exposes detached role/kind/IO/load/training metadata without inference or RNG, including strict mode;
 catalog presence is not proof of compatible inputs or physical validity. Solution plans record
 their operator contracts in `hooks.inputs`; bound reports retain the raw report under `engine`.

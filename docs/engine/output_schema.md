@@ -1162,9 +1162,12 @@ on the last one. `lava_lamp_summary.domain_learning.shadow` holds `calls`, `elem
 `applied`, `untouched`, `extrapolated`, `interval_s`, `rmse` and `max_abs` (`temperature_k`,
 `z_mm`: learned minus the authored step laws from the same state, per parcel and output frame),
 `rate_rmse` (the same divided by the interval: `heating_k_per_s`, `mean_vz_mm_s`), `mean_signed`,
-`rmse_by_third` (with `element_steps` and signed means) and `unbalanced_carrier_heat_k` (the
-carrier-equivalent heat the learned temperatures added beyond the authored exchange, summed over
-the run). `lava_lamp_summary.parcel_response_driver` is `"learned_domains"`; both fields are
+`rmse_by_third` (with `element_steps`, `handed_back` and signed means; the RMSE covers the
+parcel-frames the learner drove) and `unbalanced_carrier_heat_k` (the carrier-equivalent heat the
+learned temperatures added beyond the authored exchange, summed over the run). `trust_gate` is
+`"withhold_extrapolated"` (default) or `"none"`. `handed_back` counts the parcel-frames whose
+predictions the engine withheld, which kept the authored response, and `learned_share` is
+`applied / element_steps`. `lava_lamp_summary.parcel_response_driver` is `"learned_domains"`; both fields are
 absent in the other modes.
 
 ## Engine field-evolution emits

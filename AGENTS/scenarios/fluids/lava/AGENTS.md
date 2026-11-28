@@ -49,3 +49,6 @@ the learned temperatures added beyond the authored exchange) and `parcel_respons
 "learned_domains"`. Frame observers for paired grading are in
 `tools/validation/trech_validation/lamp_observers.py`; the suite case is
 `lava_lamp_domain_learner_deploy_closed_loop` (340 K, held out). Other modes' emits are unchanged.
+`deploy_trust_gate` (default `true`) passes `withhold_extrapolated` to the learner: parcels whose
+rows it flags as extrapolating keep the shadow response for that frame and are counted
+`handed_back`. `false` reproduces the ungated run that runs away to 407 K.

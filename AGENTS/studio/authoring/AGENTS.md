@@ -84,6 +84,13 @@ when its `{material, fraction}` projection matches the scene, because viz scenes
 2026-11-26 dropped `element`/`atoms`/`massNumber` (`RunAction` now emits them); untouched text
 keeps the model's components so a no-op Apply stays a no-op. Tests: `studio/tests/test_scene_materials.py`
 (includes a strict `trech inspect` round-trip of nested custom materials).
+**Per-field engine diagnostics:** `run_summary.engine_field_diagnostics(result)` returns
+`{(kind, name): {field: [lines]}}` from the run's `geometry_resolution` issues and
+`config_unknown_keys` (field keys `material`, `parent`, `shape`, `position`, `world_material`,
+`medium`, `unknown:<key>`); `geometry_resolution_marks` uses the same parser
+(`_resolution_issues`), so Outliner marks and Inspector rows stay identical.
+`Inspector.set_field_diagnostics` is set on run load and cleared on `_apply_scene`; drafts keep the
+recorded run's diagnostics, labelled as such. Tests: `studio/tests/test_inspector_diagnostics.py`.
 Apply builds a detached candidate, validates it through the same lossless writer, and only then
 updates the scene/Outliner/viewport. Each applied draft is recorded in `scene/history.SceneHistory`
 (pure data, deep-copied before/after snapshots with their selections, 100-edit limit); **Edit ▸

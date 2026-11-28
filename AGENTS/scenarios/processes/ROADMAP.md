@@ -20,8 +20,25 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R3 · Contract extensions: persistent-link/pair-state bindings, process pins for separate loaders, artifact signatures. ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R3 · Spatial process completion: empty populations for per-kind/spatial bindings and per-domain evidence that "no neighbour" means "no change". ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R2 · Train composition/concentration-conditioned dissolution, thermal and phase-change operators from particle-derived context with labelled independent anchors. ([detail](#deep-reusable-js-process-libraries))
-- **P3** · R3 · Coupled thermal/latent energy, mass transport and 3D solution state; supersaturation, nucleation and reversible faceted growth; generalize the domain libraries across families. ([detail](#deep-reusable-js-process-libraries))
+- **P3** · R3 · Coupled thermal/latent energy, mass transport and 3D solution state; the `energy_balance` contract (2026-11-28) refuses steps whose sensible and latent energy do not balance, but nothing transports energy or mass, no recipe or furnace binding declares it, and `react` bindings (reaction enthalpy per channel) are excluded; supersaturation, nucleation and reversible faceted growth; generalize the domain libraries across families. ([detail](#2026-11-28-coupled-energy-accounting))
 - **gated** · R5 · Calibrated microscope-scale interface data (no calibrated 3D sequence is bundled; external data needed). ([detail](#deep-reusable-js-process-libraries))
+
+## 2026-11-28 coupled energy accounting
+
+- [x] `energy_balance` on continuous process bindings (`trech_process_operators.js`): terms
+  `{field, per_unit}` with per-element aux energies per unit (J/K for temperature, J for a melt
+  fraction), an optional context power `source`, `scope` element (default for `evolve`) or total
+  (the only scope for spatial bindings), `relative_tolerance` (1e-9 of the gross exchange) and
+  `absolute_tolerance`. Labels are parsed and scaled (`kJ` → 1000), and bind fails on a non-energy
+  product, a non-power source, a `react` binding or an element scope on a spatial binding. After
+  the engine's proposal, an unbalanced step returns `energy_imbalance` (`ran:true`, runtime status
+  `rejected`) with nothing committed; an accepted step reports `energy {scope, unit, max_residual,
+  gross_exchange}`. CTest `trech_process_energy`: bind refusals, a balanced sensible/latent step,
+  kJ scaling, an unbalanced melt refused with state untouched, a 100 W source that pays for it,
+  total scope, an undeclared contract unchanged, strict mode. Synthetic constant-rate maps:
+  this tests the contract, not a phase-change response.
+- Residuals (queued above): adoption by a recipe or the furnace, reaction enthalpy per `react`
+  channel, energy transport between elements.
 
 ## 2026-11-18 unlabelled thermal domains
 

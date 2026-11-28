@@ -5913,6 +5913,9 @@ class LavaLampDomainLearnerDeploy(ValidationCase):
     category = "fluids"
     model = "data/lava_lamp_domain_learner/parcels.json"
     build_record = "data/lava_lamp_domain_learner/parcels.build_record.json"
+    # Trust-gated deploy (2026-11-28, set before its first run): the engine withholds predictions
+    # on extrapolating rows and those parcels keep the authored law for the frame.
+    min_learned_share = 0.5
     # Physics checks of the lamp that read the state the learner drives (temperature, height,
     # vertical velocity) or the run's bookkeeping. The others (topology, rendered surface,
     # horizontal convection) are reported, not gated.
@@ -5924,11 +5927,14 @@ class LavaLampDomainLearnerDeploy(ValidationCase):
     )
     description = (
         "lava_lamp at a 340 K heater (held out: the learner saw 325, 333.15 and 345 K) with "
-        "learn_domains=deploy: every output frame the committed frozen learner predicts each "
-        "parcel's heating rate and mean vertical velocity from its frame-start state and those "
-        "predictions set its temperature, height and vertical velocity, naming no phase or droplet "
-        "label. The authored step laws advance the same deployed state first and are the shadow. "
-        "Every parcel-frame must be predicted; the per-frame shadow gap, as an interval rate, must "
+        "learn_domains=deploy and the default trust gate: every output frame the committed frozen "
+        "learner predicts each parcel's heating rate and mean vertical velocity from its frame-start "
+        "state and those predictions set its temperature, height and vertical velocity, naming no "
+        "phase or droplet label. The authored step laws advance the same deployed state first and are "
+        "the shadow; the engine withholds predictions on rows its learner flags as extrapolating, and "
+        "those parcels keep the shadow law for that frame. Every parcel-frame must be driven or "
+        "handed back, the learner must drive at least half of them; the per-frame shadow gap over "
+        "the learned parcel-frames, as an interval rate, must "
         "beat the pooled single-domain law's held-out RMSE at 340 K (from the build record) for "
         "both targets and must not grow from the first to the last third of the run; the frame "
         "observers (time-mean and final temperature, time-mean height and its range, molten "
@@ -5962,11 +5968,16 @@ class LavaLampDomainLearnerDeploy(ValidationCase):
         observers = lamp_observers.compare(
             lamp_observers.observe(lamp_observers.frames_from_emits(authored_run.hook_emits or [])),
             lamp_observers.observe(lamp_observers.frames_from_emits(deployed_run.hook_emits or [])))
+        applied, handed = shadow.get("applied") or 0, shadow.get("handed_back") or 0
         checks: Dict[str, bool] = {
             "deploy_mode": learning.get("mode") == "deploy" and
             deployed.get("parcel_response_driver") == "learned_domains",
-            "every_parcel_frame_predicted": shadow.get("untouched") == 0 and (shadow.get("applied") or 0) > 0
-            and shadow.get("applied") == shadow.get("element_steps"),
+            "trust_gate_on": shadow.get("trust_gate") == "withhold_extrapolated",
+            # Every parcel-frame is either driven by the learner or handed back by the gate.
+            "every_parcel_frame_accounted": shadow.get("untouched") == 0 and applied > 0
+            and applied + handed == shadow.get("element_steps"),
+            # The learner, not the fallback, must drive most of the lamp.
+            "learner_drives_most_parcel_frames": (shadow.get("learned_share") or 0.0) >= self.min_learned_share,
         }
         rate = shadow.get("rate_rmse") or {}
         for target in ("heating_k_per_s", "mean_vz_mm_s"):

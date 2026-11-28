@@ -147,6 +147,27 @@ void regimesEmerge() {
   const double rmse = std::sqrt(sq / static_cast<double>(truth.count));
   check(rmse < 0.1 && wrong <= 6, "held-out frozen predictions follow the laws (RMSE " + std::to_string(rmse) +
                                       ", " + std::to_string(wrong) + "/300 rows off by > 0.1)");
+  // Trust gate: rows far outside every domain are flagged extrapolating and withheld; the rest
+  // keep their predictions bit for bit.
+  {
+    DomainLearner gate = DomainLearner::fromState(state, true);
+    auto far = probe;
+    for (std::size_t i = 0; i < far.count; i += 3) far.features[i * 2] += 1e3;
+    auto gated = gate.update(far);
+    DomainLearner plain = DomainLearner::fromState(state, true);
+    const auto open = plain.update(far);
+    const std::size_t withheld = trech::ml::withholdExtrapolated(gated, 1);
+    bool keptSame = true, blanked = true;
+    for (std::size_t i = 0; i < far.count; ++i) {
+      if (gated.extrapolated[i]) blanked = blanked && std::isnan(gated.predictions[i]) && std::isnan(gated.predictionStd[i]);
+      else keptSame = keptSame && gated.predictions[i] == open.predictions[i];
+    }
+    check(withheld == open.extrapolatedCount && withheld >= far.count / 3 && gated.withheldCount == withheld,
+          "withholdExtrapolated blanks exactly the extrapolating rows (" + std::to_string(withheld) + ")");
+    check(blanked && keptSame, "withheld rows are NaN, covered rows are unchanged");
+    check(gate.exportState().at("leaves") == plain.exportState().at("leaves"),
+          "withholding predictions changes nothing in the learner");
+  }
   check(last.domains.size() <= 5, "exact regimes are not over-split (" + std::to_string(last.domains.size()) + " domains)");
 }
 

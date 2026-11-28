@@ -145,6 +145,30 @@ placeholder colour. Untouched component text keeps the recorded composition exac
 included; viz scenes written before 2026-11-26 recorded only `material` and `fraction` per
 component, so the Inspector reads the composition from the run's recorded config.
 
+**Engine diagnostics per field.** When a loaded run recorded that the engine built something
+other than what was declared, the Inspector shows it under the field it concerns, in an **Engine
+diagnostics · recorded run** section. An editable field also gets the same text as its tooltip.
+The source is the run's provenance, read verbatim: `geometry_resolution` issues and
+`config_unknown_keys`.
+
+| Engine record | Inspector node | Field |
+| --- | --- | --- |
+| `material_fallback` (volume) | that volume | **material** |
+| `material_fallback` (world / medium box) | World | **material** / **medium** |
+| `parent_fallback` | that volume | **parent** |
+| `volume_skipped` | that volume | **shape** |
+| `overlap` | both sibling volumes, or the protruding one | **position in parent** |
+| `geometry.volumes[i].<key>` never read | volume *i* (named from the recorded config) | **key** `<key>` |
+| `beam.<key>`, `beams[i].<key>` never read | that beam | **key** `<key>` |
+| `environment.<key>` never read | World | **key** `<key>` |
+
+For example, a run whose volume `sample` declared `material: "unobtanium"` and `colour: "red"`
+shows, on `sample`, *material 'unobtanium' → G4_AIR (unknown_material)* under **material** and
+*ignored by the engine (unknown key)* under **key colour**. Other ignored keys (`run.*`, …) stay
+in the run summary's *Config keys the engine ignored* section. The diagnostics describe the
+loaded run: a draft edit is not re-checked until the exported scenario runs again, and loading
+another scene clears them. The Outliner still marks the affected nodes.
+
 **Undo and redo.** **Edit ▸ Undo scene edit** (Ctrl+Z / Cmd+Z) restores the scene as it was
 before the last applied draft, and **Edit ▸ Redo scene edit** (Shift+Ctrl+Z / Shift+Cmd+Z)
 re-applies it. The menu names the edit (for example *Undo scene edit (beam proton)*). Undo also
